@@ -85,12 +85,19 @@ export function useSheets(config: SheetsConfig | null) {
     if (!config?.url) return false
     try {
       const s = stockData as any
-      // strip log entries — friends only need current product quantities
       const payload = { products: s.products ?? [], syncedDates: s.syncedDates ?? [], entries: [] }
       const data = encodeURIComponent(JSON.stringify(payload))
-      const res = await fetch(`${config.url}?action=saveStock&data=${data}`)
-      const r = await res.json()
-      return r.ok === true
+      const saveRes = await fetch(`${config.url}?action=saveStock&data=${data}`)
+      try {
+        const r = await saveRes.json()
+        if (r.ok === true) return true
+      } catch {
+        // echo endpoint may block CORS — verify via separate fetchStock GET
+        const vRes = await fetch(`${config.url}?action=fetchStock`)
+        const rv = await vRes.json()
+        return rv.ok === true && rv.data != null
+      }
+      return false
     } catch { return false }
   }, [config])
 
@@ -107,9 +114,16 @@ export function useSheets(config: SheetsConfig | null) {
     if (!config?.url) return false
     try {
       const data = encodeURIComponent(JSON.stringify(machineData))
-      const res = await fetch(`${config.url}?action=saveMachine&data=${data}`)
-      const r = await res.json()
-      return r.ok === true
+      const saveRes = await fetch(`${config.url}?action=saveMachine&data=${data}`)
+      try {
+        const r = await saveRes.json()
+        if (r.ok === true) return true
+      } catch {
+        const vRes = await fetch(`${config.url}?action=fetchMachine`)
+        const rv = await vRes.json()
+        return rv.ok === true && rv.data != null
+      }
+      return false
     } catch { return false }
   }, [config])
 
