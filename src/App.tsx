@@ -87,6 +87,15 @@ export default function App() {
     }
   }
 
+  if (syncStatus === 'syncing' && store.reports.length === 0) {
+    return (
+      <div className="fixed inset-0 flex flex-col items-center justify-center bg-white z-50">
+        <img src="/pic/luffygif.gif" alt="loading" className="w-48 h-48 object-contain" />
+        <p className="mt-4 text-brand-dark/50 text-[15px] font-medium tracking-widest">Loading...</p>
+      </div>
+    )
+  }
+
   return (
     <div className="w-full min-h-screen flex flex-col bg-white md:bg-[#f0f4fb] shadow-xl shadow-brand-blue/10 md:shadow-none">
       <Header

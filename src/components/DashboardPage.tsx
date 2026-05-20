@@ -54,8 +54,8 @@ export default function DashboardPage({ reports }: DashboardPageProps) {
     const handler = (e: MouseEvent) => {
       if (!calendarRef.current?.contains(e.target as Node)) setShowCalendar(false)
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    document.addEventListener('pointerdown', handler)
+    return () => document.removeEventListener('pointerdown', handler)
   }, [showCalendar])
 
   const currentIdx = Math.min(selectedDateIdx, reports.length - 1)
@@ -226,15 +226,16 @@ export default function DashboardPage({ reports }: DashboardPageProps) {
           const hasData = availableDates.has(dateStr)
           const isSelected = selectedReport?.date === dateStr
           return (
-            <button key={day} disabled={!hasData}
+            <button key={day}
               onClick={() => {
+                if (!hasData) return
                 const idx = reports.findIndex(r => r.date === dateStr)
                 if (idx >= 0) { setSelectedDateIdx(idx); setShowCalendar(false) }
               }}
               className={`h-9 w-full rounded-lg text-[12px] font-medium transition-all ${
                 isSelected ? 'bg-brand-blue text-white'
                 : hasData ? 'text-brand-dark hover:bg-brand-pale font-semibold'
-                : 'text-brand-dark/20 cursor-default'
+                : 'text-brand-dark/20 cursor-default select-none'
               }`}
             >{day}</button>
           )
