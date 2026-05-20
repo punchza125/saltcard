@@ -1,0 +1,93 @@
+export interface AreaRow {
+  name: string
+  salesVolume: number
+  salesAmount: number
+  cashVolume: number
+  cashAmount: number
+  mdbVolume: number
+  mdbAmount: number
+  promptVolume: number
+  promptAmount: number
+  qr30Volume: number
+  qr30Amount: number
+  alipayVolume: number
+  alipayAmount: number
+  wechatVolume: number
+  wechatAmount: number
+  vipVolume: number
+  vipAmount: number
+  mifareVolume: number
+  mifareAmount: number
+  paytmVolume: number
+  paytmAmount: number
+}
+
+export interface GoodsRow {
+  goodsNumber: string
+  goodsName: string
+  goodsType: string
+  salesVolume: number
+  salesAmount: number
+}
+
+export interface DayReport {
+  date: string          // YYYY-MM-DD
+  fileName: string
+  areas: AreaRow[]
+  routes: AreaRow[]
+  sites: AreaRow[]
+  goods: GoodsRow[]
+}
+
+export interface DashboardStore {
+  reports: DayReport[]
+}
+
+export type StockUnit = 'Box' | 'Pack' | 'Carton' | 'ชิ้น'
+
+export interface StockProduct {
+  id: string
+  name: string
+  unit: StockUnit
+  packsPerBox: number   // จำนวน pack ต่อ 1 box (0 = ไม่แปลง)
+  qty: number           // ของในมือ (pack)
+  qtyIncoming: number   // ของที่สั่งแล้วรอรับ (pack)
+  yellowAt: number      // warn threshold (pack)
+  redAt: number         // critical threshold (pack)
+  goodsKeyword: string  // keyword จับคู่ชื่อใน Goods Aspect เช่น "PRB-02"
+  category: string      // หมวดหมู่ เช่น "One Piece"
+}
+
+export type EntryKind = 'in' | 'received' | 'incoming' | 'out' | 'auto' | 'adjust'
+
+export interface StockEntry {
+  id: string
+  productId: string
+  date: string
+  delta: number       // positive = เข้า, negative = ออก (หน่วย pack เสมอ)
+  note: string
+  kind: EntryKind
+}
+
+export interface MachineSlot {
+  machineNumber: string
+  siteName: string
+  goodsNumber: string
+  goodsName: string
+  slot: string
+  capacity: number
+  inventory: number
+  status: string
+}
+
+export interface MachineReport {
+  date: string
+  fileName: string
+  slots: MachineSlot[]
+}
+
+export interface StockStore {
+  products: StockProduct[]
+  entries: StockEntry[]
+  syncedDates: string[]  // วันที่ที่ sync จากรายงานแล้ว
+}

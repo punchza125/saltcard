@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /Users/peeradon -maxdepth 4 \\\\\\( -name \"*.png\" -o -name \"*.jpg\" \\\\\\) 2>/dev/null | grep -i \"salt\" | head -10 *)",
+      "Read(//Users/peeradon/**)",
+      "Read(//Users/peeradon/Desktop/**)",
+      "Bash(convert --version)",
+      "Bash(npm run *)",
+      "Bash(python3 -c ' *)",
+      "Bash(npx tsc *)",
+      "Bash(node -e ' *)",
+      "mcp__Claude_Preview__preview_start"
+    ]
+  }
+}

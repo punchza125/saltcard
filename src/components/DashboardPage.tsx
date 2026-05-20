@@ -1,0 +1,641 @@
+import { useState, useMemo, useRef, useEffect } from 'react'
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Sector
+} from 'recharts'
+import { ChevronLeft, ChevronRight, TrendingUp, Package } from 'lucide-react'
+import type { DayReport } from '../types'
+import { formatThaiDate, formatThaiDateFull, formatBaht } from '../utils/parser'
+import StatCard from './StatCard'
+
+interface DashboardPageProps {
+  reports: DayReport[]
+}
+
+type RangeMode = 'day' | 'week' | 'month' | 'all'
+
+const TYPE_COLORS = ['#4f3dc8', '#1a52b3', '#e94560', '#f59e0b', '#10b981', '#8b5cf6', '#0ea5e9', '#14b8a6']
+const THAI_MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม']
+const THAI_DAYS = ['อา','จ','อ','พ','พฤ','ศ','ส']
+
+const RANK_STYLES = [
+  { bg: '#e94560', text: '#fff' },
+  { bg: '#94a3b8', text: '#fff' },
+  { bg: '#8b5cf6', text: '#fff' },
+]
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="bg-white border border-brand-blue/15 rounded-xl px-3 py-2 text-[12px]">
+      <p className="text-brand-dark/50 mb-1">{label}</p>
+      {payload.map((p: any, i: number) => (
+        <p key={i} style={{ color: p.color }} className="font-medium">
+          {p.name}: {typeof p.value === 'number' ? (p.name === 'ยอดขาย' ? '฿' + p.value.toLocaleString('th-TH') : p.value) : p.value}
+        </p>
+      ))}
+    </div>
+  )
+}
+
+export default function DashboardPage({ reports }: DashboardPageProps) {
+  const [rangeMode, setRangeMode] = useState<RangeMode>('day')
+  const [selectedDateIdx, setSelectedDateIdx] = useState<number>(reports.length - 1)
+  const [activeGoodsTab, setActiveGoodsTab] = useState<'amount' | 'volume'>('amount')
+  const [showCalendar, setShowCalendar] = useState(false)
+  const [activePieIndex, setActivePieIndex] = useState<number | undefined>(undefined)
+  const [calendarMonth, setCalendarMonth] = useState(() =>
+    (reports[reports.length - 1]?.date ?? new Date().toISOString().slice(0, 10)).slice(0, 7)
+  )
+  const calendarRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!showCalendar) return
+    const handler = (e: MouseEvent) => {
+      if (!calendarRef.current?.contains(e.target as Node)) setShowCalendar(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showCalendar])
+
+  const currentIdx = Math.min(selectedDateIdx, reports.length - 1)
+  const selectedReport = reports[currentIdx] as DayReport | undefined
+
+  const filteredReports = useMemo(() => {
+    if (rangeMode === 'all') return reports
+    if (rangeMode === 'day') return selectedReport ? [selectedReport] : []
+    if (!reports.length) return []
+    const last = reports[reports.length - 1]
+    const anchor = new Date(last.date)
+    anchor.setDate(anchor.getDate() - (rangeMode === 'week' ? 6 : 29))
+    const cutoff = anchor.toISOString().slice(0, 10)
+    return reports.filter(r => r.date >= cutoff)
+  }, [reports, rangeMode, selectedReport])
+
+  const stats = useMemo(() => {
+    const totalAmount = filteredReports.reduce((s, r) => s + r.areas.reduce((a, row) => a + row.salesAmount, 0), 0)
+    const totalVolume = filteredReports.reduce((s, r) => s + r.areas.reduce((a, row) => a + row.salesVolume, 0), 0)
+    const avgPerPiece = totalVolume > 0 ? Math.round(totalAmount / totalVolume) : 0
+    return { totalAmount, totalVolume, avgPerPiece }
+  }, [filteredReports])
+
+  // compare selected day vs the report immediately before it (day mode only)
+  const vsYesterday = useMemo(() => {
+    if (rangeMode !== 'day') return null
+    const anchorIdx = rangeMode === 'day' ? currentIdx : reports.length - 1
+    if (anchorIdx < 1) return null
+    const today     = reports[anchorIdx]
+    const yesterday = reports[anchorIdx - 1]
+    if (!today || !yesterday) return null
+    const todayAmt = today.areas.reduce((s, r) => s + r.salesAmount, 0)
+    const yestAmt  = yesterday.areas.reduce((s, r) => s + r.salesAmount, 0)
+    const diff = todayAmt - yestAmt
+    const pct  = yestAmt > 0 ? Math.round(Math.abs(diff) / yestAmt * 100) : 0
+    return { todayAmt, yestAmt, diff, pct, todayDate: today.date, yestDate: yesterday.date }
+  }, [reports, rangeMode, currentIdx])
+
+  // week comparison for luffy card (only in 'week' mode)
+  const weekStats = useMemo(() => {
+    if (rangeMode !== 'week' || reports.length < 2) return null
+    const sorted = [...reports].sort((a, b) => a.date.localeCompare(b.date))
+    const thisWeek = sorted.slice(-7)
+    const prevWeek = sorted.slice(-14, -7)
+    if (prevWeek.length === 0) return null
+    const thisAmt = thisWeek.reduce((s, r) => s + r.areas.reduce((a, row) => a + row.salesAmount, 0), 0)
+    const prevAmt = prevWeek.reduce((s, r) => s + r.areas.reduce((a, row) => a + row.salesAmount, 0), 0)
+    const diff = thisAmt - prevAmt
+    const pct  = prevAmt > 0 ? Math.round(Math.abs(diff) / prevAmt * 100) : null
+    const best = thisWeek.reduce((a, b) => {
+      const aAmt = a.areas.reduce((s, r) => s + r.salesAmount, 0)
+      const bAmt = b.areas.reduce((s, r) => s + r.salesAmount, 0)
+      return bAmt > aAmt ? b : a
+    })
+    return { thisAmt, prevAmt, diff, pct, bestDate: best.date }
+  }, [reports, rangeMode])
+
+  // month comparison for naruto card (only in 'month' mode)
+  const monthStats = useMemo(() => {
+    if (rangeMode !== 'month' || reports.length < 2) return null
+    const sorted = [...reports].sort((a, b) => a.date.localeCompare(b.date))
+    const thisMonth = sorted.slice(-30)
+    const prevMonth = sorted.slice(-60, -30)
+    const thisAmt = thisMonth.reduce((s, r) => s + r.areas.reduce((a, row) => a + row.salesAmount, 0), 0)
+    const prevAmt = prevMonth.reduce((s, r) => s + r.areas.reduce((a, row) => a + row.salesAmount, 0), 0)
+    const diff = thisAmt - prevAmt
+    const pct  = prevAmt > 0 ? Math.round(Math.abs(diff) / prevAmt * 100) : null
+    const avgDay = thisMonth.length > 0 ? Math.round(thisAmt / thisMonth.length) : 0
+    const wins = thisMonth.slice(1).filter((r, i) => {
+      const cur  = r.areas.reduce((s, row) => s + row.salesAmount, 0)
+      const prev = thisMonth[i].areas.reduce((s, row) => s + row.salesAmount, 0)
+      return cur > prev
+    }).length
+    return { thisAmt, prevAmt, diff, pct, avgDay, wins, days: thisMonth.length }
+  }, [reports, rangeMode])
+
+  // all-time stats for pikachu card (only in 'all' mode)
+  const allTimeStats = useMemo(() => {
+    if (rangeMode !== 'all' || reports.length < 2) return null
+    const dailyAmts = reports.map(r => ({
+      date: r.date,
+      amount: r.areas.reduce((s, row) => s + row.salesAmount, 0),
+    }))
+    const best = dailyAmts.reduce((a, b) => b.amount > a.amount ? b : a)
+    // current winning streak from the end
+    let streak = 0
+    for (let i = dailyAmts.length - 1; i >= 1; i--) {
+      if (dailyAmts[i].amount > dailyAmts[i - 1].amount) streak++
+      else break
+    }
+    const winsTotal = dailyAmts.slice(1).filter((d, i) => d.amount > dailyAmts[i].amount).length
+    return { best, streak, winsTotal, total: dailyAmts.length - 1 }
+  }, [reports, rangeMode])
+
+  const availableDates = useMemo(() => new Set(reports.map(r => r.date)), [reports])
+
+  const calYear = parseInt(calendarMonth.slice(0, 4))
+  const calMonthNum = parseInt(calendarMonth.slice(5, 7))
+  const calFirstDay = new Date(calYear, calMonthNum - 1, 1).getDay()
+  const calDaysInMonth = new Date(calYear, calMonthNum, 0).getDate()
+
+  function shiftCalMonth(delta: number) {
+    const d = new Date(calYear, calMonthNum - 1 + delta, 1)
+    setCalendarMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
+  }
+
+  const trendData = useMemo(() =>
+    reports.map(r => ({
+      date: formatThaiDate(r.date),
+      ยอดขาย: r.areas.reduce((s, a) => s + a.salesAmount, 0),
+    })), [reports])
+
+  const goodsData = useMemo(() => {
+    const map = new Map<string, { name: string; volume: number; amount: number }>()
+    filteredReports.forEach(r => {
+      r.goods.forEach(g => {
+        const ex = map.get(g.goodsName)
+        if (ex) { ex.volume += g.salesVolume; ex.amount += g.salesAmount }
+        else map.set(g.goodsName, { name: g.goodsName, volume: g.salesVolume, amount: g.salesAmount })
+      })
+    })
+    return Array.from(map.values()).sort((a, b) => activeGoodsTab === 'amount' ? b.amount - a.amount : b.volume - a.volume)
+  }, [filteredReports, activeGoodsTab])
+
+  const goodsTypeData = useMemo(() => {
+    const map = new Map<string, { name: string; value: number }>()
+    filteredReports.forEach(r => {
+      r.goods.forEach(g => {
+        const ex = map.get(g.goodsType)
+        if (ex) ex.value += g.salesVolume
+        else map.set(g.goodsType, { name: g.goodsType, value: g.salesVolume })
+      })
+    })
+    return Array.from(map.values()).sort((a, b) => b.value - a.value)
+  }, [filteredReports])
+
+  const sitesData = useMemo(() => {
+    const map = new Map<string, { name: string; amount: number; volume: number }>()
+    filteredReports.forEach(r => {
+      r.sites.forEach(s => {
+        const ex = map.get(s.name)
+        if (ex) { ex.amount += s.salesAmount; ex.volume += s.salesVolume }
+        else map.set(s.name, { name: s.name, amount: s.salesAmount, volume: s.salesVolume })
+      })
+    })
+    return Array.from(map.values()).sort((a, b) => b.amount - a.amount)
+  }, [filteredReports])
+
+  // Shared calendar popup JSX
+  const calendarPopup = showCalendar && (
+    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-brand-blue/15 rounded-2xl shadow-lg shadow-brand-blue/10 p-3">
+      <div className="flex items-center justify-between mb-2">
+        <button onClick={() => shiftCalMonth(-1)} className="w-8 h-8 rounded-full hover:bg-brand-pale flex items-center justify-center transition-colors">
+          <ChevronLeft size={14} className="text-brand-blue" />
+        </button>
+        <p className="text-brand-dark font-medium text-[13px]">{THAI_MONTHS[calMonthNum - 1]} {calYear + 543}</p>
+        <button onClick={() => shiftCalMonth(1)} className="w-8 h-8 rounded-full hover:bg-brand-pale flex items-center justify-center transition-colors">
+          <ChevronRight size={14} className="text-brand-blue" />
+        </button>
+      </div>
+      <div className="grid grid-cols-7 mb-1">
+        {THAI_DAYS.map(d => <div key={d} className="text-center text-[10px] text-brand-dark/30 py-1">{d}</div>)}
+      </div>
+      <div className="grid grid-cols-7 gap-y-1">
+        {Array.from({ length: calFirstDay }).map((_, i) => <div key={`e${i}`} />)}
+        {Array.from({ length: calDaysInMonth }, (_, i) => i + 1).map(day => {
+          const dateStr = `${calYear}-${String(calMonthNum).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+          const hasData = availableDates.has(dateStr)
+          const isSelected = selectedReport?.date === dateStr
+          return (
+            <button key={day} disabled={!hasData}
+              onClick={() => {
+                const idx = reports.findIndex(r => r.date === dateStr)
+                if (idx >= 0) { setSelectedDateIdx(idx); setShowCalendar(false) }
+              }}
+              className={`h-9 w-full rounded-lg text-[12px] font-medium transition-all ${
+                isSelected ? 'bg-brand-blue text-white'
+                : hasData ? 'text-brand-dark hover:bg-brand-pale font-semibold'
+                : 'text-brand-dark/20 cursor-default'
+              }`}
+            >{day}</button>
+          )
+        })}
+      </div>
+    </div>
+  )
+
+  if (reports.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] px-8 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-brand-pale/60 flex items-center justify-center mb-4">
+          <TrendingUp size={28} className="text-brand-dark/30" />
+        </div>
+        <p className="text-brand-dark/50 text-[15px] font-medium">ยังไม่มีข้อมูล</p>
+        <p className="text-brand-dark/30 text-[13px] mt-1">ไปที่แท็บ "จัดการไฟล์" เพื่ออัปโหลด MultiReport</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="pb-10 md:pb-12">
+
+      {/* ── Controls row ─────────────────────────────── */}
+      <div className="px-4 md:px-6 pt-4 pb-3 flex flex-col md:flex-row md:items-center gap-3">
+        {/* Range selector */}
+        <div className="md:w-72 flex-shrink-0">
+          <div className="flex bg-brand-pale/60 rounded-xl p-1 gap-1">
+            {([['day','วันที่เลือก'],['week','7 วัน'],['month','30 วัน'],['all','ทั้งหมด']] as [RangeMode,string][]).map(([k, label]) => (
+              <button key={k} onClick={() => setRangeMode(k)}
+                className={`flex-1 text-[12px] font-medium py-2.5 rounded-lg transition-all ${
+                  rangeMode === k ? 'bg-brand-blue text-white' : 'text-brand-dark/50 hover:text-brand-dark'
+                }`}>{label}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Day navigator */}
+        {rangeMode === 'day' && (
+          <div ref={calendarRef} className="relative flex-1 md:flex-none">
+            <div className="flex items-center gap-1 bg-brand-pale/60 rounded-xl p-1">
+              <button onClick={() => setSelectedDateIdx(i => Math.max(0, i - 1))} disabled={currentIdx === 0}
+                className="w-10 h-10 rounded-lg bg-white/70 flex items-center justify-center disabled:opacity-30 hover:bg-white transition-colors flex-shrink-0 shadow-sm">
+                <ChevronLeft size={16} className="text-brand-blue" />
+              </button>
+              <button className="flex-1 md:w-56 text-center py-2 px-3 rounded-lg hover:bg-white/70 transition-colors"
+                onClick={() => setShowCalendar(v => !v)}>
+                <p className="text-brand-dark font-medium text-[14px] whitespace-nowrap">
+                  {selectedReport ? formatThaiDateFull(selectedReport.date) : '-'}
+                </p>
+              </button>
+              <button onClick={() => setSelectedDateIdx(i => Math.min(reports.length - 1, i + 1))} disabled={currentIdx === reports.length - 1}
+                className="w-10 h-10 rounded-lg bg-white/70 flex items-center justify-center disabled:opacity-30 hover:bg-white transition-colors flex-shrink-0 shadow-sm">
+                <ChevronRight size={16} className="text-brand-blue" />
+              </button>
+            </div>
+            {calendarPopup}
+          </div>
+        )}
+
+        {rangeMode !== 'day' && (
+          <p className="text-brand-dark/40 text-[12px]">
+            {filteredReports.length} วัน · {filteredReports[0] ? formatThaiDate(filteredReports[0].date) : ''} – {filteredReports[filteredReports.length-1] ? formatThaiDate(filteredReports[filteredReports.length-1].date) : ''}
+          </p>
+        )}
+      </div>
+
+      {/* ── Stat cards: 2 cols mobile → 4 cols desktop ─ */}
+      <div className="px-4 md:px-6 grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <StatCard label="ยอดขายรวม" value={`฿${formatBaht(stats.totalAmount)}`} sub={`${filteredReports.length} วัน`} accent icon={<TrendingUp size={12} />} delay={0} />
+        <StatCard label="จำนวนชิ้น" value={`${stats.totalVolume.toLocaleString()}`} sub={`เฉลี่ย ฿${formatBaht(stats.avgPerPiece)}/ชิ้น`} icon={<Package size={12} />} delay={50} />
+
+        {/* Luffy — 7-day comparison card */}
+        {weekStats && (() => {
+          const good = weekStats.diff >= 0
+          return (
+            <div
+              className={`col-span-2 rounded-2xl overflow-hidden flex items-stretch border ${
+                good ? 'bg-gradient-to-br from-blue-50 to-sky-50 border-blue-200'
+                      : 'bg-gradient-to-br from-slate-50 to-blue-50 border-slate-200'
+              }`}
+              style={{ animation: 'fadeUp 0.4s ease both', animationDelay: '100ms', minHeight: '96px' }}
+            >
+              <div className="flex-1 px-4 py-3 flex flex-col justify-center gap-0.5 z-10">
+                <p className={`text-[11px] font-bold uppercase tracking-wide ${good ? 'text-blue-600' : 'text-slate-500'}`}>
+                  ⚔️ สัปดาห์นี้ {good ? 'ชนะ' : 'แพ้'} สัปดาห์ก่อน
+                </p>
+                <p className={`text-[22px] font-bold leading-tight ${good ? 'text-blue-700' : 'text-slate-600'}`}>
+                  {good ? '+' : '-'}฿{formatBaht(Math.abs(weekStats.diff))}
+                </p>
+                <div className="flex items-center gap-3 mt-0.5">
+                  <span className="text-[11px] text-brand-dark/50">สัปดาห์นี้ ฿{formatBaht(weekStats.thisAmt)}</span>
+                  <span className="text-[11px] text-brand-dark/30">ก่อน ฿{formatBaht(weekStats.prevAmt)}</span>
+                </div>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className={`text-[11px] font-medium ${good ? 'text-blue-500' : 'text-slate-400'}`}>
+                    {weekStats.pct !== null ? `${good ? '▲' : '▼'} ${weekStats.pct}%` : '✨ ใหม่'}
+                  </span>
+                  <span className="text-[11px] text-brand-dark/30">· วันสูงสุด {formatThaiDate(weekStats.bestDate)}</span>
+                </div>
+              </div>
+              <div className="relative w-28 flex-shrink-0 self-stretch">
+                <img src="/pic/luffy.png" alt="luffy"
+                  className="absolute bottom-0 right-0 h-full w-full object-contain object-bottom" />
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Naruto — 30-day comparison card */}
+        {monthStats && (() => {
+          const good = monthStats.diff >= 0
+          return (
+            <div
+              className={`col-span-2 rounded-2xl overflow-hidden flex items-stretch border ${
+                good ? 'bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200'
+                      : 'bg-gradient-to-br from-stone-50 to-orange-50 border-stone-200'
+              }`}
+              style={{ animation: 'fadeUp 0.4s ease both', animationDelay: '100ms', minHeight: '96px' }}
+            >
+              <div className="flex-1 px-4 py-3 flex flex-col justify-center gap-0.5 z-10">
+                <p className={`text-[11px] font-bold uppercase tracking-wide ${good ? 'text-orange-600' : 'text-stone-500'}`}>
+                  🍥 30 วันนี้ {good ? 'ดีกว่า' : 'น้อยกว่า'} 30 วันก่อน
+                </p>
+                <p className={`text-[22px] font-bold leading-tight ${good ? 'text-orange-700' : 'text-stone-600'}`}>
+                  {good ? '+' : '-'}฿{formatBaht(Math.abs(monthStats.diff))}
+                </p>
+                <div className="flex items-center gap-3 mt-0.5">
+                  <span className="text-[11px] text-brand-dark/50">เฉลี่ย ฿{formatBaht(monthStats.avgDay)}/วัน</span>
+                  <span className="text-[11px] text-brand-dark/30">ชนะ {monthStats.wins}/{monthStats.days - 1} วัน</span>
+                </div>
+                <span className={`text-[11px] font-medium mt-0.5 ${good ? 'text-orange-500' : 'text-stone-400'}`}>
+                  {monthStats.pct !== null ? `${good ? '▲' : '▼'} ${monthStats.pct}%` : '✨ ใหม่'}
+                </span>
+              </div>
+              <div className="relative w-28 flex-shrink-0 self-stretch">
+                <img src="/pic/naruto.png" alt="naruto"
+                  className="absolute bottom-0 right-0 h-full w-full object-contain object-bottom" />
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Pikachu all-time stats card (all mode) */}
+        {allTimeStats ? (
+          <div
+            className="col-span-2 rounded-2xl overflow-hidden flex items-stretch border border-yellow-300 bg-gradient-to-br from-yellow-50 to-amber-50"
+            style={{ animation: 'fadeUp 0.4s ease both', animationDelay: '100ms', minHeight: '96px' }}
+          >
+            <div className="flex-1 px-4 py-3 flex flex-col justify-center gap-1 z-10">
+              {/* best day */}
+              <div className="flex items-baseline gap-2">
+                <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wide">🏆 สถิติสูงสุด</span>
+                <span className="text-[11px] text-brand-dark/40">{formatThaiDate(allTimeStats.best.date)}</span>
+              </div>
+              <p className="text-[22px] font-bold text-amber-600 leading-tight">
+                ฿{formatBaht(allTimeStats.best.amount)}
+              </p>
+              {/* win rate + streak */}
+              <div className="flex items-center gap-3 mt-0.5">
+                <span className="text-[11px] text-brand-dark/50">
+                  ชนะ {allTimeStats.winsTotal}/{allTimeStats.total} วัน
+                </span>
+                {allTimeStats.streak > 0 && (
+                  <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-full ${
+                    allTimeStats.streak >= 3
+                      ? 'bg-amber-400 text-white'
+                      : 'bg-amber-100 text-amber-600'
+                  }`}>
+                    🔥 streak {allTimeStats.streak} วัน
+                  </span>
+                )}
+              </div>
+            </div>
+            {/* pikachu */}
+            <div className="relative w-28 flex-shrink-0 self-stretch">
+              <img
+                src="/pic/pikachu.png"
+                alt="pikachu"
+                className="absolute bottom-0 right-0 h-full w-full object-contain object-bottom"
+              />
+            </div>
+          </div>
+        ) : vsYesterday ? (() => {
+          const good = vsYesterday.diff >= 0
+          return (
+            <div
+              className={`col-span-2 rounded-2xl overflow-hidden flex items-stretch relative border transition-all duration-500 ${
+                good ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'
+              }`}
+              style={{ animation: 'fadeUp 0.4s ease both', animationDelay: '100ms', minHeight: '96px' }}
+            >
+              <div className="flex-1 px-4 py-3 flex flex-col justify-center gap-0.5 z-10">
+                <p className={`text-[11px] font-semibold uppercase tracking-wide ${good ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {good ? 'ยอดดีกว่าวันก่อน' : 'ยอดน้อยกว่าวันก่อน'}
+                </p>
+                <p className={`text-[22px] font-bold leading-tight ${good ? 'text-emerald-700' : 'text-red-600'}`}>
+                  {good ? '+' : '-'}฿{formatBaht(Math.abs(vsYesterday.diff))}
+                </p>
+                <div className="flex items-center gap-3 mt-0.5">
+                  <span className="text-[11px] text-brand-dark/50">
+                    {formatThaiDate(vsYesterday.todayDate)} ฿{formatBaht(vsYesterday.todayAmt)}
+                  </span>
+                  <span className="text-[11px] text-brand-dark/30">
+                    {formatThaiDate(vsYesterday.yestDate)} ฿{formatBaht(vsYesterday.yestAmt)}
+                  </span>
+                </div>
+                <p className={`text-[11px] font-medium mt-0.5 ${good ? 'text-emerald-500' : 'text-red-400'}`}>
+                  {good ? '▲' : '▼'} {vsYesterday.pct}%
+                </p>
+              </div>
+              <div className="relative w-28 flex-shrink-0 self-stretch">
+                <img
+                  src={good ? '/pic/goodnami.jpeg' : '/pic/badnami.png'}
+                  alt={good ? 'goodnami' : 'badnami'}
+                  className="absolute bottom-0 right-0 h-full w-full object-contain object-bottom"
+                />
+              </div>
+            </div>
+          )
+        })() : (
+          rangeMode === 'day' ? (
+            <div className="col-span-2 rounded-2xl bg-brand-pale/40 border border-brand-blue/10 flex items-center justify-center px-4 py-3" style={{ minHeight: '96px' }}>
+              <p className="text-[12px] text-brand-dark/30">ต้องมีข้อมูลอย่างน้อย 2 วันเพื่อเปรียบเทียบ</p>
+            </div>
+          ) : null
+        )}
+      </div>
+
+      {/* ── Main content: stacked mobile → 2-col desktop ─ */}
+      <div className="md:px-6 md:grid md:grid-cols-3 md:gap-5 md:items-start">
+
+        {/* Left column (2/3) */}
+        <div className="md:col-span-2 space-y-4">
+
+          {/* Trend chart */}
+          {reports.length > 1 && (
+            <div className="px-4 md:px-0">
+              <div className="bg-white border border-brand-blue/10 rounded-2xl p-4 card-hover">
+                <p className="text-brand-dark/60 text-[12px] font-medium mb-3">ยอดขายรายวัน</p>
+                <ResponsiveContainer width="100%" height={180}>
+                  <AreaChart data={trendData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="grad1" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#1a52b3" stopOpacity={0.2} />
+                        <stop offset="95%" stopColor="#1a52b3" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(26,82,179,0.08)" />
+                    <XAxis dataKey="date" tick={{ fill: 'rgba(13,27,62,0.4)', fontSize: 10 }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fill: 'rgba(13,27,62,0.4)', fontSize: 10 }} tickLine={false} axisLine={false}
+                      tickFormatter={v => v >= 1000 ? `${Math.round(v/1000)}K` : String(v)} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Area type="monotone" dataKey="ยอดขาย" stroke="#1a52b3" strokeWidth={2} fill="url(#grad1)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          {/* Goods ranking */}
+          {goodsData.length > 0 && (
+            <div className="px-4 md:px-0">
+              <div className="bg-white border border-brand-blue/10 rounded-2xl p-4 card-hover">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-brand-dark/60 text-[12px] font-medium">สินค้าขายดี</p>
+                  <div className="flex bg-brand-pale rounded-lg p-0.5 gap-0.5">
+                    {([['amount','ยอด'],['volume','ชิ้น']] as ['amount'|'volume',string][]).map(([k, label]) => (
+                      <button key={k} onClick={() => setActiveGoodsTab(k)}
+                        className={`text-[11px] px-3 py-1 rounded-md transition-all ${activeGoodsTab === k ? 'bg-brand-blue text-white' : 'text-brand-dark/50'}`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-3 md:max-h-96 md:overflow-y-auto md:pr-1">
+                  {goodsData.map((g, i) => {
+                    const pct = goodsData[0] ? (activeGoodsTab === 'amount' ? g.amount / goodsData[0].amount : g.volume / goodsData[0].volume) * 100 : 0
+                    return (
+                      <div key={g.name} className="flex items-center gap-3 row-hover px-2 py-1 -mx-2">
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold flex-shrink-0"
+                          style={RANK_STYLES[i]
+                            ? { backgroundColor: RANK_STYLES[i].bg, color: RANK_STYLES[i].text }
+                            : { backgroundColor: '#e8f0fc', color: 'rgba(13,27,62,0.5)' }}>
+                          {i + 1}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="text-brand-dark text-[12px] font-medium truncate pr-2">{g.name}</p>
+                            <p className="text-brand-dark/70 text-[12px] font-medium flex-shrink-0">
+                              {activeGoodsTab === 'amount' ? `฿${formatBaht(g.amount)}` : `${g.volume} ชิ้น`}
+                            </p>
+                          </div>
+                          <div className="h-1.5 bg-brand-pale rounded-full overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-500"
+                              style={{ width: `${pct}%`, backgroundColor: RANK_STYLES[i]?.bg ?? '#1a52b3', opacity: i >= 3 ? 0.5 : 1 }} />
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right column (1/3) */}
+        <div className="space-y-4 mt-4 md:mt-0">
+
+          {/* Goods by type pie chart */}
+          {goodsTypeData.length > 0 && (() => {
+            const total = goodsTypeData.reduce((s, x) => s + x.value, 0)
+            return (
+              <div className="px-4 md:px-0">
+                <div className="bg-white border border-brand-blue/10 rounded-2xl p-4 card-hover">
+                  <p className="text-brand-dark/60 text-[12px] font-medium mb-2">สินค้าตามประเภท</p>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie
+                        data={goodsTypeData}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        dataKey="value"
+                        stroke="#fff"
+                        strokeWidth={2}
+                        activeIndex={activePieIndex}
+                        activeShape={(props: any) => {
+                          const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props
+                          return <Sector cx={cx} cy={cy} innerRadius={innerRadius} outerRadius={outerRadius + 10} startAngle={startAngle} endAngle={endAngle} fill={fill} />
+                        }}
+                        onMouseEnter={(_, i) => setActivePieIndex(i)}
+                        onMouseLeave={() => setActivePieIndex(undefined)}
+                      >
+                        {goodsTypeData.map((_, i) => (
+                          <Cell key={i} fill={TYPE_COLORS[i % TYPE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value: number, name: string) => [
+                          `${value} ชิ้น (${total > 0 ? (value / total * 100).toFixed(2) : 0}%)`,
+                          name,
+                        ]}
+                        contentStyle={{
+                          borderRadius: '12px',
+                          border: '1px solid rgba(26,82,179,0.12)',
+                          fontSize: '12px',
+                          boxShadow: '0 4px 16px rgba(26,82,179,0.1)',
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="mt-3 space-y-2">
+                    {goodsTypeData.map((d, i) => (
+                      <div key={d.name} className="flex items-center justify-between row-hover px-2 py-1 -mx-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: TYPE_COLORS[i % TYPE_COLORS.length] }} />
+                          <span className="text-brand-dark/70 text-[12px]">{d.name}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-brand-dark/30 text-[11px]">{total > 0 ? (d.value / total * 100).toFixed(1) : 0}%</span>
+                          <span className="text-brand-dark font-medium text-[12px] w-14 text-right">{d.value} ชิ้น</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Sites */}
+          {sitesData.length > 0 && (
+            <div className="px-4 md:px-0">
+              <div className="bg-white border border-brand-blue/10 rounded-2xl p-4 card-hover">
+                <p className="text-brand-dark/60 text-[12px] font-medium mb-3">ยอดขายตามสาขา</p>
+                <div className="space-y-3">
+                  {sitesData.map(s => {
+                    const pct = sitesData[0].amount > 0 ? (s.amount / sitesData[0].amount) * 100 : 0
+                    return (
+                      <div key={s.name} className="row-hover px-2 py-1 -mx-2">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-brand-dark text-[13px] font-medium">{s.name}</p>
+                          <p className="text-brand-dark/70 text-[12px]">฿{formatBaht(s.amount)}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-1.5 bg-brand-pale rounded-full overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: '#10b981' }} />
+                          </div>
+                          <span className="text-brand-dark/40 text-[11px] w-10 text-right">{s.volume} ชิ้น</span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
