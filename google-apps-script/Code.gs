@@ -231,6 +231,21 @@ function saveRowFromGet(params) {
 function doPost(e) {
   try {
     initSheets()
+
+    // ── blob actions (saveStock / saveMachine) ──
+    const blobAction = e.parameter && e.parameter.action
+    if (blobAction === 'saveStock' || blobAction === 'saveMachine') {
+      let data = (e.parameter && e.parameter.data) || null
+      if (!data && e.postData && e.postData.contents) {
+        const match = e.postData.contents.match(/(?:^|&)data=([^&]*)/)
+        data = match ? decodeURIComponent(match[1].replace(/\+/g, ' ')) : null
+      }
+      if (!data) return errorResponse('missing data')
+      const sheetName = blobAction === 'saveMachine' ? SHEET_NAMES.MACHINE : SHEET_NAMES.STOCK
+      saveBlob(sheetName, data)
+      return jsonResponse({ saved: blobAction === 'saveMachine' ? 'machine' : 'stock' })
+    }
+
     let raw
     if (e.parameter && e.parameter.data) {
       raw = e.parameter.data

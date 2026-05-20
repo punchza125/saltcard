@@ -84,8 +84,12 @@ export function useSheets(config: SheetsConfig | null) {
   const pushStock = useCallback(async (stockData: object): Promise<boolean> => {
     if (!config?.url) return false
     try {
-      const data = encodeURIComponent(JSON.stringify(stockData))
-      const res = await fetch(`${config.url}?action=saveStock&data=${data}`)
+      const body = `action=saveStock&data=${encodeURIComponent(JSON.stringify(stockData))}`
+      const res = await fetch(config.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+      })
       const r = await res.json()
       return r.ok === true
     } catch { return false }
@@ -103,8 +107,12 @@ export function useSheets(config: SheetsConfig | null) {
   const pushMachine = useCallback(async (machineData: object): Promise<boolean> => {
     if (!config?.url) return false
     try {
-      const data = encodeURIComponent(JSON.stringify(machineData))
-      const res = await fetch(`${config.url}?action=saveMachine&data=${data}`)
+      const body = `action=saveMachine&data=${encodeURIComponent(JSON.stringify(machineData))}`
+      const res = await fetch(config.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+      })
       const r = await res.json()
       return r.ok === true
     } catch { return false }
