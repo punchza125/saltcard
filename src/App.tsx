@@ -23,15 +23,25 @@ export default function App() {
   const sheetsConfig = sheetsUrl ? { url: sheetsUrl } : null
   const { syncStatus, syncMessage, lastSynced, pushReport, fetchAll } = useSheets(sheetsConfig)
 
-  // auto-fetch เมื่อเปิดแอปครั้งแรกถ้ามี Sheets URL และยังไม่มีข้อมูล
+  // ถ้ามี ENV_SHEETS_URL (deployed version) → โหลดจาก Sheets ทุกครั้งที่เปิดแอป
+  // ถ้าไม่มี (local dev) → โหลดเฉพาะตอนยังไม่มีข้อมูล
   const didAutoFetch = useRef(false)
   useEffect(() => {
-    if (didAutoFetch.current) return
-    if (!sheetsUrl || store.reports.length > 0) return
+    if (didAutoFetch.current || !sheetsUrl) return
     didAutoFetch.current = true
-    fetchAll().then(reports => {
-      if (reports?.length) reports.forEach(addReport)
-    })
+    if (ENV_SHEETS_URL) {
+      // always fetch latest from Sheets — replace local data
+      fetchAll().then(fresh => {
+        if (fresh?.length) {
+          clearAll()
+          fresh.forEach(addReport)
+        }
+      })
+    } else if (store.reports.length === 0) {
+      fetchAll().then(reports => {
+        if (reports?.length) reports.forEach(addReport)
+      })
+    }
   }, [sheetsUrl])
 
   const prevCount = useRef(store.reports.length)
