@@ -83,21 +83,18 @@ export function useSheets(config: SheetsConfig | null) {
 
   const pushStock = useCallback(async (stockData: object): Promise<boolean> => {
     if (!config?.url) return false
+    const s = stockData as any
+    const payload = { products: s.products ?? [], syncedDates: s.syncedDates ?? [], entries: [] }
     try {
-      const s = stockData as any
-      const payload = { products: s.products ?? [], syncedDates: s.syncedDates ?? [], entries: [] }
-      const data = encodeURIComponent(JSON.stringify(payload))
-      const saveRes = await fetch(`${config.url}?action=saveStock&data=${data}`)
-      try {
-        const r = await saveRes.json()
-        if (r.ok === true) return true
-      } catch {
-        // echo endpoint may block CORS — verify via separate fetchStock GET
-        const vRes = await fetch(`${config.url}?action=fetchStock`)
-        const rv = await vRes.json()
-        return rv.ok === true && rv.data != null
-      }
-      return false
+      await fetch(`${config.url}?action=saveStock`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      })
+    } catch {}
+    try {
+      const vRes = await fetch(`${config.url}?action=fetchStock`)
+      const rv = await vRes.json()
+      return rv.ok === true && rv.data != null
     } catch { return false }
   }, [config])
 
@@ -113,17 +110,15 @@ export function useSheets(config: SheetsConfig | null) {
   const pushMachine = useCallback(async (machineData: object): Promise<boolean> => {
     if (!config?.url) return false
     try {
-      const data = encodeURIComponent(JSON.stringify(machineData))
-      const saveRes = await fetch(`${config.url}?action=saveMachine&data=${data}`)
-      try {
-        const r = await saveRes.json()
-        if (r.ok === true) return true
-      } catch {
-        const vRes = await fetch(`${config.url}?action=fetchMachine`)
-        const rv = await vRes.json()
-        return rv.ok === true && rv.data != null
-      }
-      return false
+      await fetch(`${config.url}?action=saveMachine`, {
+        method: 'POST',
+        body: JSON.stringify(machineData),
+      })
+    } catch {}
+    try {
+      const vRes = await fetch(`${config.url}?action=fetchMachine`)
+      const rv = await vRes.json()
+      return rv.ok === true && rv.data != null
     } catch { return false }
   }, [config])
 

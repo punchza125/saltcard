@@ -21,7 +21,7 @@ export default function App() {
   const [sheetsMachine, setSheetsMachine] = useState<MachineReport | null>(null)
   // env URL เป็น default — ผู้ใช้ยังเปลี่ยนได้จาก SheetsConfigModal
   const [sheetsUrl, setSheetsUrl] = useState(
-    () => localStorage.getItem(SHEETS_URL_KEY) ?? ENV_SHEETS_URL ?? ''
+    () => ENV_SHEETS_URL ?? localStorage.getItem(SHEETS_URL_KEY) ?? ''
   )
 
   const sheetsConfig = sheetsUrl ? { url: sheetsUrl } : null
