@@ -84,15 +84,13 @@ export function useSheets(config: SheetsConfig | null) {
   const pushStock = useCallback(async (stockData: object): Promise<boolean> => {
     if (!config?.url) return false
     try {
-      await fetch(`${config.url}?action=saveStock`, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(stockData),
-      })
-      const res = await fetch(`${config.url}?action=fetchStock`)
+      const s = stockData as any
+      // strip log entries — friends only need current product quantities
+      const payload = { products: s.products ?? [], syncedDates: s.syncedDates ?? [], entries: [] }
+      const data = encodeURIComponent(JSON.stringify(payload))
+      const res = await fetch(`${config.url}?action=saveStock&data=${data}`)
       const r = await res.json()
-      return r.ok === true && r.data != null
+      return r.ok === true
     } catch { return false }
   }, [config])
 
@@ -108,15 +106,10 @@ export function useSheets(config: SheetsConfig | null) {
   const pushMachine = useCallback(async (machineData: object): Promise<boolean> => {
     if (!config?.url) return false
     try {
-      await fetch(`${config.url}?action=saveMachine`, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(machineData),
-      })
-      const res = await fetch(`${config.url}?action=fetchMachine`)
+      const data = encodeURIComponent(JSON.stringify(machineData))
+      const res = await fetch(`${config.url}?action=saveMachine&data=${data}`)
       const r = await res.json()
-      return r.ok === true && r.data != null
+      return r.ok === true
     } catch { return false }
   }, [config])
 
