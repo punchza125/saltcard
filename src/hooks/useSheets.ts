@@ -84,14 +84,15 @@ export function useSheets(config: SheetsConfig | null) {
   const pushStock = useCallback(async (stockData: object): Promise<boolean> => {
     if (!config?.url) return false
     try {
-      const body = `action=saveStock&data=${encodeURIComponent(JSON.stringify(stockData))}`
-      const res = await fetch(config.url, {
+      await fetch(`${config.url}?action=saveStock`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body,
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(stockData),
       })
+      const res = await fetch(`${config.url}?action=fetchStock`)
       const r = await res.json()
-      return r.ok === true
+      return r.ok === true && r.data != null
     } catch { return false }
   }, [config])
 
@@ -107,14 +108,15 @@ export function useSheets(config: SheetsConfig | null) {
   const pushMachine = useCallback(async (machineData: object): Promise<boolean> => {
     if (!config?.url) return false
     try {
-      const body = `action=saveMachine&data=${encodeURIComponent(JSON.stringify(machineData))}`
-      const res = await fetch(config.url, {
+      await fetch(`${config.url}?action=saveMachine`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body,
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(machineData),
       })
+      const res = await fetch(`${config.url}?action=fetchMachine`)
       const r = await res.json()
-      return r.ok === true
+      return r.ok === true && r.data != null
     } catch { return false }
   }, [config])
 

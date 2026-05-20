@@ -232,14 +232,10 @@ function doPost(e) {
   try {
     initSheets()
 
-    // ── blob actions (saveStock / saveMachine) ──
+    // ── blob actions (saveStock / saveMachine) — body is raw JSON ──
     const blobAction = e.parameter && e.parameter.action
     if (blobAction === 'saveStock' || blobAction === 'saveMachine') {
-      let data = (e.parameter && e.parameter.data) || null
-      if (!data && e.postData && e.postData.contents) {
-        const match = e.postData.contents.match(/(?:^|&)data=([^&]*)/)
-        data = match ? decodeURIComponent(match[1].replace(/\+/g, ' ')) : null
-      }
+      const data = e.postData && e.postData.contents ? e.postData.contents : null
       if (!data) return errorResponse('missing data')
       const sheetName = blobAction === 'saveMachine' ? SHEET_NAMES.MACHINE : SHEET_NAMES.STOCK
       saveBlob(sheetName, data)
