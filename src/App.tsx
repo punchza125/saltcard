@@ -15,7 +15,7 @@ const ENV_SHEETS_URL = import.meta.env.VITE_SHEETS_URL as string | undefined
 
 export default function App() {
   const { store, addReport, removeReport, clearAll } = useStore()
-  const { stock, replaceAll: replaceStock } = useStockStore()
+  const { replaceAll: replaceStock } = useStockStore()
   const [activeTab, setActiveTab] = useState<'dashboard' | 'upload' | 'stock' | 'machine'>('dashboard')
   const [showSheetsConfig, setShowSheetsConfig] = useState(false)
   const [sheetsMachine, setSheetsMachine] = useState<MachineReport | null>(null)
@@ -56,8 +56,8 @@ export default function App() {
     }
   }, [sheetsUrl])
 
-  async function handlePushStock(): Promise<boolean> {
-    return pushStock(stock)
+  async function handlePushStock(currentStock: object): Promise<boolean> {
+    return pushStock(currentStock)
   }
 
   async function handlePushMachine(r: MachineReport): Promise<boolean> {

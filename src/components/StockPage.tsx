@@ -944,7 +944,7 @@ function ProductRow({
 interface StockPageProps {
   reports: DayReport[]
   sheetsUrl?: string
-  onPushStock?: () => Promise<boolean>
+  onPushStock?: (s: object) => Promise<boolean>
 }
 
 export default function StockPage({ reports, sheetsUrl, onPushStock }: StockPageProps) {
@@ -969,7 +969,7 @@ export default function StockPage({ reports, sheetsUrl, onPushStock }: StockPage
   async function handlePushStock() {
     if (!onPushStock) return
     setPushing(true)
-    const ok = await onPushStock()
+    const ok = await onPushStock(stock)  // ส่ง stock จาก instance นี้โดยตรง
     setPushOk(ok)
     setPushing(false)
     setTimeout(() => setPushOk(null), 3000)
