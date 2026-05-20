@@ -102,6 +102,7 @@ export default function App() {
             reports={store.reports}
             sheetsUrl={sheetsUrl}
             onPushStock={handlePushStock}
+            readOnly={!!ENV_SHEETS_URL}
           />
         )}
         {activeTab === 'machine' && (

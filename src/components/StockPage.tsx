@@ -746,6 +746,7 @@ function LogModal({
 }
 
 // ── ProductRow ────────────────────────────────────────────────────────────────
+
 const ENTRY_KIND_LABEL: Record<string, { label: string; color: string }> = {
   incoming: { label: 'สั่งมา',     color: 'text-blue-500' },
   received: { label: 'รับของแล้ว', color: 'text-emerald-600' },
@@ -771,6 +772,7 @@ function ProductRow({
   onSync,
   pendingSyncCount,
   entries,
+  readOnly,
 }: {
   product: StockProduct
   resolvedGoodsName: string | null
@@ -780,6 +782,7 @@ function ProductRow({
   onSync: () => void
   pendingSyncCount: number
   entries: ReturnType<typeof useStockStore>['getEntries'] extends (id: string) => infer R ? R : never
+  readOnly?: boolean
 }) {
   const { getStatus } = useStockStore()
   const status      = getStatus(product)
@@ -874,10 +877,12 @@ function ProductRow({
 
         {/* actions */}
         <div className="flex items-center justify-end gap-0.5">
-          <button onClick={onLog}
-            className="w-6 h-6 flex items-center justify-center rounded-md bg-brand-pale/80 text-brand-blue hover:bg-brand-blue hover:text-white transition-colors"
-          ><Plus size={12} /></button>
-          {pendingSyncCount > 0 && (
+          {!readOnly && (
+            <button onClick={onLog}
+              className="w-6 h-6 flex items-center justify-center rounded-md bg-brand-pale/80 text-brand-blue hover:bg-brand-blue hover:text-white transition-colors"
+            ><Plus size={12} /></button>
+          )}
+          {!readOnly && pendingSyncCount > 0 && (
             <button onClick={onSync}
               className="relative w-6 h-6 flex items-center justify-center rounded-md bg-brand-blue/10 text-brand-blue hover:bg-brand-blue hover:text-white transition-colors"
             >
@@ -887,9 +892,11 @@ function ProductRow({
               </span>
             </button>
           )}
-          <button onClick={onEdit}
-            className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-brand-pale/80 text-brand-dark/30 hover:text-brand-dark transition-colors"
-          ><Pencil size={11} /></button>
+          {!readOnly && (
+            <button onClick={onEdit}
+              className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-brand-pale/80 text-brand-dark/30 hover:text-brand-dark transition-colors"
+            ><Pencil size={11} /></button>
+          )}
           <button onClick={() => setOpen(o => !o)}
             className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-brand-pale/80 text-brand-dark/30 hover:text-brand-dark transition-colors"
           >{open ? <ChevronUp size={11} /> : <ChevronDown size={11} />}</button>
@@ -931,9 +938,11 @@ function ProductRow({
               </div>
             )
           })}
-          <button onClick={onDelete} className="mt-1 flex items-center gap-1 text-[11px] text-red-400 hover:text-red-600">
-            <Trash2 size={11} /> ลบสินค้านี้
-          </button>
+          {!readOnly && (
+            <button onClick={onDelete} className="mt-1 flex items-center gap-1 text-[11px] text-red-400 hover:text-red-600">
+              <Trash2 size={11} /> ลบสินค้านี้
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -945,9 +954,10 @@ interface StockPageProps {
   reports: DayReport[]
   sheetsUrl?: string
   onPushStock?: (s: object) => Promise<boolean>
+  readOnly?: boolean
 }
 
-export default function StockPage({ reports, sheetsUrl, onPushStock }: StockPageProps) {
+export default function StockPage({ reports, sheetsUrl, onPushStock, readOnly }: StockPageProps) {
   const {
     stock, addProduct, updateProduct, removeProduct, logEntry,
     previewSync, applySync, previewSyncProduct, applySyncProduct,
@@ -1049,8 +1059,8 @@ export default function StockPage({ reports, sheetsUrl, onPushStock }: StockPage
   return (
     <div className="max-w-2xl mx-auto px-4 py-5 space-y-4">
 
-      {/* sync banner */}
-      {pendingDates.length > 0 ? (
+      {/* sync banner — เจ้าของเท่านั้น */}
+      {!readOnly && (pendingDates.length > 0 ? (
         <button
           onClick={() => setShowSync(true)}
           className="w-full flex items-center gap-3 bg-brand-blue/5 border border-brand-blue/20 rounded-xl px-4 py-3 hover:bg-brand-blue/10 transition-colors text-left"
@@ -1080,26 +1090,30 @@ export default function StockPage({ reports, sheetsUrl, onPushStock }: StockPage
             ซิงค์ใหม่ทั้งหมด
           </button>
         </div>
-      )}
+      ))}
 
-      {/* inventory upload button */}
-      <input
-        ref={inventoryInputRef}
-        type="file"
-        accept=".xlsx,.xls"
-        className="hidden"
-        onChange={handleInventoryFile}
-      />
-      <button
-        onClick={() => inventoryInputRef.current?.click()}
-        className="w-full flex items-center gap-3 bg-white border border-brand-blue/15 rounded-xl px-4 py-3 hover:bg-brand-pale/40 transition-colors text-left"
-      >
-        <Upload size={16} className="text-brand-dark/40 flex-shrink-0" />
-        <div className="flex-1">
-          <p className="text-[13px] font-medium text-brand-dark">อัปโหลด Inventory Snapshot</p>
-          <p className="text-[11px] text-brand-dark/40">ไฟล์ Inventory Status Batch จากตู้ — set สต๊อกตรงตามค่าจริงในตู้</p>
-        </div>
-      </button>
+      {/* inventory upload button — เจ้าของเท่านั้น */}
+      {!readOnly && (
+        <>
+          <input
+            ref={inventoryInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={handleInventoryFile}
+          />
+          <button
+            onClick={() => inventoryInputRef.current?.click()}
+            className="w-full flex items-center gap-3 bg-white border border-brand-blue/15 rounded-xl px-4 py-3 hover:bg-brand-pale/40 transition-colors text-left"
+          >
+            <Upload size={16} className="text-brand-dark/40 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-[13px] font-medium text-brand-dark">อัปโหลด Inventory Snapshot</p>
+              <p className="text-[11px] text-brand-dark/40">ไฟล์ Inventory Status Batch จากตู้ — set สต๊อกตรงตามค่าจริงในตู้</p>
+            </div>
+          </button>
+        </>
+      )}
 
       {/* category filter — scrollable */}
       <div className="flex gap-1.5 overflow-x-auto pb-0.5 -mx-1 px-1 scrollbar-none">
@@ -1156,12 +1170,14 @@ export default function StockPage({ reports, sheetsUrl, onPushStock }: StockPage
             </button>
           )
         })}
-        <button
-          onClick={() => setShowAdd(true)}
-          className="ml-auto flex items-center gap-1.5 bg-brand-blue hover:bg-brand-light text-white text-[12px] font-medium px-3 py-1.5 rounded-full active:scale-95 transition-all"
-        >
-          <Plus size={13} /> เพิ่มสินค้า
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => setShowAdd(true)}
+            className="ml-auto flex items-center gap-1.5 bg-brand-blue hover:bg-brand-light text-white text-[12px] font-medium px-3 py-1.5 rounded-full active:scale-95 transition-all"
+          >
+            <Plus size={13} /> เพิ่มสินค้า
+          </button>
+        )}
       </div>
 
       {/* product grid */}
@@ -1190,6 +1206,7 @@ export default function StockPage({ reports, sheetsUrl, onPushStock }: StockPage
                 onSync={() => setSyncProduct(p)}
                 pendingSyncCount={pendingForProduct}
                 entries={getEntries(p.id)}
+                readOnly={readOnly}
               />
             )
           })}
