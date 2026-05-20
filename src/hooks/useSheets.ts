@@ -81,12 +81,50 @@ export function useSheets(config: SheetsConfig | null) {
     }
   }, [config])
 
+  const pushStock = useCallback(async (stockData: object): Promise<boolean> => {
+    if (!config?.url) return false
+    try {
+      const data = encodeURIComponent(JSON.stringify(stockData))
+      const res = await fetch(`${config.url}?action=saveStock&data=${data}`)
+      const r = await res.json()
+      return r.ok === true
+    } catch { return false }
+  }, [config])
+
+  const fetchStock = useCallback(async (): Promise<string | null> => {
+    if (!config?.url) return null
+    try {
+      const res = await fetch(`${config.url}?action=fetchStock`)
+      const r = await res.json()
+      return r.ok && r.data ? r.data : null
+    } catch { return null }
+  }, [config])
+
+  const pushMachine = useCallback(async (machineData: object): Promise<boolean> => {
+    if (!config?.url) return false
+    try {
+      const data = encodeURIComponent(JSON.stringify(machineData))
+      const res = await fetch(`${config.url}?action=saveMachine&data=${data}`)
+      const r = await res.json()
+      return r.ok === true
+    } catch { return false }
+  }, [config])
+
+  const fetchMachine = useCallback(async (): Promise<string | null> => {
+    if (!config?.url) return null
+    try {
+      const res = await fetch(`${config.url}?action=fetchMachine`)
+      const r = await res.json()
+      return r.ok && r.data ? r.data : null
+    } catch { return null }
+  }, [config])
+
   const resetStatus = useCallback(() => {
     setSyncStatus('idle')
     setSyncMessage('')
   }, [])
 
-  return { syncStatus, syncMessage, lastSynced, pushReport, fetchAll, resetStatus }
+  return { syncStatus, syncMessage, lastSynced, pushReport, fetchAll, pushStock, fetchStock, pushMachine, fetchMachine, resetStatus }
 }
 
 // ── แปลงข้อมูลจาก Sheets กลับเป็น DayReport[] ───────────────

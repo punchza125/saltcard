@@ -48,6 +48,16 @@ export interface InventorySnapshotItem {
 export function useStockStore() {
   const [stock, setStock] = useState<StockStore>(load)
 
+  function replaceAll(s: StockStore) {
+    const migrated: StockStore = {
+      ...s,
+      syncedDates: s.syncedDates ?? [],
+      entries:  (s.entries  ?? []).map(e => ({ ...e, kind: (e.kind ?? 'in') as EntryKind })),
+      products: (s.products ?? []).map(p => ({ qtyIncoming: 0, category: '', ...p })),
+    }
+    setStock(migrated)
+  }
+
   useEffect(() => { save(stock) }, [stock])
 
   function addProduct(
@@ -291,5 +301,6 @@ export function useStockStore() {
     getPendingDates, resetSyncedDates,
     previewInventorySnapshot, applyInventorySnapshot,
     getStatus, getEntries,
+    replaceAll,
   }
 }

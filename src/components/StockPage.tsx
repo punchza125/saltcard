@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import {
   Plus, Pencil, Trash2, ArrowUp, ArrowDown,
-  ChevronDown, ChevronUp, X, Check, RefreshCw, AlertTriangle, Upload,
+  ChevronDown, ChevronUp, X, Check, RefreshCw, AlertTriangle, Upload, Cloud, CloudOff,
 } from 'lucide-react'
 import type { StockProduct, StockUnit, DayReport } from '../types'
 import { useStockStore, type SyncPreviewItem, type InventorySnapshotItem } from '../hooks/useStockStore'
@@ -943,9 +943,11 @@ function ProductRow({
 // ── StockPage ─────────────────────────────────────────────────────────────────
 interface StockPageProps {
   reports: DayReport[]
+  sheetsUrl?: string
+  onPushStock?: () => Promise<boolean>
 }
 
-export default function StockPage({ reports }: StockPageProps) {
+export default function StockPage({ reports, sheetsUrl, onPushStock }: StockPageProps) {
   const {
     stock, addProduct, updateProduct, removeProduct, logEntry,
     previewSync, applySync, previewSyncProduct, applySyncProduct,
@@ -961,6 +963,17 @@ export default function StockPage({ reports }: StockPageProps) {
   const [catFilter,     setCatFilter]     = useState<string>('ทั้งหมด')
   const [showSync,      setShowSync]      = useState(false)
   const [syncProduct,   setSyncProduct]   = useState<StockProduct | null>(null)
+  const [pushing,       setPushing]       = useState(false)
+  const [pushOk,        setPushOk]        = useState<boolean | null>(null)
+
+  async function handlePushStock() {
+    if (!onPushStock) return
+    setPushing(true)
+    const ok = await onPushStock()
+    setPushOk(ok)
+    setPushing(false)
+    setTimeout(() => setPushOk(null), 3000)
+  }
 
   // inventory snapshot
   const inventoryInputRef = useRef<HTMLInputElement>(null)
@@ -1110,6 +1123,21 @@ export default function StockPage({ reports }: StockPageProps) {
 
       {/* status filter + add */}
       <div className="flex gap-1.5 items-center flex-wrap">
+        {sheetsUrl && onPushStock && (
+          <button
+            onClick={handlePushStock}
+            disabled={pushing}
+            className={`flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full border transition-all ${
+              pushing ? 'border-brand-blue/20 text-brand-blue animate-pulse'
+              : pushOk === true ? 'border-emerald-300 text-emerald-600 bg-emerald-50'
+              : pushOk === false ? 'border-red-200 text-red-500'
+              : 'border-brand-blue/15 text-brand-dark/50 hover:border-brand-blue/40 hover:text-brand-blue'
+            }`}
+          >
+            {pushOk === false ? <CloudOff size={12} /> : <Cloud size={12} />}
+            {pushing ? 'กำลังบันทึก...' : pushOk === true ? 'บันทึกแล้ว' : pushOk === false ? 'บันทึกไม่ได้' : 'บันทึกสต๊อก'}
+          </button>
+        )}
         {(['all', 'red', 'yellow', 'green'] as const).map(f => {
           const labels = { all: `ทั้งหมด`, red: `หมด/กำลังจะหมด`, yellow: `ใกล้หมด`, green: `ปกติ` }
           const badges = { all: counts.red + counts.yellow + counts.green, red: counts.red, yellow: counts.yellow, green: counts.green }

@@ -1,5 +1,5 @@
-import { useState, useRef, useMemo } from 'react'
-import { Upload, RefreshCw } from 'lucide-react'
+import { useState, useRef, useMemo, useEffect } from 'react'
+import { Upload, RefreshCw, Cloud, CloudOff } from 'lucide-react'
 import type { MachineReport, MachineSlot } from '../types'
 import { parseMachineInventory, formatThaiDate } from '../utils/parser'
 
@@ -85,10 +85,25 @@ function SlotCard({ slot }: { slot: MachineSlot }) {
   )
 }
 
-export default function MachinePage() {
-  const [report, setReport] = useState<MachineReport | null>(loadReport)
-  const [site,   setSite]   = useState<string>('ทั้งหมด')
+export default function MachinePage({
+  sheetsReport,
+  onPushMachine,
+}: {
+  sheetsReport?: MachineReport | null
+  onPushMachine?: (r: MachineReport) => Promise<boolean>
+}) {
+  const [report,   setReport]   = useState<MachineReport | null>(loadReport)
+  const [site,     setSite]     = useState<string>('ทั้งหมด')
+  const [pushing,  setPushing]  = useState(false)
+  const [pushOk,   setPushOk]   = useState<boolean | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // sync from Sheets when fetched on load
+  useEffect(() => {
+    if (!sheetsReport) return
+    setReport(sheetsReport)
+    saveReport(sheetsReport)
+  }, [sheetsReport])
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -98,6 +113,13 @@ export default function MachinePage() {
     setReport(r)
     saveReport(r)
     setSite('ทั้งหมด')
+    if (onPushMachine) {
+      setPushing(true)
+      const ok = await onPushMachine(r)
+      setPushOk(ok)
+      setPushing(false)
+      setTimeout(() => setPushOk(null), 3000)
+    }
   }
 
   const sites = useMemo(() => {
@@ -174,12 +196,25 @@ export default function MachinePage() {
           </p>
         </div>
         <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFile} />
-        <button
-          onClick={() => fileRef.current?.click()}
-          className="flex items-center gap-1.5 bg-brand-pale text-brand-blue text-[12px] font-medium px-3 py-2 rounded-lg hover:bg-brand-blue hover:text-white transition-colors"
-        >
-          <RefreshCw size={13} /> อัปเดตไฟล์
-        </button>
+        <div className="flex items-center gap-2">
+          {onPushMachine && (
+            <span className={`text-[11px] flex items-center gap-1 ${
+              pushing ? 'text-brand-blue animate-pulse'
+              : pushOk === true ? 'text-emerald-500'
+              : pushOk === false ? 'text-red-400'
+              : 'text-brand-dark/20'
+            }`}>
+              {pushing ? <Cloud size={13} /> : pushOk === false ? <CloudOff size={13} /> : <Cloud size={13} />}
+              {pushing ? 'กำลังบันทึก...' : pushOk === true ? 'บันทึกแล้ว' : pushOk === false ? 'บันทึกไม่ได้' : ''}
+            </span>
+          )}
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="flex items-center gap-1.5 bg-brand-pale text-brand-blue text-[12px] font-medium px-3 py-2 rounded-lg hover:bg-brand-blue hover:text-white transition-colors"
+          >
+            <RefreshCw size={13} /> อัปเดตไฟล์
+          </button>
+        </div>
       </div>
 
       {/* site tabs */}

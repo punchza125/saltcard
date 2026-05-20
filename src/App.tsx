@@ -7,21 +7,25 @@ import MachinePage from './components/MachinePage'
 import SheetsConfigModal from './components/SheetsConfigModal'
 import { useStore } from './hooks/useStore'
 import { useSheets } from './hooks/useSheets'
+import { useStockStore } from './hooks/useStockStore'
+import type { MachineReport } from './types'
 
 const SHEETS_URL_KEY = 'saltcard_sheets_url'
 const ENV_SHEETS_URL = import.meta.env.VITE_SHEETS_URL as string | undefined
 
 export default function App() {
   const { store, addReport, removeReport, clearAll } = useStore()
+  const { stock, replaceAll: replaceStock } = useStockStore()
   const [activeTab, setActiveTab] = useState<'dashboard' | 'upload' | 'stock' | 'machine'>('dashboard')
   const [showSheetsConfig, setShowSheetsConfig] = useState(false)
+  const [sheetsMachine, setSheetsMachine] = useState<MachineReport | null>(null)
   // env URL เป็น default — ผู้ใช้ยังเปลี่ยนได้จาก SheetsConfigModal
   const [sheetsUrl, setSheetsUrl] = useState(
     () => localStorage.getItem(SHEETS_URL_KEY) ?? ENV_SHEETS_URL ?? ''
   )
 
   const sheetsConfig = sheetsUrl ? { url: sheetsUrl } : null
-  const { syncStatus, syncMessage, lastSynced, pushReport, fetchAll } = useSheets(sheetsConfig)
+  const { syncStatus, syncMessage, lastSynced, pushReport, fetchAll, pushStock, fetchStock, pushMachine, fetchMachine } = useSheets(sheetsConfig)
 
   // ถ้ามี ENV_SHEETS_URL (deployed version) → โหลดจาก Sheets ทุกครั้งที่เปิดแอป
   // ถ้าไม่มี (local dev) → โหลดเฉพาะตอนยังไม่มีข้อมูล
@@ -37,12 +41,28 @@ export default function App() {
           fresh.forEach(addReport)
         }
       })
+      fetchStock().then(raw => {
+        if (!raw) return
+        try { replaceStock(JSON.parse(raw)) } catch {}
+      })
+      fetchMachine().then(raw => {
+        if (!raw) return
+        try { setSheetsMachine(JSON.parse(raw)) } catch {}
+      })
     } else if (store.reports.length === 0) {
       fetchAll().then(reports => {
         if (reports?.length) reports.forEach(addReport)
       })
     }
   }, [sheetsUrl])
+
+  async function handlePushStock(): Promise<boolean> {
+    return pushStock(stock)
+  }
+
+  async function handlePushMachine(r: MachineReport): Promise<boolean> {
+    return pushMachine(r)
+  }
 
   const prevCount = useRef(store.reports.length)
   useEffect(() => {
@@ -77,8 +97,19 @@ export default function App() {
       />
       <main className="flex-1 pb-16 md:pb-0">
         {activeTab === 'dashboard' && <DashboardPage reports={store.reports} />}
-        {activeTab === 'stock' && <StockPage reports={store.reports} />}
-        {activeTab === 'machine' && <MachinePage />}
+        {activeTab === 'stock' && (
+          <StockPage
+            reports={store.reports}
+            sheetsUrl={sheetsUrl}
+            onPushStock={handlePushStock}
+          />
+        )}
+        {activeTab === 'machine' && (
+          <MachinePage
+            sheetsReport={sheetsMachine}
+            onPushMachine={handlePushMachine}
+          />
+        )}
         {activeTab === 'upload' && (
           <UploadPage
             reports={store.reports}

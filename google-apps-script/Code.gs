@@ -5,13 +5,14 @@
 // ============================================================
 
 const SHEET_NAMES = {
-  SALES:    'sales',       // ยอดขายรายวัน-สาขา
-  GOODS:    'goods',       // สินค้า
-  PAYMENTS: 'payments',    // ช่องทางชำระเงิน
-  META:     'meta',        // meta / หมายเหตุ
+  SALES:    'sales',
+  GOODS:    'goods',
+  PAYMENTS: 'payments',
+  META:     'meta',
+  STOCK:    'stock',    // JSON blob ของ stock store
+  MACHINE:  'machine',  // JSON blob ของ machine report
 }
 
-// Headers ของแต่ละ sheet
 const HEADERS = {
   SALES: [
     'date','site','route','area',
@@ -42,6 +43,8 @@ const HEADERS = {
   META: [
     'date','fileName','importedAt','importedBy','rowsSales','rowsGoods'
   ],
+  STOCK:   ['updatedAt','data'],
+  MACHINE: ['updatedAt','data'],
 }
 
 // ── Utility ──────────────────────────────────────────────────
@@ -67,15 +70,7 @@ function initSheets() {
   })
 }
 
-function corsHeaders() {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST',
-    'Access-Control-Allow-Headers': 'Content-Type',
-  }
-}
-
-function jsonResponse(data, code) {
+function jsonResponse(data) {
   return ContentService
     .createTextOutput(JSON.stringify({ ok: true, ...data }))
     .setMimeType(ContentService.MimeType.JSON)
@@ -87,22 +82,17 @@ function errorResponse(msg) {
     .setMimeType(ContentService.MimeType.JSON)
 }
 
-// ── GET — ดึงข้อมูล ──────────────────────────────────────────
+// ── GET ──────────────────────────────────────────────────────
 
 function doGet(e) {
   try {
     initSheets()
     const action = e.parameter.action || 'all'
 
-    if (action === 'all') {
-      return jsonResponse({ data: getAllData() })
-    }
-    if (action === 'dates') {
-      return jsonResponse({ dates: getAvailableDates() })
-    }
-    if (action === 'day' && e.parameter.date) {
-      return jsonResponse({ data: getDayData(e.parameter.date) })
-    }
+    if (action === 'all')  return jsonResponse({ data: getAllData() })
+    if (action === 'dates') return jsonResponse({ dates: getAvailableDates() })
+    if (action === 'saveRow') return saveRowFromGet(e.parameter)
+
     if (action === 'clear' && e.parameter.date) {
       const date = e.parameter.date
       deleteRowsByDate(SHEET_NAMES.SALES, date)
@@ -111,13 +101,53 @@ function doGet(e) {
       deleteRowsByDate(SHEET_NAMES.META, date)
       return jsonResponse({ cleared: date })
     }
-    if (action === 'saveRow') {
-      return saveRowFromGet(e.parameter)
+
+    // ── Stock ──
+    if (action === 'saveStock') {
+      const data = e.parameter.data
+      if (!data) return errorResponse('missing data')
+      saveBlob(SHEET_NAMES.STOCK, data)
+      return jsonResponse({ saved: 'stock' })
     }
+    if (action === 'fetchStock') {
+      const blob = fetchBlob(SHEET_NAMES.STOCK)
+      return jsonResponse({ data: blob })
+    }
+
+    // ── Machine ──
+    if (action === 'saveMachine') {
+      const data = e.parameter.data
+      if (!data) return errorResponse('missing data')
+      saveBlob(SHEET_NAMES.MACHINE, data)
+      return jsonResponse({ saved: 'machine' })
+    }
+    if (action === 'fetchMachine') {
+      const blob = fetchBlob(SHEET_NAMES.MACHINE)
+      return jsonResponse({ data: blob })
+    }
+
     return errorResponse('unknown action')
   } catch (err) {
     return errorResponse(String(err))
   }
+}
+
+// เก็บ JSON blob (overwrite row เดิม)
+function saveBlob(sheetName, jsonStr) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName)
+  const updatedAt = new Date().toISOString()
+  if (sheet.getLastRow() < 2) {
+    sheet.appendRow([updatedAt, jsonStr])
+  } else {
+    sheet.getRange(2, 1, 1, 2).setValues([[updatedAt, jsonStr]])
+  }
+}
+
+// ดึง JSON blob
+function fetchBlob(sheetName) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName)
+  if (!sheet || sheet.getLastRow() < 2) return null
+  return sheet.getRange(2, 2).getValue() || null
 }
 
 function getAvailableDates() {
@@ -130,7 +160,6 @@ function getAvailableDates() {
 function getAllData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet()
   const result = {}
-
   ;['SALES','GOODS','PAYMENTS','META'].forEach(key => {
     const sheet = ss.getSheetByName(SHEET_NAMES[key])
     if (!sheet || sheet.getLastRow() < 2) { result[key.toLowerCase()] = []; return }
@@ -142,24 +171,6 @@ function getAllData() {
   })
   return result
 }
-
-function getDayData(date) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet()
-  const result = {}
-
-  ;['SALES','GOODS','PAYMENTS'].forEach(key => {
-    const sheet = ss.getSheetByName(SHEET_NAMES[key])
-    if (!sheet || sheet.getLastRow() < 2) { result[key.toLowerCase()] = []; return }
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
-    const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues()
-    result[key.toLowerCase()] = rows
-      .filter(row => String(row[0]) === date)
-      .map(row => Object.fromEntries(headers.map((h, i) => [h, row[i]])))
-  })
-  return result
-}
-
-// ── Save via GET (POST redirect workaround) ──────────────────
 
 function saveRowFromGet(params) {
   const { type, date, row } = params
@@ -215,17 +226,11 @@ function saveRowFromGet(params) {
   }
 }
 
-// ── POST — บันทึกข้อมูล ──────────────────────────────────────
+// ── POST ─────────────────────────────────────────────────────
 
 function doPost(e) {
   try {
     initSheets()
-    Logger.log('=== doPost called ===')
-    Logger.log('postData type: ' + (e.postData ? e.postData.type : 'null'))
-    Logger.log('postData contents (first 300): ' + (e.postData ? String(e.postData.contents).substring(0, 300) : 'null'))
-    Logger.log('e.parameter keys: ' + JSON.stringify(Object.keys(e.parameter || {})))
-    Logger.log('e.parameter.data (first 100): ' + (e.parameter && e.parameter.data ? String(e.parameter.data).substring(0, 100) : 'null'))
-
     let raw
     if (e.parameter && e.parameter.data) {
       raw = e.parameter.data
@@ -234,17 +239,15 @@ function doPost(e) {
       const match = contents.match(/(?:^|&)data=([^&]*)/)
       raw = match ? decodeURIComponent(match[1].replace(/\+/g, ' ')) : contents
     }
-    Logger.log('raw (first 200): ' + (raw ? String(raw).substring(0, 200) : 'null'))
     if (!raw) return errorResponse('no data received')
     const payload = JSON.parse(raw)
-    const { report } = payload   // DayReport object จากเว็บ
+    const { report } = payload
 
     if (!report || !report.date) return errorResponse('missing report.date')
 
     const importedAt = new Date().toISOString()
     const date = report.date
 
-    // ลบข้อมูลวันนี้เดิมออกก่อน (upsert)
     deleteRowsByDate(SHEET_NAMES.SALES, date)
     deleteRowsByDate(SHEET_NAMES.GOODS, date)
     deleteRowsByDate(SHEET_NAMES.PAYMENTS, date)
@@ -252,13 +255,10 @@ function doPost(e) {
 
     const ss = SpreadsheetApp.getActiveSpreadsheet()
 
-    // บันทึก sales (รวม sites + routes + areas)
     const salesSheet = ss.getSheetByName(SHEET_NAMES.SALES)
     report.sites.forEach(s => {
-      const route = report.routes.find(r => r.salesAmount === s.salesAmount) || {}
-      const area  = report.areas.find(a => a.salesAmount === s.salesAmount) || {}
       salesSheet.appendRow([
-        date, s.name, route.name || '', area.name || '',
+        date, s.name, '', '',
         s.salesVolume, s.salesAmount,
         s.cashVolume, s.cashAmount,
         s.mdbVolume, s.mdbAmount,
@@ -273,7 +273,6 @@ function doPost(e) {
       ])
     })
 
-    // บันทึก goods
     const goodsSheet = ss.getSheetByName(SHEET_NAMES.GOODS)
     report.goods.forEach(g => {
       goodsSheet.appendRow([
@@ -283,7 +282,6 @@ function doPost(e) {
       ])
     })
 
-    // บันทึก payments (รวมยอดทุก site)
     const paySheet = ss.getSheetByName(SHEET_NAMES.PAYMENTS)
     const totalPayments = report.areas.reduce((acc, a) => ({
       prompt:  (acc.prompt  || 0) + a.promptAmount,
@@ -304,9 +302,7 @@ function doPost(e) {
       importedAt
     ])
 
-    // บันทึก meta
-    const metaSheet = ss.getSheetByName(SHEET_NAMES.META)
-    metaSheet.appendRow([
+    ss.getSheetByName(SHEET_NAMES.META).appendRow([
       date, report.fileName, importedAt, '',
       report.sites.length, report.goods.length
     ])
@@ -317,13 +313,12 @@ function doPost(e) {
       rowsSales: report.sites.length,
       rowsGoods: report.goods.length,
     })
-
   } catch (err) {
     return errorResponse(String(err))
   }
 }
 
-// ── Helper: ลบแถวตามวันที่ ────────────────────────────────────
+// ── Helper ───────────────────────────────────────────────────
 
 function cellToDateStr(cell) {
   if (cell instanceof Date) {
@@ -337,8 +332,6 @@ function deleteRowsByDate(sheetName, date) {
   if (!sheet || sheet.getLastRow() < 2) return
   const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues()
   for (let i = data.length - 1; i >= 0; i--) {
-    if (cellToDateStr(data[i][0]) === date) {
-      sheet.deleteRow(i + 2)
-    }
+    if (cellToDateStr(data[i][0]) === date) sheet.deleteRow(i + 2)
   }
 }
