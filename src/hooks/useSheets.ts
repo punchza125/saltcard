@@ -141,14 +141,18 @@ export function useSheets(config: SheetsConfig | null) {
 
 // ── แปลงข้อมูลจาก Sheets กลับเป็น DayReport[] ───────────────
 
+function normalizeDate(d: any): string {
+  return String(d).slice(0, 10)
+}
+
 function sheetsDataToReports(data: any): DayReport[] {
   if (!data?.sales) return []
 
-  const dateSet = [...new Set<string>(data.sales.map((r: any) => r.date))]
+  const dateSet = [...new Set<string>(data.sales.map((r: any) => normalizeDate(r.date)))]
 
   return dateSet.map(date => {
-    const salesRows = data.sales.filter((r: any) => r.date === date)
-    const goodsRows = data.goods?.filter((r: any) => r.date === date) ?? []
+    const salesRows = data.sales.filter((r: any) => normalizeDate(r.date) === date)
+    const goodsRows = data.goods?.filter((r: any) => normalizeDate(r.date) === date) ?? []
 
     const sites = salesRows.map((r: any) => ({
       name: r.site,
@@ -208,7 +212,7 @@ function sheetsDataToReports(data: any): DayReport[] {
 
     return {
       date,
-      fileName: data.meta?.find((m: any) => m.date === date)?.fileName ?? '',
+      fileName: data.meta?.find((m: any) => normalizeDate(m.date) === date)?.fileName ?? '',
       areas: [totals],
       routes: [totals],
       sites,

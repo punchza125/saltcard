@@ -49,14 +49,6 @@ export default function DashboardPage({ reports }: DashboardPageProps) {
   )
   const calendarRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (!showCalendar) return
-    const handler = (e: MouseEvent) => {
-      if (!calendarRef.current?.contains(e.target as Node)) setShowCalendar(false)
-    }
-    document.addEventListener('pointerdown', handler)
-    return () => document.removeEventListener('pointerdown', handler)
-  }, [showCalendar])
 
   const currentIdx = Math.min(selectedDateIdx, reports.length - 1)
   const selectedReport = reports[currentIdx] as DayReport | undefined
@@ -206,6 +198,8 @@ export default function DashboardPage({ reports }: DashboardPageProps) {
 
   // Shared calendar popup JSX
   const calendarPopup = showCalendar && (
+    <>
+      <div className="fixed inset-0 z-40" onClick={() => setShowCalendar(false)} />
     <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-brand-blue/15 rounded-2xl shadow-lg shadow-brand-blue/10 p-3">
       <div className="flex items-center justify-between mb-2">
         <button onClick={() => shiftCalMonth(-1)} className="w-8 h-8 rounded-full hover:bg-brand-pale flex items-center justify-center transition-colors">
@@ -242,6 +236,7 @@ export default function DashboardPage({ reports }: DashboardPageProps) {
         })}
       </div>
     </div>
+    </>
   )
 
   if (reports.length === 0) {
