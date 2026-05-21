@@ -81,18 +81,24 @@ export default function Header({ reportCount, onUploadClick, activeTab, setActiv
 
     {/* Mobile bottom nav */}
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-brand-blue/10 flex safe-bottom">
-      {NAV_ITEMS.map(({ tab, label, Icon }) => (
-        <button
-          key={tab}
-          onClick={() => setActiveTab(tab)}
-          className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 transition-colors ${
-            activeTab === tab ? 'text-brand-blue' : 'text-brand-dark/35'
-          }`}
-        >
-          <Icon size={20} strokeWidth={activeTab === tab ? 2.5 : 1.8} />
-          <span className="text-[10px] font-medium">{label}</span>
-        </button>
-      ))}
+      {NAV_ITEMS.map(({ tab, label, Icon }) => {
+        const isActive = activeTab === tab
+        return (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className="flex-1 flex flex-col items-center justify-center pt-1 pb-2 transition-colors relative"
+          >
+            {/* active indicator bar */}
+            <div className={`absolute top-0 left-3 right-3 h-0.5 rounded-full transition-all ${isActive ? 'bg-brand-blue' : 'bg-transparent'}`} />
+            {/* icon with background */}
+            <div className={`rounded-xl px-4 py-1 mb-0.5 transition-all ${isActive ? 'bg-brand-blue/10' : ''}`}>
+              <Icon size={20} strokeWidth={isActive ? 2.5 : 1.5} className={isActive ? 'text-brand-blue' : 'text-brand-dark/30'} />
+            </div>
+            <span className={`text-[10px] font-semibold transition-colors ${isActive ? 'text-brand-blue' : 'text-brand-dark/30'}`}>{label}</span>
+          </button>
+        )
+      })}
     </nav>
     </>
   )
