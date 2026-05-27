@@ -169,11 +169,13 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
     return { best, streak, winsTotal, total: dailyAmts.length - 1 }
   }, [reports, rangeMode])
 
-  // Day profit (only in day mode, only if stock products have buy prices)
+  // Day profit — only for today (cannot know cost price for past days)
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const isToday = selectedReport?.date === todayStr
   const dayProfit = useMemo(() => {
-    if (rangeMode !== 'day' || !selectedReport || stockProducts.length === 0) return null
+    if (rangeMode !== 'day' || !selectedReport || !isToday || stockProducts.length === 0) return null
     return calcDayProfit(selectedReport, stockProducts, taxRate)
-  }, [rangeMode, selectedReport, stockProducts, taxRate])
+  }, [rangeMode, selectedReport, isToday, stockProducts, taxRate])
 
   const availableDates = useMemo(() => new Set(reports.map(r => r.date)), [reports])
 
@@ -494,44 +496,48 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
       </div>
 
       {/* ── Day profit card (day mode only) ─────────────── */}
-      {rangeMode === 'day' && dayProfit && (
+      {rangeMode === 'day' && selectedReport && (
         <div className="px-4 md:px-6 mb-5">
-          <div className="rounded-2xl overflow-hidden border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 px-4 py-3 flex flex-col gap-2"
-            style={{ animation: 'fadeUp 0.4s ease both', animationDelay: '150ms' }}>
-            <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-600">💰 กำไรสุทธิวันนี้</p>
-            <div className="flex items-end gap-4 flex-wrap">
-              <div>
-                <p className="text-[26px] font-bold leading-tight text-emerald-700">
-                  ฿{formatBaht(dayProfit.netProfit)}
-                </p>
-                <p className="text-[11px] text-emerald-500 font-medium">
-                  {dayProfit.profitPct >= 0 ? '▲' : '▼'} {Math.abs(dayProfit.profitPct).toFixed(1)}% ROI
-                </p>
+          {isToday && dayProfit ? (
+            <div className="rounded-2xl overflow-hidden border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 px-4 py-3 flex flex-col gap-2"
+              style={{ animation: 'fadeUp 0.4s ease both', animationDelay: '150ms' }}>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-600">💰 กำไรสุทธิวันนี้</p>
+              <div className="flex items-end gap-4 flex-wrap">
+                <div>
+                  <p className="text-[26px] font-bold leading-tight text-emerald-700">
+                    ฿{formatBaht(dayProfit.netProfit)}
+                  </p>
+                  <p className="text-[11px] text-emerald-500 font-medium">
+                    {dayProfit.profitPct >= 0 ? '▲' : '▼'} {Math.abs(dayProfit.profitPct).toFixed(1)}% ROI
+                  </p>
+                </div>
+                <div className="flex gap-4 pb-0.5">
+                  <div>
+                    <p className="text-[10px] text-brand-dark/40 mb-0.5">รายได้สุทธิ (หักภาษี {taxRate}%)</p>
+                    <p className="text-[13px] font-semibold text-brand-dark/70">฿{formatBaht(dayProfit.totalRevenue * (1 - taxRate / 100))}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-brand-dark/40 mb-0.5">ต้นทุน</p>
+                    <p className="text-[13px] font-semibold text-brand-dark/70">฿{formatBaht(dayProfit.totalCost)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-brand-dark/40 mb-0.5">ยอดขายรวม</p>
+                    <p className="text-[13px] font-semibold text-brand-dark/70">฿{formatBaht(dayProfit.totalRevenue)}</p>
+                  </div>
+                </div>
               </div>
-              <div className="flex gap-4 pb-0.5">
-                <div>
-                  <p className="text-[10px] text-brand-dark/40 mb-0.5">รายได้สุทธิ (หักภาษี {taxRate}%)</p>
-                  <p className="text-[13px] font-semibold text-brand-dark/70">฿{formatBaht(dayProfit.totalRevenue * (1 - taxRate / 100))}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-brand-dark/40 mb-0.5">ต้นทุน</p>
-                  <p className="text-[13px] font-semibold text-brand-dark/70">฿{formatBaht(dayProfit.totalCost)}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-brand-dark/40 mb-0.5">ยอดขายรวม</p>
-                  <p className="text-[13px] font-semibold text-brand-dark/70">฿{formatBaht(dayProfit.totalRevenue)}</p>
-                </div>
-              </div>
+              <p className="text-[10px] text-brand-dark/30">คำนวณจาก {dayProfit.matchedItems} รายการที่ตรงกับสินค้าในสต๊อก</p>
             </div>
-            <p className="text-[10px] text-brand-dark/30">คำนวณจาก {dayProfit.matchedItems} รายการที่ตรงกับสินค้าในสต๊อก</p>
-          </div>
-        </div>
-      )}
-      {rangeMode === 'day' && !dayProfit && stockProducts.length > 0 && selectedReport && (
-        <div className="px-4 md:px-6 mb-5">
-          <div className="rounded-2xl border border-brand-blue/10 bg-brand-pale/30 px-4 py-3 text-center">
-            <p className="text-[12px] text-brand-dark/30">ยังไม่มีข้อมูลราคากล่อง — ตั้งค่าราคาซื้อในหน้าสต๊อกเพื่อดูกำไร</p>
-          </div>
+          ) : isToday ? (
+            <div className="rounded-2xl border border-brand-blue/10 bg-brand-pale/30 px-4 py-3 text-center">
+              <p className="text-[12px] text-brand-dark/30">ยังไม่มีข้อมูลราคากล่อง — ตั้งค่าราคาซื้อในหน้าสต๊อกเพื่อดูกำไร</p>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-brand-blue/10 bg-brand-pale/30 px-4 py-3 flex items-center gap-3">
+              <span className="text-[18px]">📊</span>
+              <p className="text-[12px] text-brand-dark/40">ไม่มีข้อมูลกำไรย้อนหลัง — ระบบจะบันทึกกำไรได้เฉพาะวันปัจจุบันเท่านั้น</p>
+            </div>
+          )}
         </div>
       )}
 
