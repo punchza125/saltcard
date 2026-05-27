@@ -4,12 +4,39 @@ import {
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Sector
 } from 'recharts'
 import { ChevronLeft, ChevronRight, TrendingUp, Package } from 'lucide-react'
-import type { DayReport } from '../types'
+import type { DayReport, StockProduct } from '../types'
 import { formatThaiDate, formatThaiDateFull, formatBaht } from '../utils/parser'
 import StatCard from './StatCard'
 
 interface DashboardPageProps {
   reports: DayReport[]
+  stockProducts?: StockProduct[]
+  taxRate?: number
+}
+
+function calcDayProfit(report: DayReport, products: StockProduct[], taxRate: number) {
+  let totalRevenue = 0
+  let totalCost = 0
+  let matchedItems = 0
+  for (const goods of report.goods) {
+    const lowerName = goods.goodsName.toLowerCase()
+    const isBox = lowerName.includes('(box)') || lowerName.endsWith(' box')
+    for (const product of products) {
+      if (!product.goodsKeyword || !product.buyPricePerBox || product.packsPerBox <= 0) continue
+      if (!lowerName.includes(product.goodsKeyword.toLowerCase())) continue
+      const costPerPack = product.buyPricePerBox / product.packsPerBox
+      const packsSold = isBox ? goods.salesVolume * product.packsPerBox : goods.salesVolume
+      totalRevenue += goods.salesAmount
+      totalCost += packsSold * costPerPack
+      matchedItems++
+      break
+    }
+  }
+  if (matchedItems === 0) return null
+  const grossProfit = totalRevenue - totalCost
+  const netProfit = totalRevenue * (1 - taxRate / 100) - totalCost
+  const profitPct = totalCost > 0 ? (netProfit / totalCost) * 100 : 0
+  return { totalRevenue, totalCost, grossProfit, netProfit, profitPct, matchedItems }
 }
 
 type RangeMode = 'day' | 'week' | 'month' | 'all'
@@ -38,7 +65,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   )
 }
 
-export default function DashboardPage({ reports }: DashboardPageProps) {
+export default function DashboardPage({ reports, stockProducts = [], taxRate = 15 }: DashboardPageProps) {
   const [rangeMode, setRangeMode] = useState<RangeMode>('day')
   const [selectedDateIdx, setSelectedDateIdx] = useState<number>(reports.length - 1)
   const [activeGoodsTab, setActiveGoodsTab] = useState<'amount' | 'volume'>('amount')
@@ -141,6 +168,12 @@ export default function DashboardPage({ reports }: DashboardPageProps) {
     const winsTotal = dailyAmts.slice(1).filter((d, i) => d.amount > dailyAmts[i].amount).length
     return { best, streak, winsTotal, total: dailyAmts.length - 1 }
   }, [reports, rangeMode])
+
+  // Day profit (only in day mode, only if stock products have buy prices)
+  const dayProfit = useMemo(() => {
+    if (rangeMode !== 'day' || !selectedReport || stockProducts.length === 0) return null
+    return calcDayProfit(selectedReport, stockProducts, taxRate)
+  }, [rangeMode, selectedReport, stockProducts, taxRate])
 
   const availableDates = useMemo(() => new Set(reports.map(r => r.date)), [reports])
 
@@ -459,6 +492,48 @@ export default function DashboardPage({ reports }: DashboardPageProps) {
           ) : null
         )}
       </div>
+
+      {/* ── Day profit card (day mode only) ─────────────── */}
+      {rangeMode === 'day' && dayProfit && (
+        <div className="px-4 md:px-6 mb-5">
+          <div className="rounded-2xl overflow-hidden border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 px-4 py-3 flex flex-col gap-2"
+            style={{ animation: 'fadeUp 0.4s ease both', animationDelay: '150ms' }}>
+            <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-600">💰 กำไรสุทธิวันนี้</p>
+            <div className="flex items-end gap-4 flex-wrap">
+              <div>
+                <p className="text-[26px] font-bold leading-tight text-emerald-700">
+                  ฿{formatBaht(dayProfit.netProfit)}
+                </p>
+                <p className="text-[11px] text-emerald-500 font-medium">
+                  {dayProfit.profitPct >= 0 ? '▲' : '▼'} {Math.abs(dayProfit.profitPct).toFixed(1)}% ROI
+                </p>
+              </div>
+              <div className="flex gap-4 pb-0.5">
+                <div>
+                  <p className="text-[10px] text-brand-dark/40 mb-0.5">รายได้สุทธิ (หักภาษี {taxRate}%)</p>
+                  <p className="text-[13px] font-semibold text-brand-dark/70">฿{formatBaht(dayProfit.totalRevenue * (1 - taxRate / 100))}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-brand-dark/40 mb-0.5">ต้นทุน</p>
+                  <p className="text-[13px] font-semibold text-brand-dark/70">฿{formatBaht(dayProfit.totalCost)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-brand-dark/40 mb-0.5">ยอดขายรวม</p>
+                  <p className="text-[13px] font-semibold text-brand-dark/70">฿{formatBaht(dayProfit.totalRevenue)}</p>
+                </div>
+              </div>
+            </div>
+            <p className="text-[10px] text-brand-dark/30">คำนวณจาก {dayProfit.matchedItems} รายการที่ตรงกับสินค้าในสต๊อก</p>
+          </div>
+        </div>
+      )}
+      {rangeMode === 'day' && !dayProfit && stockProducts.length > 0 && selectedReport && (
+        <div className="px-4 md:px-6 mb-5">
+          <div className="rounded-2xl border border-brand-blue/10 bg-brand-pale/30 px-4 py-3 text-center">
+            <p className="text-[12px] text-brand-dark/30">ยังไม่มีข้อมูลราคากล่อง — ตั้งค่าราคาซื้อในหน้าสต๊อกเพื่อดูกำไร</p>
+          </div>
+        </div>
+      )}
 
       {/* ── Main content: stacked mobile → 2-col desktop ─ */}
       <div className="md:px-6 md:grid md:grid-cols-3 md:gap-5 md:items-start">

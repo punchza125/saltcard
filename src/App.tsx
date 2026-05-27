@@ -15,7 +15,7 @@ const ENV_SHEETS_URL = import.meta.env.VITE_SHEETS_URL as string | undefined
 
 export default function App() {
   const { store, addReport, removeReport, clearAll } = useStore()
-  const { replaceAll: replaceStock } = useStockStore()
+  const { stock, replaceAll: replaceStock } = useStockStore()
   const [activeTab, setActiveTab] = useState<'dashboard' | 'upload' | 'stock' | 'machine'>('dashboard')
   const [showSheetsConfig, setShowSheetsConfig] = useState(false)
   const [sheetsMachine, setSheetsMachine] = useState<MachineReport | null>(null)
@@ -105,7 +105,7 @@ export default function App() {
         setActiveTab={setActiveTab}
       />
       <main className="flex-1 pb-16 md:pb-0">
-        {activeTab === 'dashboard' && <DashboardPage reports={store.reports} />}
+        {activeTab === 'dashboard' && <DashboardPage reports={store.reports} stockProducts={stock.products} taxRate={stock.taxRate} />}
         {activeTab === 'stock' && (
           <StockPage
             reports={store.reports}
