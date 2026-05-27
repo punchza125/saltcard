@@ -255,13 +255,17 @@ function ProductModal({
   initial?: StockProduct
   onSave: (
     name: string, unit: StockUnit, packsPerBox: number,
-    qty: number, qtyIncoming: number, yellowAt: number, redAt: number, goodsKeyword: string, category: string
+    qty: number, qtyIncoming: number, yellowAt: number, redAt: number, goodsKeyword: string, category: string,
+    buyPricePerBox?: number, sellPricePerPack?: number, sellPricePerBox?: number
   ) => void
   onClose: () => void
 }) {
   const [name,        setName]        = useState(initial?.name          ?? '')
   const [unit,        setUnit]        = useState<StockUnit>(initial?.unit ?? 'Box')
   const [packsPerBox, setPacksPerBox] = useState(String(initial?.packsPerBox ?? 24))
+  const [buyPrice,    setBuyPrice]    = useState(String(initial?.buyPricePerBox   ?? ''))
+  const [sellPack,    setSellPack]    = useState(String(initial?.sellPricePerPack ?? ''))
+  const [sellBox,     setSellBox]     = useState(String(initial?.sellPricePerBox  ?? ''))
   const [qtyInput,    setQtyInput]    = useState(() => {
     if (!initial) return '0'
     const p = initial.packsPerBox
@@ -294,7 +298,12 @@ function ProductModal({
     if (r >= y) return setError('ขีดแดงต้องน้อยกว่าขีดเหลือง')
     const q   = hasConversion ? Math.round(raw * ppb)    : raw
     const inc = hasConversion ? Math.round(rawInc * ppb) : rawInc
-    onSave(name.trim(), unit, ppb < 0 ? 0 : ppb, q, inc, y, r, keyword.trim(), category)
+    onSave(
+      name.trim(), unit, ppb < 0 ? 0 : ppb, q, inc, y, r, keyword.trim(), category,
+      buyPrice ? Number(buyPrice) : undefined,
+      sellPack ? Number(sellPack) : undefined,
+      sellBox  ? Number(sellBox)  : undefined,
+    )
     onClose()
   }
 
@@ -436,6 +445,40 @@ function ProductModal({
                   value={redAt} onChange={e => setRedAt(e.target.value)}
                 />
                 <p className="text-[10px] text-brand-dark/30 mt-0.5">{boxHint(redAt)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* ราคาซื้อ-ขาย */}
+          <div className="bg-emerald-50/60 rounded-xl p-3 space-y-2 border border-emerald-100">
+            <p className="text-[11px] text-emerald-700 font-medium">ราคา (สำหรับคำนวณกำไร)</p>
+            <div>
+              <label className="text-[12px] text-brand-dark/60 mb-1 block">ราคาซื้อต่อกล่อง (฿)</label>
+              <input
+                type="number" min={0}
+                className="w-full border border-emerald-200 rounded-lg px-3 py-2 text-[13px] outline-none focus:border-emerald-400"
+                value={buyPrice} onChange={e => setBuyPrice(e.target.value)}
+                placeholder="เช่น 14490"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[12px] text-brand-dark/60 mb-1 block">ราคาขายต่อซอง (฿)</label>
+                <input
+                  type="number" min={0}
+                  className="w-full border border-emerald-200 rounded-lg px-3 py-2 text-[13px] outline-none focus:border-emerald-400"
+                  value={sellPack} onChange={e => setSellPack(e.target.value)}
+                  placeholder="เช่น 350"
+                />
+              </div>
+              <div>
+                <label className="text-[12px] text-brand-dark/60 mb-1 block">ราคาขายต่อกล่อง (฿)</label>
+                <input
+                  type="number" min={0}
+                  className="w-full border border-emerald-200 rounded-lg px-3 py-2 text-[13px] outline-none focus:border-emerald-400"
+                  value={sellBox} onChange={e => setSellBox(e.target.value)}
+                  placeholder="ไม่บังคับ"
+                />
               </div>
             </div>
           </div>
@@ -773,6 +816,7 @@ function ProductRow({
   pendingSyncCount,
   entries,
   readOnly,
+  taxRate,
 }: {
   product: StockProduct
   resolvedGoodsName: string | null
@@ -783,6 +827,7 @@ function ProductRow({
   pendingSyncCount: number
   entries: ReturnType<typeof useStockStore>['getEntries'] extends (id: string) => infer R ? R : never
   readOnly?: boolean
+  taxRate: number
 }) {
   const { getStatus } = useStockStore()
   const status      = getStatus(product)
@@ -903,13 +948,44 @@ function ProductRow({
         </div>
       </div>
 
-      {/* expanded: thresholds + history */}
+      {/* expanded: thresholds + profit + history */}
       {open && (
         <div className="border-t border-brand-blue/8 px-3 pt-2 pb-3 space-y-1.5">
           <p className="text-[10px] text-brand-dark/30 mb-2">
             เหลือง ≤ {formatQty(product.yellowAt, ppb)} · แดง ≤ {formatQty(product.redAt, ppb)}
             {ppb > 0 && ` · 1 ${product.unit} = ${ppb} Pack`}
           </p>
+
+          {/* Profit section */}
+          {(() => {
+            const p = calcProfit(product, taxRate)
+            if (!p) return null
+            return (
+              <div className="bg-emerald-50 rounded-xl p-2.5 mb-2 border border-emerald-100">
+                <p className="text-[10px] font-semibold text-emerald-700 mb-1.5">กำไร (ภาษี {taxRate}%)</p>
+                <div className="grid grid-cols-3 text-[9px] text-brand-dark/40 font-medium px-1 mb-1">
+                  <span></span><span className="text-center">Pack</span><span className="text-center">Box</span>
+                </div>
+                {[
+                  { label: 'ต้นทุน', packVal: p.costPerPack, boxVal: product.buyPricePerBox, color: 'text-brand-dark/60' },
+                  { label: 'ราคาขาย', packVal: product.sellPricePerPack, boxVal: product.sellPricePerBox, color: 'text-brand-dark/60' },
+                  { label: 'กำไรดิบ', packVal: p.pack ? p.pack.rawProfit : undefined, boxVal: p.box ? p.box.rawProfit : undefined, color: 'text-amber-600' },
+                  { label: 'กำไรสุทธิ', packVal: p.pack ? p.pack.netProfit : undefined, boxVal: p.box ? p.box.netProfit : undefined, color: 'text-emerald-600', bold: true },
+                  { label: 'กำไร %', packVal: p.pack ? p.pack.profitPct : undefined, boxVal: p.box ? p.box.profitPct : undefined, color: 'text-blue-600', isPct: true },
+                ].map(({ label, packVal, boxVal, color, bold, isPct }) => (
+                  <div key={label} className="grid grid-cols-3 text-[11px] py-0.5 border-t border-emerald-100/60">
+                    <span className="text-brand-dark/50 text-[10px]">{label}</span>
+                    <span className={`text-center font-${bold ? 'bold' : 'medium'} ${color}`}>
+                      {packVal != null ? (isPct ? `${packVal.toFixed(1)}%` : `฿${packVal.toFixed(2)}`) : '—'}
+                    </span>
+                    <span className={`text-center font-${bold ? 'bold' : 'medium'} ${color}`}>
+                      {boxVal != null ? (isPct ? `${boxVal.toFixed(1)}%` : `฿${boxVal.toFixed(0)}`) : '—'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
           {entries.length === 0 ? (
             <p className="text-[12px] text-brand-dark/30 text-center py-1">ยังไม่มีประวัติ</p>
           ) : entries.slice(0, 15).map(e => {
@@ -957,13 +1033,39 @@ interface StockPageProps {
   readOnly?: boolean
 }
 
+// ── Profit Calculator ─────────────────────────────────────────────────────────
+function calcProfit(product: StockProduct, taxRate: number) {
+  const ppb = product.packsPerBox
+  if (!product.buyPricePerBox || ppb <= 0) return null
+  const costPerPack = product.buyPricePerBox / ppb
+  const result: {
+    costPerPack: number
+    pack?: { rawProfit: number; netProfit: number; profitPct: number }
+    box?: { rawProfit: number; netProfit: number; profitPct: number }
+  } = { costPerPack }
+  if (product.sellPricePerPack) {
+    const rawProfit = product.sellPricePerPack - costPerPack
+    const netProfit = product.sellPricePerPack * (1 - taxRate / 100) - costPerPack
+    const profitPct = costPerPack > 0 ? (netProfit / costPerPack) * 100 : 0
+    result.pack = { rawProfit, netProfit, profitPct }
+  }
+  if (product.sellPricePerBox) {
+    const costPerBox = product.buyPricePerBox
+    const rawProfit = product.sellPricePerBox - costPerBox
+    const netProfit = product.sellPricePerBox * (1 - taxRate / 100) - costPerBox
+    const profitPct = costPerBox > 0 ? (netProfit / costPerBox) * 100 : 0
+    result.box = { rawProfit, netProfit, profitPct }
+  }
+  return result
+}
+
 export default function StockPage({ reports, sheetsUrl, onPushStock, readOnly }: StockPageProps) {
   const {
     stock, addProduct, updateProduct, removeProduct, logEntry,
     previewSync, applySync, previewSyncProduct, applySyncProduct,
     getPendingDates, resetSyncedDates,
     previewInventorySnapshot, applyInventorySnapshot,
-    getStatus, getEntries,
+    getStatus, getEntries, setTaxRate,
   } = useStockStore()
 
   const [showAdd,       setShowAdd]       = useState(false)
@@ -1170,6 +1272,19 @@ export default function StockPage({ reports, sheetsUrl, onPushStock, readOnly }:
             </button>
           )
         })}
+        {/* Tax rate input */}
+        <div className="flex items-center gap-1 ml-1">
+          <span className="text-[11px] text-brand-dark/40">ภาษี</span>
+          <input
+            type="number" min={0} max={100}
+            className="w-12 border border-brand-blue/20 rounded-lg px-1.5 py-1 text-[11px] text-center outline-none focus:border-brand-blue"
+            value={stock.taxRate}
+            onChange={e => setTaxRate(Number(e.target.value))}
+            disabled={readOnly}
+          />
+          <span className="text-[11px] text-brand-dark/40">%</span>
+        </div>
+
         {!readOnly && (
           <button
             onClick={() => setShowAdd(true)}
@@ -1207,6 +1322,7 @@ export default function StockPage({ reports, sheetsUrl, onPushStock, readOnly }:
                 pendingSyncCount={pendingForProduct}
                 entries={getEntries(p.id)}
                 readOnly={readOnly}
+                taxRate={stock.taxRate}
               />
             )
           })}
@@ -1216,16 +1332,18 @@ export default function StockPage({ reports, sheetsUrl, onPushStock, readOnly }:
       {/* modals */}
       {showAdd && (
         <ProductModal
-          onSave={(name, unit, ppb, qty, inc, yellowAt, redAt, kw, cat) =>
-            addProduct(name, unit, ppb, qty, yellowAt, redAt, kw, cat)}
+          onSave={(name, unit, ppb, qty, inc, yellowAt, redAt, kw, cat, buyPricePerBox, sellPricePerPack, sellPricePerBox) => {
+            const id = addProduct(name, unit, ppb, qty, yellowAt, redAt, kw, cat)
+            updateProduct(id, { buyPricePerBox, sellPricePerPack, sellPricePerBox })
+          }}
           onClose={() => setShowAdd(false)}
         />
       )}
       {editTarget && (
         <ProductModal
           initial={editTarget}
-          onSave={(name, unit, ppb, qty, inc, yellowAt, redAt, kw, cat) =>
-            updateProduct(editTarget.id, { name, unit, packsPerBox: ppb, qty, qtyIncoming: inc, yellowAt, redAt, goodsKeyword: kw, category: cat })}
+          onSave={(name, unit, ppb, qty, inc, yellowAt, redAt, kw, cat, buyPricePerBox, sellPricePerPack, sellPricePerBox) =>
+            updateProduct(editTarget.id, { name, unit, packsPerBox: ppb, qty, qtyIncoming: inc, yellowAt, redAt, goodsKeyword: kw, category: cat, buyPricePerBox, sellPricePerPack, sellPricePerBox })}
           onClose={() => setEditTarget(null)}
         />
       )}

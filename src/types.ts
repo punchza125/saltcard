@@ -49,13 +49,16 @@ export interface StockProduct {
   id: string
   name: string
   unit: StockUnit
-  packsPerBox: number   // จำนวน pack ต่อ 1 box (0 = ไม่แปลง)
-  qty: number           // ของในมือ (pack)
-  qtyIncoming: number   // ของที่สั่งแล้วรอรับ (pack)
-  yellowAt: number      // warn threshold (pack)
-  redAt: number         // critical threshold (pack)
-  goodsKeyword: string  // keyword จับคู่ชื่อใน Goods Aspect เช่น "PRB-02"
-  category: string      // หมวดหมู่ เช่น "One Piece"
+  packsPerBox: number    // จำนวน pack ต่อ 1 box (0 = ไม่แปลง)
+  qty: number            // ของในมือ (pack)
+  qtyIncoming: number    // ของที่สั่งแล้วรอรับ (pack)
+  yellowAt: number       // warn threshold (pack)
+  redAt: number          // critical threshold (pack)
+  goodsKeyword: string   // keyword จับคู่ชื่อใน Goods Aspect เช่น "PRB-02"
+  category: string       // หมวดหมู่ เช่น "One Piece"
+  buyPricePerBox?: number   // ราคาซื้อต่อกล่อง (฿)
+  sellPricePerPack?: number // ราคาขายต่อซอง (฿)
+  sellPricePerBox?: number  // ราคาขายต่อกล่อง (฿) — optional
 }
 
 export type EntryKind = 'in' | 'received' | 'incoming' | 'out' | 'auto' | 'adjust'
@@ -90,4 +93,5 @@ export interface StockStore {
   products: StockProduct[]
   entries: StockEntry[]
   syncedDates: string[]  // วันที่ที่ sync จากรายงานแล้ว
+  taxRate: number        // ภาษี % เช่น 15
 }

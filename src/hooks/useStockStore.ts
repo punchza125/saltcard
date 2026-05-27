@@ -17,10 +17,10 @@ function load(): StockStore {
       if (parsed.products) {
         parsed.products = parsed.products.map((p: StockProduct) => ({ qtyIncoming: 0, category: '', ...p }))
       }
-      return { syncedDates: [], ...parsed }
+      return { syncedDates: [], taxRate: 15, ...parsed }
     }
   } catch {}
-  return { products: [], entries: [], syncedDates: [] }
+  return { products: [], entries: [], syncedDates: [], taxRate: 15 }
 }
 
 function save(s: StockStore) {
@@ -294,6 +294,10 @@ export function useStockStore() {
     return stock.entries.filter(e => e.productId === productId).reverse()
   }
 
+  function setTaxRate(rate: number) {
+    setStock(s => ({ ...s, taxRate: rate }))
+  }
+
   return {
     stock,
     addProduct, updateProduct, removeProduct, logEntry,
@@ -301,6 +305,6 @@ export function useStockStore() {
     getPendingDates, resetSyncedDates,
     previewInventorySnapshot, applyInventorySnapshot,
     getStatus, getEntries,
-    replaceAll,
+    replaceAll, setTaxRate,
   }
 }
