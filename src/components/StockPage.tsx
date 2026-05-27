@@ -814,7 +814,6 @@ function ProductRow({
   onLog,
   onSync,
   pendingSyncCount,
-  entries,
   readOnly,
   taxRate,
 }: {
@@ -825,7 +824,6 @@ function ProductRow({
   onLog: () => void
   onSync: () => void
   pendingSyncCount: number
-  entries: ReturnType<typeof useStockStore>['getEntries'] extends (id: string) => infer R ? R : never
   readOnly?: boolean
   taxRate: number
 }) {
@@ -986,34 +984,6 @@ function ProductRow({
               </div>
             )
           })()}
-          {entries.length === 0 ? (
-            <p className="text-[12px] text-brand-dark/30 text-center py-1">ยังไม่มีประวัติ</p>
-          ) : entries.slice(0, 15).map(e => {
-            const kindMeta = ENTRY_KIND_LABEL[e.kind ?? 'in']
-            const isIncoming = e.kind === 'incoming'
-            const isAdjust   = e.kind === 'adjust'
-            return (
-              <div key={e.id} className="flex items-center gap-2 text-[12px]">
-                <span className={`text-[9px] px-1.5 py-0.5 rounded font-semibold flex-shrink-0 ${
-                  isIncoming ? 'bg-blue-100 text-blue-500'
-                  : isAdjust  ? 'bg-purple-100 text-purple-500'
-                  : e.delta > 0 ? 'bg-emerald-100 text-emerald-600'
-                  : 'bg-red-100 text-red-500'
-                }`}>{kindMeta.label}</span>
-                <span className={`font-semibold w-16 text-right flex-shrink-0 ${
-                  isIncoming ? 'text-blue-500'
-                  : isAdjust  ? 'text-purple-500'
-                  : e.delta > 0 ? 'text-emerald-600'
-                  : 'text-red-500'
-                }`}>
-                  {isIncoming ? '+' : e.delta > 0 ? '+' : '−'}
-                  {ppb > 0 ? formatQty(Math.abs(e.delta), ppb) : `${Math.abs(e.delta)} Pack`}
-                </span>
-                <span className="text-brand-dark/40 flex-shrink-0">{e.date}</span>
-                <span className="text-brand-dark/50 truncate">{e.note || '—'}</span>
-              </div>
-            )
-          })}
           {!readOnly && (
             <button onClick={onDelete} className="mt-1 flex items-center gap-1 text-[11px] text-red-400 hover:text-red-600">
               <Trash2 size={11} /> ลบสินค้านี้
@@ -1320,7 +1290,6 @@ export default function StockPage({ reports, sheetsUrl, onPushStock, readOnly }:
                 onLog={() => setLogTarget(p)}
                 onSync={() => setSyncProduct(p)}
                 pendingSyncCount={pendingForProduct}
-                entries={getEntries(p.id)}
                 readOnly={readOnly}
                 taxRate={stock.taxRate}
               />
