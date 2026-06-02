@@ -1038,15 +1038,17 @@ export default function StockPage({ reports, sheetsUrl, onPushStock, readOnly }:
     getStatus, getEntries, setTaxRate,
   } = useStockStore()
 
-  const [showAdd,       setShowAdd]       = useState(false)
-  const [editTarget,    setEditTarget]    = useState<StockProduct | null>(null)
-  const [logTarget,     setLogTarget]     = useState<StockProduct | null>(null)
-  const [filter,        setFilter]        = useState<'all' | 'red' | 'yellow' | 'green'>('all')
-  const [catFilter,     setCatFilter]     = useState<string>('ทั้งหมด')
-  const [showSync,      setShowSync]      = useState(false)
-  const [syncProduct,   setSyncProduct]   = useState<StockProduct | null>(null)
-  const [pushing,       setPushing]       = useState(false)
-  const [pushOk,        setPushOk]        = useState<boolean | null>(null)
+  const [showAdd,          setShowAdd]          = useState(false)
+  const [editTarget,       setEditTarget]       = useState<StockProduct | null>(null)
+  const [logTarget,        setLogTarget]        = useState<StockProduct | null>(null)
+  const [filter,           setFilter]           = useState<'all' | 'red' | 'yellow' | 'green'>('all')
+  const [catFilter,        setCatFilter]        = useState<string>('ทั้งหมด')
+  const [showSync,         setShowSync]         = useState(false)
+  const [syncProduct,      setSyncProduct]      = useState<StockProduct | null>(null)
+  const [syncExpanded,     setSyncExpanded]     = useState(false)
+  const [selectedSyncDates, setSelectedSyncDates] = useState<Set<string>>(new Set())
+  const [pushing,          setPushing]          = useState(false)
+  const [pushOk,           setPushOk]           = useState<boolean | null>(null)
 
   async function handlePushStock() {
     if (!onPushStock) return
@@ -1102,7 +1104,28 @@ export default function StockPage({ reports, sheetsUrl, onPushStock, readOnly }:
   }
 
   const pendingDates = useMemo(() => getPendingDates(reports), [reports, stock.syncedDates])
-  const syncPreview  = useMemo(() => showSync ? previewSync(reports) : [], [showSync, reports, stock])
+
+  // Reset selection whenever pending dates change (new data loaded / after sync)
+  useEffect(() => {
+    setSelectedSyncDates(new Set(pendingDates))
+    setSyncExpanded(false)
+  }, [pendingDates.join(',')])
+
+  // All preview items (for counting per date in banner)
+  const syncPreviewAll = useMemo(() => reports.length > 0 ? previewSync(reports) : [], [reports, stock.syncedDates])
+  const syncCountByDate = useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const item of syncPreviewAll) {
+      map[item.date] = (map[item.date] || 0) + 1
+    }
+    return map
+  }, [syncPreviewAll])
+
+  // Only items for selected dates (used in modal)
+  const syncPreview = useMemo(
+    () => showSync ? syncPreviewAll.filter(i => selectedSyncDates.has(i.date)) : [],
+    [showSync, syncPreviewAll, selectedSyncDates]
+  )
   const productSyncPreview = useMemo(
     () => syncProduct ? previewSyncProduct(reports, syncProduct.id) : [],
     [syncProduct, reports, stock]
@@ -1125,7 +1148,7 @@ export default function StockPage({ reports, sheetsUrl, onPushStock, readOnly }:
   })
 
   function handleConfirmSync() {
-    applySync(syncPreview, pendingDates)
+    applySync(syncPreview, Array.from(selectedSyncDates))
   }
 
   return (
@@ -1133,23 +1156,81 @@ export default function StockPage({ reports, sheetsUrl, onPushStock, readOnly }:
 
       {/* sync banner — เจ้าของเท่านั้น */}
       {!readOnly && (pendingDates.length > 0 ? (
-        <button
-          onClick={() => setShowSync(true)}
-          className="w-full flex items-center gap-3 bg-brand-blue/5 border border-brand-blue/20 rounded-xl px-4 py-3 hover:bg-brand-blue/10 transition-colors text-left"
-        >
-          <RefreshCw size={16} className="text-brand-blue flex-shrink-0" />
-          <div className="flex-1">
-            <p className="text-[13px] font-medium text-brand-blue">
-              มีรายงาน {pendingDates.length} วันที่รอซิงค์
-            </p>
-            <p className="text-[11px] text-brand-blue/60">
-              {pendingDates.map(d => formatThaiDate(d)).join(', ')}
-            </p>
-          </div>
-          <span className="bg-brand-blue text-white text-[11px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0">
-            ซิงค์เลย
-          </span>
-        </button>
+        <div className="bg-brand-blue/5 border border-brand-blue/20 rounded-xl overflow-hidden">
+          {/* header row */}
+          <button
+            onClick={() => setSyncExpanded(v => !v)}
+            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-brand-blue/10 transition-colors text-left"
+          >
+            <RefreshCw size={16} className="text-brand-blue flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-medium text-brand-blue">
+                มีรายงาน {pendingDates.length} วันที่รอซิงค์
+              </p>
+              <p className="text-[11px] text-brand-blue/50">
+                เลือกแล้ว {selectedSyncDates.size} วัน · กดเพื่อจัดการ
+              </p>
+            </div>
+            <ChevronDown size={14} className={`text-brand-blue flex-shrink-0 transition-transform duration-200 ${syncExpanded ? 'rotate-180' : ''}`} />
+          </button>
+
+          {/* expandable date list */}
+          {syncExpanded && (
+            <div className="border-t border-brand-blue/15 px-3 pb-3 pt-2">
+              <div className="space-y-1 mb-3">
+                {pendingDates.map(date => {
+                  const itemCount = syncCountByDate[date] ?? 0
+                  const checked = selectedSyncDates.has(date)
+                  return (
+                    <button
+                      key={date}
+                      onClick={() => setSelectedSyncDates(prev => {
+                        const next = new Set(prev)
+                        if (next.has(date)) next.delete(date)
+                        else next.add(date)
+                        return next
+                      })}
+                      className="w-full flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-brand-blue/5 transition-colors text-left"
+                    >
+                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                        checked ? 'bg-brand-blue border-brand-blue' : 'border-brand-dark/25'
+                      }`}>
+                        {checked && <Check size={10} className="text-white" />}
+                      </div>
+                      <p className="flex-1 text-[13px] font-medium text-brand-dark">{formatThaiDate(date)}</p>
+                      <p className={`text-[11px] flex-shrink-0 ${itemCount > 0 ? 'text-brand-dark/50' : 'text-brand-dark/25'}`}>
+                        {itemCount > 0 ? `${itemCount} รายการ` : 'ไม่พบ'}
+                      </p>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="flex items-center gap-2 pt-2 border-t border-brand-blue/10">
+                <button
+                  onClick={() => setSelectedSyncDates(new Set(pendingDates))}
+                  className="text-[11px] text-brand-blue/60 hover:text-brand-blue transition-colors"
+                >
+                  เลือกทั้งหมด
+                </button>
+                <span className="text-brand-dark/20 text-[11px]">·</span>
+                <button
+                  onClick={() => setSelectedSyncDates(new Set())}
+                  className="text-[11px] text-brand-dark/35 hover:text-brand-dark transition-colors"
+                >
+                  ยกเลิกทั้งหมด
+                </button>
+                <button
+                  disabled={selectedSyncDates.size === 0}
+                  onClick={() => setShowSync(true)}
+                  className="ml-auto bg-brand-blue text-white text-[12px] font-semibold px-3 py-1.5 rounded-lg disabled:opacity-30 hover:bg-brand-light active:scale-95 transition-all flex items-center gap-1.5"
+                >
+                  <Check size={12} /> ซิงค์ที่เลือก ({selectedSyncDates.size})
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       ) : reports.length > 0 && (
         <div className="flex items-center justify-between bg-brand-pale/40 rounded-xl px-4 py-2.5">
           <p className="text-[12px] text-brand-dark/40">
@@ -1327,7 +1408,7 @@ export default function StockPage({ reports, sheetsUrl, onPushStock, readOnly }:
       {showSync && (
         <SyncModal
           preview={syncPreview}
-          pendingDates={pendingDates}
+          pendingDates={Array.from(selectedSyncDates)}
           onConfirm={handleConfirmSync}
           onClose={() => setShowSync(false)}
         />
