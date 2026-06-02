@@ -1182,26 +1182,36 @@ export default function StockPage({ reports, sheetsUrl, onPushStock, readOnly }:
                   const itemCount = syncCountByDate[date] ?? 0
                   const checked = selectedSyncDates.has(date)
                   return (
-                    <button
-                      key={date}
-                      onClick={() => setSelectedSyncDates(prev => {
-                        const next = new Set(prev)
-                        if (next.has(date)) next.delete(date)
-                        else next.add(date)
-                        return next
-                      })}
-                      className="w-full flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-brand-blue/5 transition-colors text-left"
-                    >
-                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                        checked ? 'bg-brand-blue border-brand-blue' : 'border-brand-dark/25'
-                      }`}>
-                        {checked && <Check size={10} className="text-white" />}
-                      </div>
-                      <p className="flex-1 text-[13px] font-medium text-brand-dark">{formatThaiDate(date)}</p>
-                      <p className={`text-[11px] flex-shrink-0 ${itemCount > 0 ? 'text-brand-dark/50' : 'text-brand-dark/25'}`}>
-                        {itemCount > 0 ? `${itemCount} รายการ` : 'ไม่พบ'}
-                      </p>
-                    </button>
+                    <div key={date} className="flex items-center gap-1">
+                      {/* checkbox + date */}
+                      <button
+                        onClick={() => setSelectedSyncDates(prev => {
+                          const next = new Set(prev)
+                          if (next.has(date)) next.delete(date)
+                          else next.add(date)
+                          return next
+                        })}
+                        className="flex-1 flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-brand-blue/5 transition-colors text-left min-w-0"
+                      >
+                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                          checked ? 'bg-brand-blue border-brand-blue' : 'border-brand-dark/25'
+                        }`}>
+                          {checked && <Check size={10} className="text-white" />}
+                        </div>
+                        <p className="flex-1 text-[13px] font-medium text-brand-dark">{formatThaiDate(date)}</p>
+                        <p className={`text-[11px] flex-shrink-0 ${itemCount > 0 ? 'text-brand-dark/50' : 'text-brand-dark/25'}`}>
+                          {itemCount > 0 ? `${itemCount} รายการ` : 'ไม่พบ'}
+                        </p>
+                      </button>
+                      {/* skip button */}
+                      <button
+                        onClick={() => applySync([], [date])}
+                        title="ไม่ซิงค์วันนี้ (หายไปจากรายการ)"
+                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-brand-dark/25 hover:bg-red-50 hover:text-red-400 transition-colors"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
                   )
                 })}
               </div>
