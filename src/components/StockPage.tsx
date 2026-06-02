@@ -1368,9 +1368,7 @@ export default function StockPage({ reports, sheetsUrl, onPushStock, readOnly }:
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {filtered.map(p => {
-            const pendingForProduct = reports.length > 0
-              ? previewSyncProduct(reports, p.id).length
-              : 0
+            const pendingForProduct = syncPreviewAll.filter(i => i.productId === p.id).length
             return (
               <ProductRow
                 key={p.id}
