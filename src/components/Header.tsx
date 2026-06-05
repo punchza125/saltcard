@@ -1,5 +1,5 @@
 import React from 'react'
-import { Upload, BarChart2, Package, MonitorPlay, FolderOpen } from 'lucide-react'
+import { Upload } from 'lucide-react'
 
 interface HeaderProps {
   reportCount: number
@@ -8,16 +8,8 @@ interface HeaderProps {
   setActiveTab: (t: 'dashboard' | 'upload' | 'stock' | 'machine') => void
 }
 
-const NAV_ITEMS = [
-  { tab: 'dashboard' as const, label: 'ภาพรวม',    Icon: BarChart2   },
-  { tab: 'stock'     as const, label: 'สต็อก',      Icon: Package     },
-  { tab: 'machine'   as const, label: 'หน้าตู้',    Icon: MonitorPlay },
-  { tab: 'upload'    as const, label: 'จัดการไฟล์', Icon: FolderOpen  },
-]
-
 export default function Header({ reportCount, onUploadClick, activeTab, setActiveTab }: HeaderProps) {
   return (
-    <>
     <header className="sticky top-0 z-50 bg-white border-b border-brand-blue/10 w-full">
       <div className="flex items-center px-4 md:px-6 h-16 gap-3">
 
@@ -78,28 +70,5 @@ export default function Header({ reportCount, onUploadClick, activeTab, setActiv
       </div>
 
     </header>
-
-    {/* Mobile bottom nav */}
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-brand-blue/10 flex safe-bottom">
-      {NAV_ITEMS.map(({ tab, label, Icon }) => {
-        const isActive = activeTab === tab
-        return (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className="flex-1 flex flex-col items-center justify-center pt-1 pb-2 transition-colors relative"
-          >
-            {/* active indicator bar */}
-            <div className={`absolute top-0 left-3 right-3 h-0.5 rounded-full transition-all ${isActive ? 'bg-brand-blue' : 'bg-transparent'}`} />
-            {/* icon with background */}
-            <div className={`rounded-xl px-4 py-1 mb-0.5 transition-all ${isActive ? 'bg-brand-blue/10' : ''}`}>
-              <Icon size={20} strokeWidth={isActive ? 2.5 : 1.5} className={isActive ? 'text-brand-blue' : 'text-brand-dark/30'} />
-            </div>
-            <span className={`text-[10px] font-semibold transition-colors ${isActive ? 'text-brand-blue' : 'text-brand-dark/30'}`}>{label}</span>
-          </button>
-        )
-      })}
-    </nav>
-    </>
   )
 }
