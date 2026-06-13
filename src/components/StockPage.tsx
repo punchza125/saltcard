@@ -836,8 +836,11 @@ function ProductRow({
   const [open, setOpen] = useState(false)
   const [imgIdx, setImgIdx] = useState(0)
   const imgCandidates = useMemo(() => {
+    // ถ้าชื่อสินค้ามี "(1 Pack)" หรือ "(Box)" อยู่แล้ว ใช้ชื่อตรงๆ ไม่เติมซ้ำ
+    const hasUnitSuffix = /\((1 Pack|Box)\)\s*$/i.test(product.name)
     const list = [
-      `/Img/${product.name} (1 Pack).jpg`,
+      `/Img/${product.name}.jpg`,
+      ...(hasUnitSuffix ? [] : [`/Img/${product.name} (1 Pack).jpg`]),
       ...(resolvedGoodsName ? [`/Img/${resolvedGoodsName}.jpg`] : []),
     ]
     // deduplicate
