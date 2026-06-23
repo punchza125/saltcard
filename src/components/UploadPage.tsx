@@ -8,10 +8,14 @@ import type { DayReport } from '../types'
 import { parseMultiReport, formatThaiDate } from '../utils/parser'
 
 interface UploadPageProps {
-  reports: DayReport[]
-  onAdd: (r: DayReport) => void
-  onRemove: (date: string) => void
-  onClearAll: () => void
+  centralReports: DayReport[]
+  passionReports: DayReport[]
+  onAddCentral: (r: DayReport) => void
+  onAddPassion: (r: DayReport) => void
+  onRemoveCentral: (date: string) => void
+  onRemovePassion: (date: string) => void
+  onClearCentral: () => void
+  onClearPassion: () => void
   sheetsUrl: string
   lastSynced: string | null
   onPushReport: (r: DayReport) => Promise<boolean>
@@ -46,8 +50,17 @@ function StatusIcon({ status }: { status: FileStatus['status'] }) {
   return <AlertCircle size={14} className="text-red-400 flex-shrink-0" />
 }
 
+// Map branch label → which store handler to call
+const BRANCH_HANDLERS: Record<string, 'central' | 'passion'> = {
+  'เซนทรัล ระยอง': 'central',
+  'พาชชั่น ระยอง': 'passion',
+}
+
 export default function UploadPage({
-  reports, onAdd, onRemove, onClearAll,
+  centralReports, passionReports,
+  onAddCentral, onAddPassion,
+  onRemoveCentral, onRemovePassion,
+  onClearCentral, onClearPassion,
   sheetsUrl, lastSynced,
   onPushReport, onFetchAll, onOpenSheetsConfig,
 }: UploadPageProps) {
@@ -56,14 +69,22 @@ export default function UploadPage({
   const [pushingAll,  setPushingAll]  = useState(false)
   const [draggingId,  setDraggingId]  = useState<string | null>(null)
 
-  // one ref per branch
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   const handlePushAll = async () => {
-    if (!reports.length) return
+    const all = [...centralReports, ...passionReports]
+    if (!all.length) return
     setPushingAll(true)
-    for (const r of reports) await onPushReport(r)
+    for (const r of all) await onPushReport(r)
     setPushingAll(false)
+  }
+
+  // Auto-detect branch from parsed report, fall back to the zone it was dropped in
+  function detectBranch(report: DayReport, fallback: string): 'central' | 'passion' {
+    const siteName = report.sites[0]?.name ?? report.areas[0]?.name ?? ''
+    if (siteName.includes('พาชชั่น')) return 'passion'
+    if (siteName.includes('เซนทรัล')) return 'central'
+    return BRANCH_HANDLERS[fallback] ?? 'central'
   }
 
   const processFiles = useCallback(async (files: FileList | File[], branchLabel: string) => {
@@ -72,42 +93,45 @@ export default function UploadPage({
 
     const newStatuses: FileStatus[] = arr.map(f => ({ name: f.name, branch: branchLabel, status: 'parsing' }))
     setFileStatuses(prev => [...newStatuses, ...prev])
-    const offset = 0
 
     for (let i = 0; i < arr.length; i++) {
       try {
         const report = await parseMultiReport(arr[i])
-        onAdd(report)
+        const target = detectBranch(report, branchLabel)
+        if (target === 'passion') onAddPassion(report)
+        else                      onAddCentral(report)
+
         setFileStatuses(prev => prev.map((s, idx) =>
-          idx === i + offset ? { ...s, status: sheetsUrl ? 'syncing' : 'done', message: formatThaiDate(report.date) } : s
+          idx === i ? { ...s, status: sheetsUrl ? 'syncing' : 'done', message: formatThaiDate(report.date) } : s
         ))
         if (sheetsUrl) {
           const ok = await onPushReport(report)
           setFileStatuses(prev => prev.map((s, idx) =>
-            idx === i + offset ? { ...s, status: ok ? 'synced' : 'done', message: formatThaiDate(report.date) } : s
+            idx === i ? { ...s, status: ok ? 'synced' : 'done', message: formatThaiDate(report.date) } : s
           ))
         }
       } catch {
         setFileStatuses(prev => prev.map((s, idx) =>
-          idx === i + offset ? { ...s, status: 'error', message: 'อ่านไฟล์ไม่ได้' } : s
+          idx === i ? { ...s, status: 'error', message: 'อ่านไฟล์ไม่ได้' } : s
         ))
       }
     }
-  }, [onAdd, onPushReport, sheetsUrl])
+  }, [onAddCentral, onAddPassion, onPushReport, sheetsUrl])
 
   const handleFetchAll = async () => {
     setFetching(true)
     const fetched = await onFetchAll()
-    if (fetched) fetched.forEach(r => onAdd(r))
+    if (fetched) fetched.forEach(r => onAddCentral(r))  // fetched from Sheets = Central
     setFetching(false)
   }
 
-  // Group reports by detected branch
-  const reportsByBranch = reports.reduce<Record<string, DayReport[]>>((acc, r) => {
-    const b = getReportBranch(r)
-    ;(acc[b] ??= []).push(r)
-    return acc
-  }, {})
+  const reportsByBranch: Record<string, DayReport[]> = {
+    'เซนทรัล ระยอง': [...centralReports].sort((a,b) => b.date.localeCompare(a.date)),
+    'พาชชั่น ระยอง':  [...passionReports].sort((a,b) => b.date.localeCompare(a.date)),
+  }
+
+  const onRemoveByBranch = { 'เซนทรัล ระยอง': onRemoveCentral, 'พาชชั่น ระยอง': onRemovePassion }
+  const onClearByBranch  = { 'เซนทรัล ระยอง': onClearCentral,  'พาชชั่น ระยอง': onClearPassion  }
 
   return (
     <div className="px-4 md:px-6 py-5 md:py-8 md:max-w-4xl md:mx-auto">
@@ -218,7 +242,7 @@ export default function UploadPage({
                   {branchReports.length > 0 && (
                     <button onClick={() => {
                       if (!confirm(`ลบข้อมูล ${branch.label} ทั้งหมด ${branchReports.length} วัน?`)) return
-                      branchReports.forEach(r => onRemove(r.date))
+                      onClearByBranch[branch.label]?.()
                     }} className="text-[11px] text-red-400 hover:text-red-600 transition-colors">
                       ล้าง
                     </button>
@@ -293,7 +317,7 @@ export default function UploadPage({
                                 <CloudUpload size={12} className="text-brand-blue/40 group-hover:text-brand-blue transition-colors" />
                               </button>
                             )}
-                            <button onClick={() => onRemove(r.date)} aria-label="ลบ"
+                            <button onClick={() => onRemoveByBranch[branch.label]?.(r.date)} aria-label="ลบ"
                               className="w-7 h-7 rounded-full bg-red-50 flex items-center justify-center hover:bg-red-100 transition-colors group">
                               <X size={12} className="text-red-300 group-hover:text-red-500 transition-colors" />
                             </button>
