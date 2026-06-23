@@ -311,23 +311,6 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
   return (
     <div className="pb-10 md:pb-12">
 
-      {/* ── Branch filter ──────────────────────────────── */}
-      {availableSites.length > 0 && (
-        <div className="px-4 md:px-6 pt-4 pb-0 flex gap-2 overflow-x-auto scrollbar-none">
-          {(['ทั้งหมด', ...availableSites] as string[]).map(site => (
-            <button key={site} onClick={() => setSelectedSite(site)}
-              className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium border transition-all ${
-                selectedSite === site
-                  ? 'bg-brand-dark text-white border-transparent'
-                  : 'bg-white text-brand-dark/60 border-brand-blue/15 hover:border-brand-blue/40'
-              }`}>
-              <MapPin size={11} />
-              {site}
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* ── Controls row ─────────────────────────────── */}
       <div className="px-4 md:px-6 pt-4 pb-3 flex flex-col md:flex-row md:items-center gap-3">
         {/* Range selector */}
@@ -374,48 +357,8 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
 
       {/* ── Stat cards: 2 cols mobile → 4 cols desktop ─ */}
       <div className="px-4 md:px-6 grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        <StatCard label="ยอดขายรวม" value={`฿${formatBaht(stats.totalAmount)}`} sub={`${filteredReports.length} วัน${selectedSite !== 'ทั้งหมด' ? ` · ${selectedSite}` : ''}`} accent icon={<TrendingUp size={12} />} delay={0} />
+        <StatCard label="ยอดขายรวม" value={`฿${formatBaht(stats.totalAmount)}`} sub={selectedSite !== 'ทั้งหมด' ? selectedSite : `${filteredReports.length} วัน`} accent icon={<TrendingUp size={12} />} delay={0} />
         <StatCard label="จำนวนชิ้น" value={`${stats.totalVolume.toLocaleString()}`} sub={`เฉลี่ย ฿${formatBaht(stats.avgPerPiece)}/ชิ้น`} icon={<Package size={12} />} delay={50} />
-
-        {/* Branch comparison card */}
-        {branchComparison && (
-          <div className="col-span-2 rounded-2xl border border-brand-blue/15 bg-white px-4 py-3"
-            style={{ animation: 'fadeUp 0.4s ease both', animationDelay: '80ms' }}>
-            <p className="text-[11px] font-bold text-brand-dark/40 uppercase tracking-wide mb-2.5 flex items-center gap-1.5">
-              <MapPin size={11} /> ยอดแยกสาขา
-            </p>
-            <div className="space-y-2">
-              {branchComparison.map((b, i) => {
-                const maxAmt = branchComparison[0].amount
-                const pct = maxAmt > 0 ? (b.amount / maxAmt) * 100 : 0
-                const COLORS = ['#1a52b3', '#10b981', '#f59e0b', '#e94560', '#8b5cf6']
-                const color = COLORS[i % COLORS.length]
-                return (
-                  <div key={b.site}>
-                    <div className="flex items-center justify-between mb-0.5">
-                      <button
-                        onClick={() => setSelectedSite(selectedSite === b.site ? 'ทั้งหมด' : b.site)}
-                        className={`text-[12px] font-medium transition-colors hover:opacity-80 flex items-center gap-1 ${selectedSite === b.site ? 'font-bold' : ''}`}
-                        style={{ color }}
-                      >
-                        {selectedSite === b.site && <span className="text-[9px]">▶</span>}
-                        {b.site}
-                      </button>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-brand-dark/40">{b.volume} ชิ้น</span>
-                        <span className="text-[12px] font-semibold text-brand-dark">฿{formatBaht(b.amount)}</span>
-                      </div>
-                    </div>
-                    <div className="h-1.5 bg-brand-pale rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${pct}%`, backgroundColor: color }} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
 
         {/* Luffy — 7-day comparison card */}
         {weekStats && (() => {
@@ -766,15 +709,28 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
           {/* Sites */}
           {sitesData.length > 0 && (
             <div className="px-4 md:px-0">
-              <div className="bg-white border border-brand-blue/10 rounded-2xl p-4 card-hover">
-                <p className="text-brand-dark/60 text-[12px] font-medium mb-3">ยอดขายตามสาขา</p>
+              <div className={`bg-white border rounded-2xl p-4 card-hover transition-all ${selectedSite !== 'ทั้งหมด' ? 'border-brand-blue/40 ring-1 ring-brand-blue/20' : 'border-brand-blue/10'}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-brand-dark/60 text-[12px] font-medium">ยอดขายตามสาขา</p>
+                  {selectedSite !== 'ทั้งหมด' && (
+                    <button onClick={() => setSelectedSite('ทั้งหมด')}
+                      className="flex items-center gap-1 text-[11px] text-brand-blue bg-brand-pale px-2 py-0.5 rounded-full hover:bg-brand-blue hover:text-white transition-colors">
+                      <MapPin size={10} /> {selectedSite} ×
+                    </button>
+                  )}
+                </div>
                 <div className="space-y-3">
                   {sitesData.map(s => {
                     const pct = sitesData[0].amount > 0 ? (s.amount / sitesData[0].amount) * 100 : 0
+                    const isSelected = selectedSite === s.name
                     return (
-                      <div key={s.name} className="row-hover px-2 py-1 -mx-2">
+                      <button key={s.name} onClick={() => setSelectedSite(isSelected ? 'ทั้งหมด' : s.name)}
+                        className={`w-full text-left px-2 py-1.5 -mx-2 rounded-xl transition-all ${isSelected ? 'bg-brand-blue/8' : 'hover:bg-brand-pale/60'}`}>
                         <div className="flex items-center justify-between mb-1">
-                          <p className="text-brand-dark text-[13px] font-medium">{s.name}</p>
+                          <p className={`text-[13px] font-medium flex items-center gap-1.5 ${isSelected ? 'text-brand-blue' : 'text-brand-dark'}`}>
+                            {isSelected && <MapPin size={11} className="text-brand-blue" />}
+                            {s.name}
+                          </p>
                           <p className="text-brand-dark/70 text-[12px]">฿{formatBaht(s.amount)}</p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -783,7 +739,7 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
                           </div>
                           <span className="text-brand-dark/40 text-[11px] w-10 text-right">{s.volume} ชิ้น</span>
                         </div>
-                      </div>
+                      </button>
                     )
                   })}
                 </div>
