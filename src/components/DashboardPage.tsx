@@ -353,6 +353,29 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
             {filteredReports.length} วัน · {filteredReports[0] ? formatThaiDate(filteredReports[0].date) : ''} – {filteredReports[filteredReports.length-1] ? formatThaiDate(filteredReports[filteredReports.length-1].date) : ''}
           </p>
         )}
+
+        {/* Branch selector — แสดงเสมอเมื่อมีข้อมูลสาขา */}
+        {availableSites.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <MapPin size={13} className="text-brand-dark/30 flex-shrink-0" />
+            <div className="flex gap-1 bg-brand-pale/60 rounded-xl p-1">
+              <button
+                onClick={() => setSelectedSite('ทั้งหมด')}
+                className={`text-[12px] font-medium px-3 py-1.5 rounded-lg transition-all ${
+                  selectedSite === 'ทั้งหมด' ? 'bg-brand-blue text-white' : 'text-brand-dark/50 hover:text-brand-dark'
+                }`}
+              >ทั้งหมด</button>
+              {availableSites.map(site => (
+                <button key={site}
+                  onClick={() => setSelectedSite(selectedSite === site ? 'ทั้งหมด' : site)}
+                  className={`text-[12px] font-medium px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${
+                    selectedSite === site ? 'bg-brand-blue text-white' : 'text-brand-dark/50 hover:text-brand-dark'
+                  }`}
+                >{site}</button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Stat cards: 2 cols mobile → 4 cols desktop ─ */}
