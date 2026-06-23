@@ -57,18 +57,15 @@ export default function App() {
     return store.reports  // default = Central Rayong
   }, [selectedSite, allReports, store.reports, passionStore.reports])
 
-  const availableSites = useMemo(
-    () => {
-      const sites = new Set<string>()
-      store.reports.forEach(r => r.sites.forEach(s => sites.add(s.name)))
-      passionStore.reports.forEach(r => r.sites.forEach(s => sites.add(s.name)))
-      // always include branch names if their store has data
-      if (store.reports.length > 0)        sites.add('เซนทรัล ระยอง')
-      if (passionStore.reports.length > 0) sites.add('พาชชั่น ระยอง')
-      return Array.from(sites).sort()
-    },
-    [store.reports, passionStore.reports]
-  )
+  const availableSites = useMemo(() => {
+    // Use actual site names from data; add Passion placeholder only when no data yet
+    const sites = new Set<string>()
+    store.reports.forEach(r => r.sites.forEach(s => sites.add(s.name)))
+    passionStore.reports.forEach(r => r.sites.forEach(s => sites.add(s.name)))
+    // Passion placeholder when store is empty (shows as "เร็วๆ นี้" in Header)
+    if (passionStore.reports.length === 0) sites.add('พาชชั่น ระยอง')
+    return Array.from(sites).sort()
+  }, [store.reports, passionStore.reports])
 
   const sheetsConfig = sheetsUrl ? { url: sheetsUrl } : null
   const { syncStatus, syncMessage, lastSynced, pushReport, fetchAll, pushStock, fetchStock, pushMachine, fetchMachine } = useSheets(sheetsConfig)
@@ -165,7 +162,7 @@ export default function App() {
 
       {/* main scrolls inside — ไม่ใช้ body scroll เพื่อให้ nav ไม่ลอย */}
       <main className="flex-1 overflow-y-auto md:overflow-visible">
-        {activeTab === 'dashboard' && <DashboardPage reports={activeReports} stockProducts={stock.products} taxRate={stock.taxRate} selectedSite={selectedSite} setSelectedSite={setSelectedSite} />}
+        {activeTab === 'dashboard' && <DashboardPage reports={activeReports} stockProducts={stock.products} taxRate={stock.taxRate} activeBranch={selectedSite} setActiveBranch={setSelectedSite} />}
         {activeTab === 'stock' && (
           <StockPage
             reports={store.reports}

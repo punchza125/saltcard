@@ -3,7 +3,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Sector
 } from 'recharts'
-import { ChevronLeft, ChevronRight, TrendingUp, Package } from 'lucide-react'
+import { ChevronLeft, ChevronRight, TrendingUp, Package, MapPin } from 'lucide-react'
 import type { DayReport, StockProduct } from '../types'
 import { formatThaiDate, formatThaiDateFull, formatBaht } from '../utils/parser'
 import StatCard from './StatCard'
@@ -12,8 +12,8 @@ interface DashboardPageProps {
   reports: DayReport[]
   stockProducts?: StockProduct[]
   taxRate?: number
-  selectedSite: string
-  setSelectedSite: (s: string) => void
+  activeBranch: string       // which branch is selected (for display only — reports are pre-filtered)
+  setActiveBranch: (s: string) => void
 }
 
 function calcDayProfit(report: DayReport, products: StockProduct[], taxRate: number) {
@@ -67,7 +67,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   )
 }
 
-export default function DashboardPage({ reports, stockProducts = [], taxRate = 15, selectedSite, setSelectedSite }: DashboardPageProps) {
+export default function DashboardPage({ reports, stockProducts = [], taxRate = 15, activeBranch, setActiveBranch }: DashboardPageProps) {
+  // Reports are already filtered by branch at App level — always use area totals here
+  const selectedSite = 'ทั้งหมด'
   const [rangeMode, setRangeMode] = useState<RangeMode>('day')
   const [selectedDateIdx, setSelectedDateIdx] = useState<number>(reports.length - 1)
   const [activeGoodsTab, setActiveGoodsTab] = useState<'amount' | 'volume'>('amount')
@@ -353,7 +355,7 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
 
       {/* ── Stat cards: 2 cols mobile → 4 cols desktop ─ */}
       <div className="px-4 md:px-6 grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        <StatCard label="ยอดขายรวม" value={`฿${formatBaht(stats.totalAmount)}`} sub={selectedSite !== 'ทั้งหมด' ? selectedSite : `${filteredReports.length} วัน`} accent icon={<TrendingUp size={12} />} delay={0} />
+        <StatCard label="ยอดขายรวม" value={`฿${formatBaht(stats.totalAmount)}`} sub={activeBranch !== 'ทั้งหมด' ? activeBranch : `${filteredReports.length} วัน`} accent icon={<TrendingUp size={12} />} delay={0} />
         <StatCard label="จำนวนชิ้น" value={`${stats.totalVolume.toLocaleString()}`} sub={`เฉลี่ย ฿${formatBaht(stats.avgPerPiece)}/ชิ้น`} icon={<Package size={12} />} delay={50} />
 
         {/* Luffy — 7-day comparison card */}
@@ -705,22 +707,22 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
           {/* Sites */}
           {sitesData.length > 0 && (
             <div className="px-4 md:px-0">
-              <div className={`bg-white border rounded-2xl p-4 card-hover transition-all ${selectedSite !== 'ทั้งหมด' ? 'border-brand-blue/40 ring-1 ring-brand-blue/20' : 'border-brand-blue/10'}`}>
+              <div className="bg-white border border-brand-blue/10 rounded-2xl p-4 card-hover">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-brand-dark/60 text-[12px] font-medium">ยอดขายตามสาขา</p>
-                  {selectedSite !== 'ทั้งหมด' && (
-                    <button onClick={() => setSelectedSite('ทั้งหมด')}
+                  {activeBranch !== 'ทั้งหมด' && (
+                    <button onClick={() => setActiveBranch('ทั้งหมด')}
                       className="flex items-center gap-1 text-[11px] text-brand-blue bg-brand-pale px-2 py-0.5 rounded-full hover:bg-brand-blue hover:text-white transition-colors">
-                      <MapPin size={10} /> {selectedSite} ×
+                      <MapPin size={10} /> {activeBranch} ×
                     </button>
                   )}
                 </div>
                 <div className="space-y-3">
                   {sitesData.map(s => {
                     const pct = sitesData[0].amount > 0 ? (s.amount / sitesData[0].amount) * 100 : 0
-                    const isSelected = selectedSite === s.name
+                    const isSelected = activeBranch === s.name
                     return (
-                      <button key={s.name} onClick={() => setSelectedSite(isSelected ? 'ทั้งหมด' : s.name)}
+                      <button key={s.name} onClick={() => setActiveBranch(isSelected ? 'ทั้งหมด' : s.name)}
                         className={`w-full text-left px-2 py-1.5 -mx-2 rounded-xl transition-all ${isSelected ? 'bg-brand-blue/8' : 'hover:bg-brand-pale/60'}`}>
                         <div className="flex items-center justify-between mb-1">
                           <p className={`text-[13px] font-medium flex items-center gap-1.5 ${isSelected ? 'text-brand-blue' : 'text-brand-dark'}`}>
