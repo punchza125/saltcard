@@ -3,7 +3,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Sector
 } from 'recharts'
-import { ChevronLeft, ChevronRight, TrendingUp, Package } from 'lucide-react'
+import { ChevronLeft, ChevronRight, TrendingUp, Package, MapPin } from 'lucide-react'
 import type { DayReport, StockProduct } from '../types'
 import { formatThaiDate, formatThaiDateFull, formatBaht } from '../utils/parser'
 import StatCard from './StatCard'
@@ -71,11 +71,28 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
   const [activeGoodsTab, setActiveGoodsTab] = useState<'amount' | 'volume'>('amount')
   const [showCalendar, setShowCalendar] = useState(false)
   const [activePieIndex, setActivePieIndex] = useState<number | undefined>(undefined)
+  const [selectedSite, setSelectedSite] = useState<string>('ทั้งหมด')
   const [calendarMonth, setCalendarMonth] = useState(() =>
     (reports[reports.length - 1]?.date ?? new Date().toISOString().slice(0, 10)).slice(0, 7)
   )
   const calendarRef = useRef<HTMLDivElement>(null)
 
+  // all unique sites across all reports
+  const availableSites = useMemo(() => {
+    const set = new Set<string>()
+    reports.forEach(r => r.sites.forEach(s => set.add(s.name)))
+    return Array.from(set).sort()
+  }, [reports])
+
+  // helper: get amount/volume for a report, optionally filtered to one site
+  function siteAmt(r: DayReport, site: string) {
+    if (site === 'ทั้งหมด') return r.areas.reduce((a, row) => a + row.salesAmount, 0)
+    return r.sites.find(s => s.name === site)?.salesAmount ?? 0
+  }
+  function siteVol(r: DayReport, site: string) {
+    if (site === 'ทั้งหมด') return r.areas.reduce((a, row) => a + row.salesVolume, 0)
+    return r.sites.find(s => s.name === site)?.salesVolume ?? 0
+  }
 
   const currentIdx = Math.min(selectedDateIdx, reports.length - 1)
   const selectedReport = reports[currentIdx] as DayReport | undefined
@@ -92,26 +109,35 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
   }, [reports, rangeMode, selectedReport])
 
   const stats = useMemo(() => {
-    const totalAmount = filteredReports.reduce((s, r) => s + r.areas.reduce((a, row) => a + row.salesAmount, 0), 0)
-    const totalVolume = filteredReports.reduce((s, r) => s + r.areas.reduce((a, row) => a + row.salesVolume, 0), 0)
+    const totalAmount = filteredReports.reduce((s, r) => s + siteAmt(r, selectedSite), 0)
+    const totalVolume = filteredReports.reduce((s, r) => s + siteVol(r, selectedSite), 0)
     const avgPerPiece = totalVolume > 0 ? Math.round(totalAmount / totalVolume) : 0
     return { totalAmount, totalVolume, avgPerPiece }
-  }, [filteredReports])
+  }, [filteredReports, selectedSite])
+
+  // branch comparison — only when > 1 site
+  const branchComparison = useMemo(() => {
+    if (availableSites.length <= 1) return null
+    return availableSites.map(site => ({
+      site,
+      amount: filteredReports.reduce((s, r) => s + siteAmt(r, site), 0),
+      volume: filteredReports.reduce((s, r) => s + siteVol(r, site), 0),
+    })).sort((a, b) => b.amount - a.amount)
+  }, [filteredReports, availableSites])
 
   // compare selected day vs the report immediately before it (day mode only)
   const vsYesterday = useMemo(() => {
     if (rangeMode !== 'day') return null
-    const anchorIdx = rangeMode === 'day' ? currentIdx : reports.length - 1
-    if (anchorIdx < 1) return null
-    const today     = reports[anchorIdx]
-    const yesterday = reports[anchorIdx - 1]
+    if (currentIdx < 1) return null
+    const today     = reports[currentIdx]
+    const yesterday = reports[currentIdx - 1]
     if (!today || !yesterday) return null
-    const todayAmt = today.areas.reduce((s, r) => s + r.salesAmount, 0)
-    const yestAmt  = yesterday.areas.reduce((s, r) => s + r.salesAmount, 0)
+    const todayAmt = siteAmt(today, selectedSite)
+    const yestAmt  = siteAmt(yesterday, selectedSite)
     const diff = todayAmt - yestAmt
     const pct  = yestAmt > 0 ? Math.round(Math.abs(diff) / yestAmt * 100) : 0
     return { todayAmt, yestAmt, diff, pct, todayDate: today.date, yestDate: yesterday.date }
-  }, [reports, rangeMode, currentIdx])
+  }, [reports, rangeMode, currentIdx, selectedSite])
 
   // week comparison for luffy card (only in 'week' mode)
   const weekStats = useMemo(() => {
@@ -120,15 +146,13 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
     const thisWeek = sorted.slice(-7)
     const prevWeek = sorted.slice(-14, -7)
     if (prevWeek.length === 0) return null
-    const thisAmt = thisWeek.reduce((s, r) => s + r.areas.reduce((a, row) => a + row.salesAmount, 0), 0)
-    const prevAmt = prevWeek.reduce((s, r) => s + r.areas.reduce((a, row) => a + row.salesAmount, 0), 0)
+    const thisAmt = thisWeek.reduce((s, r) => s + siteAmt(r, selectedSite), 0)
+    const prevAmt = prevWeek.reduce((s, r) => s + siteAmt(r, selectedSite), 0)
     const diff = thisAmt - prevAmt
     const pct  = prevAmt > 0 ? Math.round(Math.abs(diff) / prevAmt * 100) : null
-    const best = thisWeek.reduce((a, b) => {
-      const aAmt = a.areas.reduce((s, r) => s + r.salesAmount, 0)
-      const bAmt = b.areas.reduce((s, r) => s + r.salesAmount, 0)
-      return bAmt > aAmt ? b : a
-    })
+    const best = thisWeek.reduce((a, b) =>
+      siteAmt(b, selectedSite) > siteAmt(a, selectedSite) ? b : a
+    )
     return { thisAmt, prevAmt, diff, pct, bestDate: best.date }
   }, [reports, rangeMode])
 
@@ -138,16 +162,14 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
     const sorted = [...reports].sort((a, b) => a.date.localeCompare(b.date))
     const thisMonth = sorted.slice(-30)
     const prevMonth = sorted.slice(-60, -30)
-    const thisAmt = thisMonth.reduce((s, r) => s + r.areas.reduce((a, row) => a + row.salesAmount, 0), 0)
-    const prevAmt = prevMonth.reduce((s, r) => s + r.areas.reduce((a, row) => a + row.salesAmount, 0), 0)
+    const thisAmt = thisMonth.reduce((s, r) => s + siteAmt(r, selectedSite), 0)
+    const prevAmt = prevMonth.reduce((s, r) => s + siteAmt(r, selectedSite), 0)
     const diff = thisAmt - prevAmt
     const pct  = prevAmt > 0 ? Math.round(Math.abs(diff) / prevAmt * 100) : null
     const avgDay = thisMonth.length > 0 ? Math.round(thisAmt / thisMonth.length) : 0
-    const wins = thisMonth.slice(1).filter((r, i) => {
-      const cur  = r.areas.reduce((s, row) => s + row.salesAmount, 0)
-      const prev = thisMonth[i].areas.reduce((s, row) => s + row.salesAmount, 0)
-      return cur > prev
-    }).length
+    const wins = thisMonth.slice(1).filter((r, i) =>
+      siteAmt(r, selectedSite) > siteAmt(thisMonth[i], selectedSite)
+    ).length
     return { thisAmt, prevAmt, diff, pct, avgDay, wins, days: thisMonth.length }
   }, [reports, rangeMode])
 
@@ -156,7 +178,7 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
     if (rangeMode !== 'all' || reports.length < 2) return null
     const dailyAmts = reports.map(r => ({
       date: r.date,
-      amount: r.areas.reduce((s, row) => s + row.salesAmount, 0),
+      amount: siteAmt(r, selectedSite),
     }))
     const best = dailyAmts.reduce((a, b) => b.amount > a.amount ? b : a)
     // current winning streak from the end
@@ -192,8 +214,8 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
   const trendData = useMemo(() =>
     reports.map(r => ({
       date: formatThaiDate(r.date),
-      ยอดขาย: r.areas.reduce((s, a) => s + a.salesAmount, 0),
-    })), [reports])
+      ยอดขาย: siteAmt(r, selectedSite),
+    })), [reports, selectedSite])
 
   const goodsData = useMemo(() => {
     const map = new Map<string, { name: string; volume: number; amount: number }>()
@@ -289,6 +311,23 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
   return (
     <div className="pb-10 md:pb-12">
 
+      {/* ── Branch filter (แสดงเมื่อมี > 1 สาขา) ──────── */}
+      {availableSites.length > 1 && (
+        <div className="px-4 md:px-6 pt-4 pb-0 flex gap-2 overflow-x-auto scrollbar-none">
+          {(['ทั้งหมด', ...availableSites] as string[]).map(site => (
+            <button key={site} onClick={() => setSelectedSite(site)}
+              className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium border transition-all ${
+                selectedSite === site
+                  ? 'bg-brand-dark text-white border-transparent'
+                  : 'bg-white text-brand-dark/60 border-brand-blue/15 hover:border-brand-blue/40'
+              }`}>
+              <MapPin size={11} />
+              {site}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* ── Controls row ─────────────────────────────── */}
       <div className="px-4 md:px-6 pt-4 pb-3 flex flex-col md:flex-row md:items-center gap-3">
         {/* Range selector */}
@@ -335,8 +374,48 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
 
       {/* ── Stat cards: 2 cols mobile → 4 cols desktop ─ */}
       <div className="px-4 md:px-6 grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        <StatCard label="ยอดขายรวม" value={`฿${formatBaht(stats.totalAmount)}`} sub={`${filteredReports.length} วัน`} accent icon={<TrendingUp size={12} />} delay={0} />
+        <StatCard label="ยอดขายรวม" value={`฿${formatBaht(stats.totalAmount)}`} sub={`${filteredReports.length} วัน${selectedSite !== 'ทั้งหมด' ? ` · ${selectedSite}` : ''}`} accent icon={<TrendingUp size={12} />} delay={0} />
         <StatCard label="จำนวนชิ้น" value={`${stats.totalVolume.toLocaleString()}`} sub={`เฉลี่ย ฿${formatBaht(stats.avgPerPiece)}/ชิ้น`} icon={<Package size={12} />} delay={50} />
+
+        {/* Branch comparison card — แสดงเมื่อมี > 1 สาขา */}
+        {branchComparison && (
+          <div className="col-span-2 rounded-2xl border border-brand-blue/15 bg-white px-4 py-3"
+            style={{ animation: 'fadeUp 0.4s ease both', animationDelay: '80ms' }}>
+            <p className="text-[11px] font-bold text-brand-dark/40 uppercase tracking-wide mb-2.5 flex items-center gap-1.5">
+              <MapPin size={11} /> ยอดแยกสาขา
+            </p>
+            <div className="space-y-2">
+              {branchComparison.map((b, i) => {
+                const maxAmt = branchComparison[0].amount
+                const pct = maxAmt > 0 ? (b.amount / maxAmt) * 100 : 0
+                const COLORS = ['#1a52b3', '#10b981', '#f59e0b', '#e94560', '#8b5cf6']
+                const color = COLORS[i % COLORS.length]
+                return (
+                  <div key={b.site}>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <button
+                        onClick={() => setSelectedSite(selectedSite === b.site ? 'ทั้งหมด' : b.site)}
+                        className={`text-[12px] font-medium transition-colors hover:opacity-80 flex items-center gap-1 ${selectedSite === b.site ? 'font-bold' : ''}`}
+                        style={{ color }}
+                      >
+                        {selectedSite === b.site && <span className="text-[9px]">▶</span>}
+                        {b.site}
+                      </button>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-brand-dark/40">{b.volume} ชิ้น</span>
+                        <span className="text-[12px] font-semibold text-brand-dark">฿{formatBaht(b.amount)}</span>
+                      </div>
+                    </div>
+                    <div className="h-1.5 bg-brand-pale rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${pct}%`, backgroundColor: color }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Luffy — 7-day comparison card */}
         {weekStats && (() => {
