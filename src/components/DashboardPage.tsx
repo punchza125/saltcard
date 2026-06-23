@@ -115,9 +115,9 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
     return { totalAmount, totalVolume, avgPerPiece }
   }, [filteredReports, selectedSite])
 
-  // branch comparison — only when > 1 site
+  // branch comparison
   const branchComparison = useMemo(() => {
-    if (availableSites.length <= 1) return null
+    if (availableSites.length === 0) return null
     return availableSites.map(site => ({
       site,
       amount: filteredReports.reduce((s, r) => s + siteAmt(r, site), 0),
@@ -311,8 +311,8 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
   return (
     <div className="pb-10 md:pb-12">
 
-      {/* ── Branch filter (แสดงเมื่อมี > 1 สาขา) ──────── */}
-      {availableSites.length > 1 && (
+      {/* ── Branch filter ──────────────────────────────── */}
+      {availableSites.length > 0 && (
         <div className="px-4 md:px-6 pt-4 pb-0 flex gap-2 overflow-x-auto scrollbar-none">
           {(['ทั้งหมด', ...availableSites] as string[]).map(site => (
             <button key={site} onClick={() => setSelectedSite(site)}
@@ -377,7 +377,7 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
         <StatCard label="ยอดขายรวม" value={`฿${formatBaht(stats.totalAmount)}`} sub={`${filteredReports.length} วัน${selectedSite !== 'ทั้งหมด' ? ` · ${selectedSite}` : ''}`} accent icon={<TrendingUp size={12} />} delay={0} />
         <StatCard label="จำนวนชิ้น" value={`${stats.totalVolume.toLocaleString()}`} sub={`เฉลี่ย ฿${formatBaht(stats.avgPerPiece)}/ชิ้น`} icon={<Package size={12} />} delay={50} />
 
-        {/* Branch comparison card — แสดงเมื่อมี > 1 สาขา */}
+        {/* Branch comparison card */}
         {branchComparison && (
           <div className="col-span-2 rounded-2xl border border-brand-blue/15 bg-white px-4 py-3"
             style={{ animation: 'fadeUp 0.4s ease both', animationDelay: '80ms' }}>
