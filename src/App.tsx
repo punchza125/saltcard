@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { BarChart2, Package, MonitorPlay, FolderOpen } from 'lucide-react'
 import Header from './components/Header'
 import DashboardPage from './components/DashboardPage'
@@ -18,11 +18,17 @@ export default function App() {
   const { store, addReport, removeReport, clearAll } = useStore()
   const { stock, replaceAll: replaceStock } = useStockStore()
   const [activeTab, setActiveTab] = useState<'dashboard' | 'upload' | 'stock' | 'machine'>('dashboard')
+  const [selectedSite, setSelectedSite] = useState<string>('ทั้งหมด')
   const [showSheetsConfig, setShowSheetsConfig] = useState(false)
   const [sheetsMachine, setSheetsMachine] = useState<MachineReport | null>(null)
   // env URL เป็น default — ผู้ใช้ยังเปลี่ยนได้จาก SheetsConfigModal
   const [sheetsUrl, setSheetsUrl] = useState(
     () => ENV_SHEETS_URL ?? localStorage.getItem(SHEETS_URL_KEY) ?? ''
+  )
+
+  const availableSites = useMemo(
+    () => Array.from(new Set(store.reports.flatMap(r => r.sites.map(s => s.name)))).sort(),
+    [store.reports]
   )
 
   const sheetsConfig = sheetsUrl ? { url: sheetsUrl } : null
@@ -113,11 +119,14 @@ export default function App() {
         onUploadClick={() => setActiveTab('upload')}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        availableSites={availableSites}
+        selectedSite={selectedSite}
+        setSelectedSite={setSelectedSite}
       />
 
       {/* main scrolls inside — ไม่ใช้ body scroll เพื่อให้ nav ไม่ลอย */}
       <main className="flex-1 overflow-y-auto md:overflow-visible">
-        {activeTab === 'dashboard' && <DashboardPage reports={store.reports} stockProducts={stock.products} taxRate={stock.taxRate} />}
+        {activeTab === 'dashboard' && <DashboardPage reports={store.reports} stockProducts={stock.products} taxRate={stock.taxRate} selectedSite={selectedSite} setSelectedSite={setSelectedSite} />}
         {activeTab === 'stock' && (
           <StockPage
             reports={store.reports}

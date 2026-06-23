@@ -3,7 +3,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Sector
 } from 'recharts'
-import { ChevronLeft, ChevronRight, TrendingUp, Package, MapPin } from 'lucide-react'
+import { ChevronLeft, ChevronRight, TrendingUp, Package } from 'lucide-react'
 import type { DayReport, StockProduct } from '../types'
 import { formatThaiDate, formatThaiDateFull, formatBaht } from '../utils/parser'
 import StatCard from './StatCard'
@@ -12,6 +12,8 @@ interface DashboardPageProps {
   reports: DayReport[]
   stockProducts?: StockProduct[]
   taxRate?: number
+  selectedSite: string
+  setSelectedSite: (s: string) => void
 }
 
 function calcDayProfit(report: DayReport, products: StockProduct[], taxRate: number) {
@@ -65,24 +67,16 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   )
 }
 
-export default function DashboardPage({ reports, stockProducts = [], taxRate = 15 }: DashboardPageProps) {
+export default function DashboardPage({ reports, stockProducts = [], taxRate = 15, selectedSite, setSelectedSite }: DashboardPageProps) {
   const [rangeMode, setRangeMode] = useState<RangeMode>('day')
   const [selectedDateIdx, setSelectedDateIdx] = useState<number>(reports.length - 1)
   const [activeGoodsTab, setActiveGoodsTab] = useState<'amount' | 'volume'>('amount')
   const [showCalendar, setShowCalendar] = useState(false)
   const [activePieIndex, setActivePieIndex] = useState<number | undefined>(undefined)
-  const [selectedSite, setSelectedSite] = useState<string>('ทั้งหมด')
   const [calendarMonth, setCalendarMonth] = useState(() =>
     (reports[reports.length - 1]?.date ?? new Date().toISOString().slice(0, 10)).slice(0, 7)
   )
   const calendarRef = useRef<HTMLDivElement>(null)
-
-  // all unique sites across all reports
-  const availableSites = useMemo(() => {
-    const set = new Set<string>()
-    reports.forEach(r => r.sites.forEach(s => set.add(s.name)))
-    return Array.from(set).sort()
-  }, [reports])
 
   // helper: get amount/volume for a report, optionally filtered to one site
   function siteAmt(r: DayReport, site: string) {
@@ -115,15 +109,16 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
     return { totalAmount, totalVolume, avgPerPiece }
   }, [filteredReports, selectedSite])
 
-  // branch comparison
+  // branch comparison (for sites card — shows each site's share)
   const branchComparison = useMemo(() => {
-    if (availableSites.length === 0) return null
-    return availableSites.map(site => ({
+    const sites = Array.from(new Set(filteredReports.flatMap(r => r.sites.map(s => s.name)))).sort()
+    if (sites.length === 0) return null
+    return sites.map(site => ({
       site,
       amount: filteredReports.reduce((s, r) => s + siteAmt(r, site), 0),
       volume: filteredReports.reduce((s, r) => s + siteVol(r, site), 0),
     })).sort((a, b) => b.amount - a.amount)
-  }, [filteredReports, availableSites])
+  }, [filteredReports])
 
   // compare selected day vs the report immediately before it (day mode only)
   const vsYesterday = useMemo(() => {
@@ -354,28 +349,6 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
           </p>
         )}
 
-        {/* Branch selector — แสดงเสมอเมื่อมีข้อมูลสาขา */}
-        {availableSites.length > 0 && (
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            <MapPin size={13} className="text-brand-dark/30 flex-shrink-0" />
-            <div className="flex gap-1 bg-brand-pale/60 rounded-xl p-1">
-              <button
-                onClick={() => setSelectedSite('ทั้งหมด')}
-                className={`text-[12px] font-medium px-3 py-1.5 rounded-lg transition-all ${
-                  selectedSite === 'ทั้งหมด' ? 'bg-brand-blue text-white' : 'text-brand-dark/50 hover:text-brand-dark'
-                }`}
-              >ทั้งหมด</button>
-              {availableSites.map(site => (
-                <button key={site}
-                  onClick={() => setSelectedSite(selectedSite === site ? 'ทั้งหมด' : site)}
-                  className={`text-[12px] font-medium px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${
-                    selectedSite === site ? 'bg-brand-blue text-white' : 'text-brand-dark/50 hover:text-brand-dark'
-                  }`}
-                >{site}</button>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ── Stat cards: 2 cols mobile → 4 cols desktop ─ */}
