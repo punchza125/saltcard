@@ -9,7 +9,7 @@ const ORDER_SHEET  = 'orders'
 const ITEMS_SHEET  = 'order_items'
 
 const ORDER_HEADERS = [
-  'id', 'createdAt', 'supplier', 'status',
+  'id', 'createdAt', 'orderedBy', 'supplier', 'status',
   'carrier', 'trackingNumber', 'receivedAt', 'notes', 'updatedAt',
 ]
 const ITEM_HEADERS = [
@@ -75,6 +75,7 @@ function doGet(e) {
       const result = orders.map(o => ({
         id:             String(o.id || ''),
         createdAt:      String(o.createdAt || ''),
+        orderedBy:      o.orderedBy || undefined,
         supplier:       o.supplier  || undefined,
         notes:          o.notes     || undefined,
         status:         String(o.status || 'ordered'),
@@ -134,7 +135,7 @@ function saveAllOrders(orders) {
   // write orders
   if (orders.length > 0) {
     const orderRows = orders.map(o => [
-      o.id, o.createdAt, o.supplier || '', o.status,
+      o.id, o.createdAt, o.orderedBy || '', o.supplier || '', o.status,
       o.carrier || '', o.trackingNumber || '', o.receivedAt || '', o.notes || '', now,
     ])
     orderSheet.getRange(2, 1, orderRows.length, ORDER_HEADERS.length).setValues(orderRows)
