@@ -1047,7 +1047,7 @@ function SubTabBar({ active, onChange, pendingCount }: {
   return (
     <div className="sticky top-[64px] z-30 bg-white/80 backdrop-blur-md border-b border-brand-blue/8 px-4 md:px-6 py-2.5">
       <div className="max-w-2xl mx-auto">
-        <div className="inline-flex bg-brand-pale/60 rounded-xl p-1 gap-1">
+        <div className="inline-flex bg-brand-pale/60 border border-brand-blue/10 rounded-xl p-1 gap-1">
           {TABS.map(tab => {
             const isActive = active === tab.id
             return (
