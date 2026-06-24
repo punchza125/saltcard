@@ -1045,7 +1045,7 @@ function SubTabBar({ active, onChange, pendingCount }: {
     { id: 'orders' as const, label: 'ติดตามสินค้า', icon: <Truck size={14} />, badge: pendingCount },
   ]
   return (
-    <div className="sticky top-[64px] z-30 bg-white/80 backdrop-blur-md border-b border-brand-blue/8 px-4 md:px-6 py-2.5">
+    <div className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-brand-blue/8 px-4 md:px-6 py-2.5">
       <div className="max-w-2xl mx-auto">
         <div className="inline-flex bg-[#e4eaf6] rounded-2xl p-1.5 gap-1.5">
           {TABS.map(tab => {
@@ -1211,8 +1211,9 @@ export default function StockPage({ reports, sheetsUrl, onPushStock, readOnly }:
   }
 
   return (
+    <>
+    <SubTabBar active={stockTab} onChange={setStockTab} pendingCount={pendingOrderCount} />
     <div className="max-w-2xl mx-auto px-4 py-5 space-y-4">
-      <SubTabBar active={stockTab} onChange={setStockTab} pendingCount={pendingOrderCount} />
 
       {/* sync banner — เจ้าของเท่านั้น */}
       {!readOnly && (pendingDates.length > 0 ? (
@@ -1499,5 +1500,6 @@ export default function StockPage({ reports, sheetsUrl, onPushStock, readOnly }:
         />
       )}
     </div>
+    </>
   )
 }
