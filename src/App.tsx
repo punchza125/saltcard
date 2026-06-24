@@ -72,8 +72,10 @@ export default function App() {
   const { syncStatus, syncMessage, lastSynced, pushReport, fetchAll, pushStock, fetchStock, pushMachine, fetchMachine, pushOrders, fetchOrders } = useSheets(sheetsConfig)
   // If VITE_ORDERS_URL is set, route orders to the separate SaltOrder sheet
   const ordersSheets = useOrdersSheets()
-  const effectivePushOrders = ordersSheets.isEnvConfigured ? ordersSheets.push : pushOrders
-  const effectiveFetchOrders = ordersSheets.isEnvConfigured ? ordersSheets.fetch : fetchOrders
+  // Use ordersSheets if VITE_ORDERS_URL is set OR if user manually saved a URL in localStorage
+  const hasOrdersUrl = ordersSheets.isEnvConfigured || !!ordersSheets.url
+  const effectivePushOrders = hasOrdersUrl ? ordersSheets.push : pushOrders
+  const effectiveFetchOrders = hasOrdersUrl ? ordersSheets.fetch : fetchOrders
 
   // ถ้ามี ENV_SHEETS_URL (deployed version) → โหลดจาก Sheets ทุกครั้งที่เปิดแอป
   // ถ้าไม่มี (local dev) → โหลดเฉพาะตอนยังไม่มีข้อมูล
