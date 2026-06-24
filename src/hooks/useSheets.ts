@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import type { DayReport } from '../types'
+import type { DayReport, PurchaseOrder } from '../types'
 
 export interface SheetsConfig {
   url: string   // Apps Script Web App URL
@@ -131,12 +131,33 @@ export function useSheets(config: SheetsConfig | null) {
     } catch { return null }
   }, [config])
 
+  const pushOrders = useCallback(async (orders: PurchaseOrder[]): Promise<boolean> => {
+    if (!config?.url) return false
+    try {
+      await fetch(`${config.url}?action=saveOrders`, {
+        method: 'POST',
+        body: JSON.stringify(orders),
+      })
+      return true
+    } catch { return false }
+  }, [config])
+
+  const fetchOrders = useCallback(async (): Promise<PurchaseOrder[] | null> => {
+    if (!config?.url) return null
+    try {
+      const res = await fetch(`${config.url}?action=fetchOrders`)
+      const r = await res.json()
+      if (!r.ok || !r.data) return null
+      return JSON.parse(r.data) as PurchaseOrder[]
+    } catch { return null }
+  }, [config])
+
   const resetStatus = useCallback(() => {
     setSyncStatus('idle')
     setSyncMessage('')
   }, [])
 
-  return { syncStatus, syncMessage, lastSynced, pushReport, fetchAll, pushStock, fetchStock, pushMachine, fetchMachine, resetStatus }
+  return { syncStatus, syncMessage, lastSynced, pushReport, fetchAll, pushStock, fetchStock, pushMachine, fetchMachine, pushOrders, fetchOrders, resetStatus }
 }
 
 // ── แปลงข้อมูลจาก Sheets กลับเป็น DayReport[] ───────────────

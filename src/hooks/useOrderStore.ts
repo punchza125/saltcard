@@ -50,7 +50,11 @@ export function useOrderStore() {
     setOrders(prev => prev.filter(o => o.id !== id))
   }, [])
 
+  const replaceAll = useCallback((fresh: PurchaseOrder[]) => {
+    setOrders(fresh)
+  }, [])
+
   const byStatus = (status: OrderStatus) => orders.filter(o => o.status === status)
 
-  return { orders, addOrder, updateOrder, setTracking, markReceived, deleteOrder, byStatus }
+  return { orders, addOrder, updateOrder, setTracking, markReceived, deleteOrder, replaceAll, byStatus }
 }

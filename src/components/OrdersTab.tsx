@@ -2,11 +2,12 @@ import React, { useState, useRef, useEffect } from 'react'
 import {
   Plus, Package, Truck, CheckCircle2, Clock,
   Copy, ExternalLink, ChevronDown, X, Check,
-  Pencil, Trash2, Search, ChevronRight,
+  Pencil, Trash2, Search, Link, Cloud, CloudOff, RefreshCw, Loader2,
 } from 'lucide-react'
 import type { PurchaseOrder, OrderItem, OrderStatus, StockProduct, CarrierId } from '../types'
 import { CARRIERS } from '../types'
 import { useOrderStore } from '../hooks/useOrderStore'
+import { useOrdersSheets } from '../hooks/useOrdersSheets'
 import { formatThaiDate } from '../utils/parser'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -431,16 +432,125 @@ function OrderCard({
   )
 }
 
+// ── SheetsBanner ─────────────────────────────────────────────────────────────
+
+function SheetsBanner({ url, onSave, syncing, lastSync, syncError, onFetch }: {
+  url: string
+  onSave: (u: string) => void
+  syncing: boolean
+  lastSync: string | null
+  syncError: boolean
+  onFetch: () => void
+}) {
+  const [editing, setEditing] = useState(!url)
+  const [draft,   setDraft]   = useState(url)
+  const [testing, setTesting] = useState(false)
+  const [testOk,  setTestOk]  = useState<boolean | null>(null)
+  const { testUrl } = useOrdersSheets()
+
+  async function handleTest() {
+    setTesting(true); setTestOk(null)
+    const ok = await testUrl(draft)
+    setTestOk(ok); setTesting(false)
+  }
+
+  if (!editing && url) {
+    return (
+      <div className={`rounded-xl px-4 py-3 flex items-center gap-3 mb-4 border ${
+        syncError ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'
+      }`}>
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${syncError ? 'bg-red-100' : 'bg-green-100'}`}>
+          {syncError ? <CloudOff size={14} className="text-red-500" /> : <Cloud size={14} className="text-green-600" />}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[12px] font-semibold text-brand-dark">
+            {syncError ? 'ซิงค์ไม่สำเร็จ' : 'เชื่อมต่อ Google Sheet แล้ว'}
+          </p>
+          <p className="text-[10px] text-brand-dark/40">
+            {syncing ? 'กำลังซิงค์...' : lastSync ? `ซิงค์ล่าสุด ${lastSync}` : 'พร้อมซิงค์'}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button onClick={onFetch} disabled={syncing}
+            className="flex items-center gap-1 text-[11px] text-brand-blue border border-brand-blue/20 px-2.5 py-1.5 rounded-lg hover:bg-brand-pale disabled:opacity-40 transition-all">
+            {syncing ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+            ดึงข้อมูล
+          </button>
+          <button onClick={() => setEditing(true)}
+            className="text-[11px] text-brand-dark/40 hover:text-brand-dark px-2 py-1.5 rounded-lg hover:bg-brand-pale transition-colors">
+            แก้ไข
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-xl border border-brand-blue/15 bg-brand-pale/40 p-4 mb-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <Link size={14} className="text-brand-blue flex-shrink-0" />
+        <p className="text-[12px] font-semibold text-brand-dark">เชื่อมต่อ Google Sheet สำหรับ Orders</p>
+      </div>
+      <p className="text-[11px] text-brand-dark/40 leading-relaxed">
+        สร้าง Google Sheet ใหม่ → วาง OrdersCode.gs ใน Apps Script → Deploy เป็น Web App แล้วใส่ URL ด้านล่าง
+      </p>
+      <div className="flex gap-2">
+        <input
+          value={draft}
+          onChange={e => { setDraft(e.target.value); setTestOk(null) }}
+          placeholder="https://script.google.com/macros/s/..."
+          className="flex-1 border border-brand-blue/15 rounded-xl px-3 py-2 text-[12px] outline-none focus:border-brand-blue bg-white"
+        />
+        <button onClick={handleTest} disabled={!draft || testing}
+          className="px-3 py-2 border border-brand-blue/20 rounded-xl text-[12px] text-brand-blue hover:bg-brand-pale disabled:opacity-40 transition-all flex-shrink-0">
+          {testing ? <Loader2 size={13} className="animate-spin" /> : 'ทดสอบ'}
+        </button>
+      </div>
+      {testOk === true  && <p className="text-[11px] text-emerald-600">✓ เชื่อมต่อสำเร็จ</p>}
+      {testOk === false && <p className="text-[11px] text-red-500">✗ เชื่อมต่อไม่ได้ ตรวจสอบ URL</p>}
+      <div className="flex gap-2">
+        <button
+          onClick={() => { onSave(draft); setEditing(false) }}
+          disabled={!draft}
+          className="flex-1 py-2 bg-brand-blue text-white rounded-xl text-[12px] font-semibold disabled:opacity-40 transition-all"
+        >บันทึก</button>
+        {url && (
+          <button onClick={() => setEditing(false)}
+            className="px-4 py-2 border border-brand-blue/15 rounded-xl text-[12px] text-brand-dark/50 hover:bg-brand-pale transition-colors">
+            ยกเลิก
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── OrdersTab (main) ─────────────────────────────────────────────────────────
 
 type FilterTab = 'all' | OrderStatus
 
 export default function OrdersTab({ products }: { products: StockProduct[] }) {
-  const { orders, addOrder, updateOrder, setTracking, markReceived, deleteOrder } = useOrderStore()
+  const { orders, addOrder, updateOrder, setTracking, markReceived, deleteOrder, replaceAll } = useOrderStore()
+  const sheets = useOrdersSheets()
   const [filter,       setFilter]       = useState<FilterTab>('all')
   const [showCreate,   setShowCreate]   = useState(false)
   const [editOrder,    setEditOrder]    = useState<PurchaseOrder | null>(null)
   const [trackOrder,   setTrackOrder]   = useState<PurchaseOrder | null>(null)
+
+  // fetch on mount when URL is set
+  useEffect(() => {
+    if (!sheets.url) return
+    sheets.fetch().then(fetched => {
+      if (fetched?.length) replaceAll(fetched)
+    })
+  }, [sheets.url])
+
+  // helper: push current orders then call the original mutation
+  async function withSync(mutation: () => void) {
+    mutation()
+    // push after state settles
+    setTimeout(() => sheets.push(orders), 50)
+  }
 
   const filtered = orders.filter(o => filter === 'all' || o.status === filter)
 
@@ -460,6 +570,16 @@ export default function OrdersTab({ products }: { products: StockProduct[] }) {
 
   return (
     <div className="px-4 md:px-6 py-4 max-w-2xl mx-auto">
+
+      {/* Google Sheet banner */}
+      <SheetsBanner
+        url={sheets.url}
+        onSave={sheets.saveUrl}
+        syncing={sheets.syncing}
+        lastSync={sheets.lastSync}
+        syncError={sheets.syncError}
+        onFetch={() => sheets.fetch().then(f => { if (f?.length) replaceAll(f) })}
+      />
 
       {/* top bar */}
       <div className="flex items-center justify-between mb-4">
@@ -506,10 +626,17 @@ export default function OrdersTab({ products }: { products: StockProduct[] }) {
               key={order.id}
               order={order}
               products={products}
-              onDelete={() => deleteOrder(order.id)}
+              onDelete={() => {
+                deleteOrder(order.id)
+                if (sheets.url) setTimeout(() => sheets.push(orders.filter(o => o.id !== order.id)), 100)
+              }}
               onEdit={() => setEditOrder(order)}
               onSetTracking={() => setTrackOrder(order)}
-              onMarkReceived={() => markReceived(order.id)}
+              onMarkReceived={() => {
+                markReceived(order.id)
+                const today = new Date().toISOString().slice(0, 10)
+                if (sheets.url) setTimeout(() => sheets.push(orders.map(o => o.id === order.id ? { ...o, status: 'received', receivedAt: today } : o)), 100)
+              }}
             />
           ))}
         </div>
@@ -520,7 +647,10 @@ export default function OrdersTab({ products }: { products: StockProduct[] }) {
         <CreateOrderModal
           products={products}
           onClose={() => setShowCreate(false)}
-          onSave={data => addOrder(data)}
+          onSave={data => {
+            const newOrder = addOrder(data)
+            if (sheets.url) setTimeout(() => sheets.push([...orders, newOrder]), 100)
+          }}
         />
       )}
       {editOrder && (
@@ -528,14 +658,20 @@ export default function OrdersTab({ products }: { products: StockProduct[] }) {
           products={products}
           initial={editOrder}
           onClose={() => setEditOrder(null)}
-          onSave={data => updateOrder(editOrder.id, data)}
+          onSave={data => {
+            updateOrder(editOrder.id, data)
+            if (sheets.url) setTimeout(() => sheets.push(orders.map(o => o.id === editOrder.id ? { ...o, ...data } : o)), 100)
+          }}
         />
       )}
       {trackOrder && (
         <TrackingModal
           order={trackOrder}
           onClose={() => setTrackOrder(null)}
-          onSave={(carrier, tracking) => setTracking(trackOrder.id, carrier, tracking)}
+          onSave={(carrier, tracking) => {
+            setTracking(trackOrder.id, carrier, tracking)
+            if (sheets.url) setTimeout(() => sheets.push(orders.map(o => o.id === trackOrder.id ? { ...o, carrier, trackingNumber: tracking, status: 'in_transit' } : o)), 100)
+          }}
         />
       )}
     </div>
