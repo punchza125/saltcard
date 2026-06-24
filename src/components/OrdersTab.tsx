@@ -333,8 +333,10 @@ function OrderCard({
     setTrackLoading(true); setTrackError(false); setShowTrack(true)
     const result = await fetchTracking(order.carrier, order.trackingNumber)
     setTrackLoading(false)
-    if (result) setTracking(result)
-    else setTrackError(true)
+    if (result) {
+      setTracking(result)
+      if (result.tag === 'Delivered') onMarkReceived()
+    } else setTrackError(true)
   }
 
   function handleCopy() {
