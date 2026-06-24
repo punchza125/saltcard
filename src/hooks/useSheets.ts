@@ -147,7 +147,8 @@ export function useSheets(config: SheetsConfig | null) {
     try {
       const res = await fetch(`${config.url}?action=fetchOrders`)
       const r = await res.json()
-      if (!r.ok || !r.data) return null
+      if (!r.ok) return null           // actual error from GAS
+      if (!r.data) return []           // connected, but no orders saved yet
       return JSON.parse(r.data) as PurchaseOrder[]
     } catch { return null }
   }, [config])
