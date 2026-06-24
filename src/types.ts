@@ -119,9 +119,13 @@ export interface OrderItem {
 
 export type OrderStatus = 'ordered' | 'in_transit' | 'received'
 
+export const ORDER_MEMBERS = ['Punch', 'Tai', 'Ranger', 'Mark'] as const
+export type OrderMember = typeof ORDER_MEMBERS[number]
+
 export interface PurchaseOrder {
   id: string
   createdAt: string       // ISO date
+  orderedBy?: OrderMember
   supplier?: string
   notes?: string
   items: OrderItem[]

@@ -4,8 +4,8 @@ import {
   Copy, ExternalLink, ChevronDown, X, Check,
   Pencil, Trash2, Search, Link, Cloud, CloudOff, RefreshCw, Loader2,
 } from 'lucide-react'
-import type { PurchaseOrder, OrderItem, OrderStatus, StockProduct, CarrierId } from '../types'
-import { CARRIERS } from '../types'
+import type { PurchaseOrder, OrderItem, OrderStatus, StockProduct, CarrierId, OrderMember } from '../types'
+import { CARRIERS, ORDER_MEMBERS } from '../types'
 import { useOrderStore } from '../hooks/useOrderStore'
 import { formatThaiDate } from '../utils/parser'
 
@@ -38,6 +38,7 @@ function CreateOrderModal({
   onSave: (data: Omit<PurchaseOrder, 'id' | 'createdAt' | 'status'>) => void
   initial?: PurchaseOrder
 }) {
+  const [orderedBy, setOrderedBy] = useState<OrderMember | undefined>(initial?.orderedBy)
   const [supplier, setSupplier] = useState(initial?.supplier ?? '')
   const [notes,    setNotes]    = useState(initial?.notes ?? '')
   const [items,    setItems]    = useState<OrderItem[]>(
@@ -74,7 +75,7 @@ function CreateOrderModal({
 
   function handleSave() {
     const validItems = items.filter(it => it.name.trim() && it.qty > 0)
-    onSave({ supplier: supplier.trim() || undefined, notes: notes.trim() || undefined, items: validItems })
+    onSave({ orderedBy, supplier: supplier.trim() || undefined, notes: notes.trim() || undefined, items: validItems })
     onClose()
   }
 
@@ -92,6 +93,27 @@ function CreateOrderModal({
         </div>
 
         <div className="overflow-y-auto flex-1 px-5 pb-4 space-y-4">
+
+          {/* ordered by */}
+          <div>
+            <label className="text-[11px] font-semibold text-brand-dark/40 uppercase tracking-wider">ผู้สั่ง</label>
+            <div className="flex gap-2 mt-1.5 flex-wrap">
+              {ORDER_MEMBERS.map(m => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setOrderedBy(orderedBy === m ? undefined : m)}
+                  className={`px-4 py-2 rounded-xl text-[13px] font-semibold transition-all ${
+                    orderedBy === m
+                      ? 'bg-brand-blue text-white shadow-sm shadow-brand-blue/30'
+                      : 'bg-brand-pale text-brand-dark/60 hover:bg-brand-blue/10'
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* supplier */}
           <div>
@@ -341,6 +363,7 @@ function OrderCard({
             </div>
             <p className="text-[11px] text-brand-dark/40 mt-0.5">
               สั่ง {formatThaiDate(order.createdAt)}
+              {order.orderedBy && <span className="text-brand-blue/70 font-medium"> · {order.orderedBy}</span>}
               {order.receivedAt && ` · รับ ${formatThaiDate(order.receivedAt)}`}
             </p>
           </div>
