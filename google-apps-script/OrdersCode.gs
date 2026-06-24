@@ -66,6 +66,14 @@ function doGet(e) {
 
     if (action === 'dates') return jsonOk({})   // health-check endpoint
 
+    if (action === 'save' || action === 'saveOrders') {
+      const data = e.parameter && e.parameter.data
+      if (!data) return jsonErr('missing data')
+      const orders = JSON.parse(decodeURIComponent(data))
+      saveAllOrders(orders)
+      return jsonOk({ saved: orders.length })
+    }
+
     if (action === 'fetch' || action === 'fetchOrders') {
       const orderSheet = getSheet(ORDER_SHEET, ORDER_HEADERS)
       const itemSheet  = getSheet(ITEMS_SHEET,  ITEM_HEADERS)

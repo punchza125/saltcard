@@ -33,11 +33,9 @@ export function useOrdersSheets() {
     if (!u) return false
     setSyncing(true); setSyncError(false)
     try {
-      const res = await fetch(`${u}?action=save`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(orders),
-      })
+      // Send via GET param — GAS POST redirects to GET and loses the body
+      const data = encodeURIComponent(JSON.stringify(orders))
+      const res = await fetch(`${u}?action=save&data=${data}`)
       const json = await res.json()
       if (!json.ok) { setSyncError(true); return false }
       setLastSync(new Date().toLocaleTimeString('th-TH'))
