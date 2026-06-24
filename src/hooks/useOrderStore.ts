@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useSyncExternalStore, useCallback } from 'react'
 import type { PurchaseOrder, OrderStatus } from '../types'
 
 const STORAGE_KEY = 'saltcard_orders_v1'
@@ -14,10 +14,25 @@ function save(orders: PurchaseOrder[]) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(orders)) } catch {}
 }
 
-export function useOrderStore() {
-  const [orders, setOrders] = useState<PurchaseOrder[]>(load)
+// ── Module-level shared store ─────────────────────────────────
+let _orders: PurchaseOrder[] = load()
+const _listeners = new Set<() => void>()
 
-  useEffect(() => { save(orders) }, [orders])
+function notify() { _listeners.forEach(fn => fn()) }
+
+function setOrders(next: PurchaseOrder[] | ((prev: PurchaseOrder[]) => PurchaseOrder[])) {
+  _orders = typeof next === 'function' ? next(_orders) : next
+  save(_orders)
+  notify()
+}
+
+// ─────────────────────────────────────────────────────────────
+
+export function useOrderStore() {
+  const orders = useSyncExternalStore(
+    (cb) => { _listeners.add(cb); return () => _listeners.delete(cb) },
+    () => _orders,
+  )
 
   const addOrder = useCallback((o: Omit<PurchaseOrder, 'id' | 'createdAt' | 'status'>) => {
     const order: PurchaseOrder = {
