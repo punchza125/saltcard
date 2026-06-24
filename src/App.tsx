@@ -68,7 +68,7 @@ export default function App() {
   }, [store.reports, passionStore.reports])
 
   const sheetsConfig = sheetsUrl ? { url: sheetsUrl } : null
-  const { syncStatus, syncMessage, lastSynced, pushReport, fetchAll, pushStock, fetchStock, pushMachine, fetchMachine } = useSheets(sheetsConfig)
+  const { syncStatus, syncMessage, lastSynced, pushReport, fetchAll, pushStock, fetchStock, pushMachine, fetchMachine, pushOrders, fetchOrders } = useSheets(sheetsConfig)
 
   // ถ้ามี ENV_SHEETS_URL (deployed version) → โหลดจาก Sheets ทุกครั้งที่เปิดแอป
   // ถ้าไม่มี (local dev) → โหลดเฉพาะตอนยังไม่มีข้อมูล
