@@ -95,3 +95,38 @@ export interface StockStore {
   syncedDates: string[]  // วันที่ที่ sync จากรายงานแล้ว
   taxRate: number        // ภาษี % เช่น 15
 }
+
+// ── Purchase Order / Shipping Tracking ──────────────────────────────────────
+
+export const CARRIERS = [
+  { id: 'kerry',    label: 'Kerry Express',    trackUrl: (n: string) => `https://th.kerryexpress.com/th/track/?track=${n}` },
+  { id: 'flash',    label: 'Flash Express',    trackUrl: (n: string) => `https://www.flashexpress.co.th/fle/tracking/?se=${n}` },
+  { id: 'thaipost', label: 'ไปรษณีย์ไทย',     trackUrl: (n: string) => `https://track.thailandpost.co.th/?trackNumber=${n}` },
+  { id: 'jt',       label: 'J&T Express',      trackUrl: (n: string) => `https://www.jtexpress.co.th/index/query/gzquery.html?bills=${n}` },
+  { id: 'ninja',    label: 'Ninja Van',         trackUrl: () => `https://www.ninjavan.co/th-th/tracking` },
+  { id: 'dhl',      label: 'DHL',               trackUrl: (n: string) => `https://www.dhl.com/th-th/home/tracking.html?tracking-id=${n}` },
+  { id: 'other',    label: 'อื่นๆ',             trackUrl: () => '' },
+] as const
+
+export type CarrierId = typeof CARRIERS[number]['id']
+
+export interface OrderItem {
+  productId?: string   // id จาก StockProduct (ถ้ามี)
+  name: string         // ชื่อสินค้า (สำเนาจาก product หรือพิมพ์เอง)
+  qty: number          // จำนวนที่สั่ง
+  unit: string         // หน่วย (Box/Pack/etc)
+}
+
+export type OrderStatus = 'ordered' | 'in_transit' | 'received'
+
+export interface PurchaseOrder {
+  id: string
+  createdAt: string       // ISO date
+  supplier?: string
+  notes?: string
+  items: OrderItem[]
+  carrier?: CarrierId
+  trackingNumber?: string
+  status: OrderStatus
+  receivedAt?: string
+}

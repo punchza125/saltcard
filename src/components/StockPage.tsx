@@ -2,10 +2,13 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import {
   Plus, Pencil, Trash2, ArrowUp, ArrowDown,
   ChevronDown, ChevronUp, X, Check, RefreshCw, AlertTriangle, Upload, Cloud, CloudOff,
+  Package2, BarChart2, Truck,
 } from 'lucide-react'
 import type { StockProduct, StockUnit, DayReport } from '../types'
 import { useStockStore, type SyncPreviewItem, type InventorySnapshotItem } from '../hooks/useStockStore'
 import { formatThaiDate, parseInventoryReport } from '../utils/parser'
+import OrdersTab from './OrdersTab'
+import { useOrderStore } from '../hooks/useOrderStore'
 
 const UNITS: StockUnit[] = ['Box', 'Pack', 'Carton', 'ชิ้น']
 
@@ -1032,7 +1035,43 @@ function calcProfit(product: StockProduct, taxRate: number) {
   return result
 }
 
+function SubTabBar({ active, onChange, pendingCount }: {
+  active: 'stock' | 'orders'
+  onChange: (t: 'stock' | 'orders') => void
+  pendingCount: number
+}) {
+  return (
+    <div className="sticky top-[64px] z-30 bg-white border-b border-brand-blue/10 px-4 md:px-6">
+      <div className="max-w-2xl mx-auto flex gap-0">
+        {([
+          { id: 'stock',  label: 'สต็อก',         icon: <Package2 size={14} /> },
+          { id: 'orders', label: 'ติดตามสินค้า',   icon: <Truck size={14} />, badge: pendingCount },
+        ] as const).map(tab => (
+          <button key={tab.id} onClick={() => onChange(tab.id)}
+            className={`flex items-center gap-1.5 px-4 py-3 text-[13px] font-semibold border-b-2 transition-all ${
+              active === tab.id
+                ? 'border-brand-blue text-brand-blue'
+                : 'border-transparent text-brand-dark/40 hover:text-brand-dark'
+            }`}
+          >
+            {tab.icon}
+            {tab.label}
+            {'badge' in tab && tab.badge > 0 && (
+              <span className="ml-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-brand-blue text-white">
+                {tab.badge}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function StockPage({ reports, sheetsUrl, onPushStock, readOnly }: StockPageProps) {
+  const [stockTab, setStockTab] = useState<'stock' | 'orders'>('stock')
+  const { orders } = useOrderStore()
+  const pendingOrderCount = orders.filter(o => o.status !== 'received').length
   const {
     stock, addProduct, updateProduct, removeProduct, logEntry,
     previewSync, applySync, previewSyncProduct, applySyncProduct,
@@ -1154,8 +1193,18 @@ export default function StockPage({ reports, sheetsUrl, onPushStock, readOnly }:
     applySync(syncPreview, Array.from(selectedSyncDates))
   }
 
+  if (stockTab === 'orders') {
+    return (
+      <>
+        <SubTabBar active={stockTab} onChange={setStockTab} pendingCount={pendingOrderCount} />
+        <OrdersTab products={stock.products} />
+      </>
+    )
+  }
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-5 space-y-4">
+      <SubTabBar active={stockTab} onChange={setStockTab} pendingCount={pendingOrderCount} />
 
       {/* sync banner — เจ้าของเท่านั้น */}
       {!readOnly && (pendingDates.length > 0 ? (
