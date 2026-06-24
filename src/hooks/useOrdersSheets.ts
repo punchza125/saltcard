@@ -33,7 +33,13 @@ export function useOrdersSheets() {
     if (!u) return false
     setSyncing(true); setSyncError(false)
     try {
-      await fetch(`${u}?action=save`, { method: 'POST', body: JSON.stringify(orders) })
+      const res = await fetch(`${u}?action=save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(orders),
+      })
+      const json = await res.json()
+      if (!json.ok) { setSyncError(true); return false }
       setLastSync(new Date().toLocaleTimeString('th-TH'))
       return true
     } catch {
