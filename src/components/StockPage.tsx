@@ -1207,7 +1207,7 @@ export default function StockPage({ reports, sheetsUrl, onPushStock, onPushOrder
     return (
       <>
         <SubTabBar active={stockTab} onChange={setStockTab} pendingCount={pendingOrderCount} />
-        <OrdersTab products={stock.products} onPush={onPushOrders} onFetch={onFetchOrders} sheetsConnected={!!sheetsUrl} />
+        <OrdersTab products={stock.products} onPush={onPushOrders} onFetch={onFetchOrders} sheetsConnected={!!sheetsUrl} sheetsUrl={sheetsUrl} />
       </>
     )
   }

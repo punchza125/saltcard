@@ -557,11 +557,12 @@ function SheetsBanner({ url, onSave, syncing, lastSync, syncError, onFetch, isEn
 
 type FilterTab = 'all' | OrderStatus
 
-export default function OrdersTab({ products, onPush, onFetch, sheetsConnected }: {
+export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, sheetsUrl }: {
   products: StockProduct[]
   onPush?: (orders: PurchaseOrder[]) => Promise<boolean>
   onFetch?: () => Promise<PurchaseOrder[] | null>
   sheetsConnected?: boolean
+  sheetsUrl?: string
 }) {
   const { orders, addOrder, updateOrder, setTracking, markReceived, deleteOrder, replaceAll } = useOrderStore()
   const [filter,       setFilter]       = useState<FilterTab>('all')
@@ -571,6 +572,19 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected }
   const [syncing,      setSyncing]      = useState(false)
   const [lastSync,     setLastSync]     = useState<string | null>(null)
   const [syncError,    setSyncError]    = useState(false)
+  const [urlTesting,   setUrlTesting]   = useState(false)
+  const [urlStatus,    setUrlStatus]    = useState<'ok' | 'fail' | null>(null)
+
+  async function testSheetsUrl() {
+    if (!sheetsUrl) return
+    setUrlTesting(true); setUrlStatus(null)
+    try {
+      const res = await fetch(`${sheetsUrl}?action=dates`)
+      const json = await res.json()
+      setUrlStatus(json.ok === true ? 'ok' : 'fail')
+    } catch { setUrlStatus('fail') }
+    finally { setUrlTesting(false) }
+  }
 
   // fetch from main sheet on mount
   useEffect(() => {
@@ -624,28 +638,52 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected }
 
       {/* Sync status banner — shown only when sheet is connected */}
       {sheetsConnected && (
-        <div className={`rounded-xl px-4 py-3 flex items-center gap-3 mb-4 border ${
+        <div className={`rounded-xl px-4 py-3 flex flex-col gap-2 mb-4 border ${
           syncError ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'
         }`}>
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${syncError ? 'bg-red-100' : 'bg-green-100'}`}>
-            {syncError ? <CloudOff size={14} className="text-red-500" /> : <Cloud size={14} className="text-green-600" />}
+          <div className="flex items-center gap-3">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${syncError ? 'bg-red-100' : 'bg-green-100'}`}>
+              {syncError ? <CloudOff size={14} className="text-red-500" /> : <Cloud size={14} className="text-green-600" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[12px] font-semibold text-brand-dark">
+                {syncError ? 'ซิงค์ไม่สำเร็จ' : 'เชื่อมต่อ Google Sheet แล้ว'}
+              </p>
+              <p className="text-[10px] text-brand-dark/40">
+                {syncing ? 'กำลังซิงค์...' : lastSync ? `ซิงค์ล่าสุด ${lastSync}` : 'พร้อมซิงค์'}
+              </p>
+            </div>
+            <button
+              onClick={() => onFetch && onFetch().then(f => { if (f) { replaceAll(f); setLastSync(new Date().toLocaleTimeString('th-TH')); setSyncError(false) } else setSyncError(true) })}
+              disabled={syncing}
+              className="flex items-center gap-1 text-[11px] text-brand-blue border border-brand-blue/20 px-2.5 py-1.5 rounded-lg hover:bg-brand-pale disabled:opacity-40 transition-all"
+            >
+              {syncing ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+              ดึงข้อมูล
+            </button>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[12px] font-semibold text-brand-dark">
-              {syncError ? 'ซิงค์ไม่สำเร็จ' : 'เชื่อมต่อ Google Sheet แล้ว'}
-            </p>
-            <p className="text-[10px] text-brand-dark/40">
-              {syncing ? 'กำลังซิงค์...' : lastSync ? `ซิงค์ล่าสุด ${lastSync}` : 'พร้อมซิงค์'}
-            </p>
-          </div>
-          <button
-            onClick={() => onFetch && onFetch().then(f => { if (f) { replaceAll(f); setLastSync(new Date().toLocaleTimeString('th-TH')); setSyncError(false) } else setSyncError(true) })}
-            disabled={syncing}
-            className="flex items-center gap-1 text-[11px] text-brand-blue border border-brand-blue/20 px-2.5 py-1.5 rounded-lg hover:bg-brand-pale disabled:opacity-40 transition-all"
-          >
-            {syncing ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
-            ดึงข้อมูล
-          </button>
+
+          {/* URL debug row */}
+          {sheetsUrl && (
+            <div className="flex items-center gap-2 pl-11">
+              <p className="text-[10px] text-brand-dark/40 truncate flex-1 font-mono">
+                {sheetsUrl.length > 50 ? '…' + sheetsUrl.slice(-47) : sheetsUrl}
+              </p>
+              <button
+                onClick={testSheetsUrl}
+                disabled={urlTesting}
+                className={`flex-shrink-0 text-[10px] px-2 py-1 rounded-lg border font-medium transition-all ${
+                  urlStatus === 'ok'   ? 'border-green-300 text-green-600 bg-green-50' :
+                  urlStatus === 'fail' ? 'border-red-300 text-red-500 bg-red-50' :
+                  'border-brand-blue/20 text-brand-blue hover:bg-brand-pale'
+                } disabled:opacity-40`}
+              >
+                {urlTesting ? <Loader2 size={10} className="animate-spin inline" /> :
+                 urlStatus === 'ok' ? '✓ URL ถูก' :
+                 urlStatus === 'fail' ? '✗ URL ผิด' : 'เช็ค URL'}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
