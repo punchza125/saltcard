@@ -1040,29 +1040,39 @@ function SubTabBar({ active, onChange, pendingCount }: {
   onChange: (t: 'stock' | 'orders') => void
   pendingCount: number
 }) {
+  const TABS = [
+    { id: 'stock'  as const, label: 'สต็อก',       icon: <Package2 size={14} /> },
+    { id: 'orders' as const, label: 'ติดตามสินค้า', icon: <Truck size={14} />, badge: pendingCount },
+  ]
   return (
-    <div className="sticky top-[64px] z-30 bg-white border-b border-brand-blue/10 px-4 md:px-6">
-      <div className="max-w-2xl mx-auto flex gap-0">
-        {([
-          { id: 'stock',  label: 'สต็อก',         icon: <Package2 size={14} /> },
-          { id: 'orders', label: 'ติดตามสินค้า',   icon: <Truck size={14} />, badge: pendingCount },
-        ] as const).map(tab => (
-          <button key={tab.id} onClick={() => onChange(tab.id)}
-            className={`flex items-center gap-1.5 px-4 py-3 text-[13px] font-semibold border-b-2 transition-all ${
-              active === tab.id
-                ? 'border-brand-blue text-brand-blue'
-                : 'border-transparent text-brand-dark/40 hover:text-brand-dark'
-            }`}
-          >
-            {tab.icon}
-            {tab.label}
-            {'badge' in tab && tab.badge > 0 && (
-              <span className="ml-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-brand-blue text-white">
-                {tab.badge}
-              </span>
-            )}
-          </button>
-        ))}
+    <div className="sticky top-[64px] z-30 bg-white/80 backdrop-blur-md border-b border-brand-blue/8 px-4 md:px-6 py-2.5">
+      <div className="max-w-2xl mx-auto">
+        <div className="inline-flex bg-brand-pale/60 rounded-xl p-1 gap-1">
+          {TABS.map(tab => {
+            const isActive = active === tab.id
+            return (
+              <button key={tab.id} onClick={() => onChange(tab.id)}
+                className={`relative flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold transition-all duration-200 ${
+                  isActive
+                    ? 'bg-white text-brand-blue shadow-sm shadow-brand-blue/10'
+                    : 'text-brand-dark/40 hover:text-brand-dark'
+                }`}
+              >
+                <span className={`transition-colors ${isActive ? 'text-brand-blue' : 'text-brand-dark/30'}`}>
+                  {tab.icon}
+                </span>
+                {tab.label}
+                {'badge' in tab && tab.badge > 0 && (
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full transition-colors ${
+                    isActive ? 'bg-brand-blue text-white' : 'bg-brand-dark/15 text-brand-dark/50'
+                  }`}>
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
       </div>
     </div>
   )
