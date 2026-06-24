@@ -8,6 +8,7 @@ import type { PurchaseOrder, OrderItem, OrderStatus, StockProduct, CarrierId, Or
 import { CARRIERS, ORDER_MEMBERS } from '../types'
 import { useOrderStore } from '../hooks/useOrderStore'
 import { formatThaiDate } from '../utils/parser'
+import { fetchTracking, hasAfterShip, TAG_TH, type TrackingResult } from '../hooks/useAfterShip'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -319,9 +320,22 @@ function OrderCard({
   onSetTracking: () => void
   onMarkReceived: () => void
 }) {
-  const [copied, setCopied] = useState(false)
+  const [copied,       setCopied]       = useState(false)
+  const [tracking,     setTracking]     = useState<TrackingResult | null>(null)
+  const [trackLoading, setTrackLoading] = useState(false)
+  const [trackError,   setTrackError]   = useState(false)
+  const [showTrack,    setShowTrack]    = useState(false)
   const meta    = STATUS_META[order.status]
   const carrier = carrierId(order.carrier)
+
+  async function loadTracking() {
+    if (!order.carrier || !order.trackingNumber) return
+    setTrackLoading(true); setTrackError(false); setShowTrack(true)
+    const result = await fetchTracking(order.carrier, order.trackingNumber)
+    setTrackLoading(false)
+    if (result) setTracking(result)
+    else setTrackError(true)
+  }
 
   function handleCopy() {
     if (!order.trackingNumber) return
@@ -406,23 +420,83 @@ function OrderCard({
 
       {/* tracking info (in_transit) */}
       {order.status === 'in_transit' && order.trackingNumber && (
-        <div className="mx-4 mb-3 flex items-center gap-2 bg-white/70 rounded-xl px-3 py-2.5 border border-blue-100">
-          <Truck size={13} className="text-blue-400 flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-[10px] text-brand-dark/40">{carrier?.label}</p>
-            <p className="text-[13px] font-mono font-semibold text-brand-dark tracking-wide truncate">
-              {order.trackingNumber}
-            </p>
-          </div>
-          <button onClick={handleCopy}
-            className="w-7 h-7 rounded-lg bg-brand-pale flex items-center justify-center hover:bg-brand-blue hover:text-white transition-all group">
-            {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} className="text-brand-dark/40 group-hover:text-white" />}
-          </button>
-          {carrier?.trackUrl(order.trackingNumber) && (
-            <button onClick={openTracking}
+        <div className="mx-4 mb-3 space-y-2">
+          <div className="flex items-center gap-2 bg-white/70 rounded-xl px-3 py-2.5 border border-blue-100">
+            <Truck size={13} className="text-blue-400 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] text-brand-dark/40">{carrier?.label}</p>
+              <p className="text-[13px] font-mono font-semibold text-brand-dark tracking-wide truncate">
+                {order.trackingNumber}
+              </p>
+            </div>
+            <button onClick={handleCopy}
               className="w-7 h-7 rounded-lg bg-brand-pale flex items-center justify-center hover:bg-brand-blue hover:text-white transition-all group">
-              <ExternalLink size={12} className="text-brand-dark/40 group-hover:text-white" />
+              {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} className="text-brand-dark/40 group-hover:text-white" />}
             </button>
+            {carrier?.trackUrl(order.trackingNumber) && (
+              <button onClick={openTracking}
+                className="w-7 h-7 rounded-lg bg-brand-pale flex items-center justify-center hover:bg-brand-blue hover:text-white transition-all group">
+                <ExternalLink size={12} className="text-brand-dark/40 group-hover:text-white" />
+              </button>
+            )}
+          </div>
+
+          {/* AfterShip status panel */}
+          {hasAfterShip && (
+            <div>
+              {!showTrack ? (
+                <button onClick={loadTracking}
+                  className="w-full flex items-center justify-center gap-1.5 py-2 text-[11px] font-semibold text-blue-600 bg-blue-50 border border-blue-100 rounded-xl hover:bg-blue-100 transition-colors">
+                  <RefreshCw size={11} /> ดูสถานะจากขนส่ง
+                </button>
+              ) : (
+                <div className="bg-white/80 rounded-xl border border-blue-100 overflow-hidden">
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-blue-50">
+                    <span className="text-[11px] font-semibold text-blue-700">
+                      {trackLoading ? 'กำลังโหลด...' :
+                       trackError   ? 'โหลดไม่สำเร็จ' :
+                       tracking     ? (TAG_TH[tracking.tag] ?? tracking.tag) : ''}
+                    </span>
+                    <button onClick={() => { setShowTrack(false); setTracking(null) }}
+                      className="text-brand-dark/30 hover:text-brand-dark transition-colors">
+                      <X size={12} />
+                    </button>
+                  </div>
+                  {trackLoading && (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 size={16} className="animate-spin text-blue-400" />
+                    </div>
+                  )}
+                  {trackError && (
+                    <p className="text-[11px] text-red-400 px-3 py-2">ไม่พบข้อมูลหรือ API key ยังไม่ถูกต้อง</p>
+                  )}
+                  {tracking && !trackLoading && (
+                    <div className="divide-y divide-blue-50 max-h-48 overflow-y-auto">
+                      {tracking.checkpoints.slice().reverse().slice(0, 6).map((cp, i) => (
+                        <div key={i} className="px-3 py-2">
+                          <p className="text-[11px] text-brand-dark/70 leading-snug">{cp.message}</p>
+                          {cp.location && <p className="text-[10px] text-brand-dark/40 mt-0.5">{cp.location}</p>}
+                          <p className="text-[10px] text-brand-dark/30 mt-0.5">
+                            {new Date(cp.created_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}
+                          </p>
+                        </div>
+                      ))}
+                      {tracking.checkpoints.length === 0 && (
+                        <p className="text-[11px] text-brand-dark/40 px-3 py-2">ยังไม่มีการอัปเดต</p>
+                      )}
+                    </div>
+                  )}
+                  {tracking && !trackLoading && (
+                    <div className="px-3 py-2 border-t border-blue-50">
+                      <button onClick={loadTracking}
+                        className="text-[10px] text-blue-500 hover:text-blue-700 flex items-center gap-1">
+                        <RefreshCw size={9} /> รีเฟรช
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}
