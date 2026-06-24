@@ -434,13 +434,14 @@ function OrderCard({
 
 // ── SheetsBanner ─────────────────────────────────────────────────────────────
 
-function SheetsBanner({ url, onSave, syncing, lastSync, syncError, onFetch }: {
+function SheetsBanner({ url, onSave, syncing, lastSync, syncError, onFetch, isEnvConfigured }: {
   url: string
   onSave: (u: string) => void
   syncing: boolean
   lastSync: string | null
   syncError: boolean
   onFetch: () => void
+  isEnvConfigured: boolean
 }) {
   const [editing, setEditing] = useState(!url)
   const [draft,   setDraft]   = useState(url)
@@ -476,14 +477,19 @@ function SheetsBanner({ url, onSave, syncing, lastSync, syncError, onFetch }: {
             {syncing ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
             ดึงข้อมูล
           </button>
-          <button onClick={() => setEditing(true)}
-            className="text-[11px] text-brand-dark/40 hover:text-brand-dark px-2 py-1.5 rounded-lg hover:bg-brand-pale transition-colors">
-            แก้ไข
-          </button>
+          {!isEnvConfigured && (
+            <button onClick={() => setEditing(true)}
+              className="text-[11px] text-brand-dark/40 hover:text-brand-dark px-2 py-1.5 rounded-lg hover:bg-brand-pale transition-colors">
+              แก้ไข
+            </button>
+          )}
         </div>
       </div>
     )
   }
+
+  // env configured but no local URL — don't show config form
+  if (isEnvConfigured) return null
 
   return (
     <div className="rounded-xl border border-brand-blue/15 bg-brand-pale/40 p-4 mb-4 space-y-3">
@@ -578,6 +584,7 @@ export default function OrdersTab({ products }: { products: StockProduct[] }) {
         syncing={sheets.syncing}
         lastSync={sheets.lastSync}
         syncError={sheets.syncError}
+        isEnvConfigured={sheets.isEnvConfigured}
         onFetch={() => sheets.fetch().then(f => { if (f?.length) replaceAll(f) })}
       />
 

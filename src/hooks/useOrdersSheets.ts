@@ -2,14 +2,20 @@ import { useCallback, useState } from 'react'
 import type { PurchaseOrder } from '../types'
 
 const URL_KEY = 'saltcard_orders_sheets_url'
+const ENV_URL = import.meta.env.VITE_ORDERS_URL as string | undefined
 
 export function useOrdersSheets() {
-  const [url, setUrlState] = useState(() => localStorage.getItem(URL_KEY) ?? '')
+  // env var takes priority over localStorage (deployed = everyone shares same sheet)
+  const [url, setUrlState] = useState(
+    () => ENV_URL ?? localStorage.getItem(URL_KEY) ?? ''
+  )
+  const isEnvConfigured = !!ENV_URL
   const [syncing, setSyncing] = useState(false)
   const [lastSync, setLastSync] = useState<string | null>(null)
   const [syncError, setSyncError] = useState(false)
 
   function saveUrl(u: string) {
+    if (isEnvConfigured) return  // env var takes over, can't override
     setUrlState(u)
     localStorage.setItem(URL_KEY, u)
   }
@@ -23,7 +29,7 @@ export function useOrdersSheets() {
   }
 
   const push = useCallback(async (orders: PurchaseOrder[]): Promise<boolean> => {
-    const u = localStorage.getItem(URL_KEY)
+    const u = ENV_URL ?? localStorage.getItem(URL_KEY)
     if (!u) return false
     setSyncing(true); setSyncError(false)
     try {
@@ -37,7 +43,7 @@ export function useOrdersSheets() {
   }, [])
 
   const fetch_ = useCallback(async (): Promise<PurchaseOrder[] | null> => {
-    const u = localStorage.getItem(URL_KEY)
+    const u = ENV_URL ?? localStorage.getItem(URL_KEY)
     if (!u) return null
     setSyncing(true); setSyncError(false)
     try {
@@ -52,5 +58,5 @@ export function useOrdersSheets() {
     } finally { setSyncing(false) }
   }, [])
 
-  return { url, saveUrl, testUrl, push, fetch: fetch_, syncing, lastSync, syncError }
+  return { url, saveUrl, testUrl, push, fetch: fetch_, syncing, lastSync, syncError, isEnvConfigured }
 }
