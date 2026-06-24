@@ -7,7 +7,6 @@ import {
 import type { PurchaseOrder, OrderItem, OrderStatus, StockProduct, CarrierId } from '../types'
 import { CARRIERS } from '../types'
 import { useOrderStore } from '../hooks/useOrderStore'
-import { useOrdersSheets } from '../hooks/useOrdersSheets'
 import { formatThaiDate } from '../utils/parser'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -535,27 +534,50 @@ function SheetsBanner({ url, onSave, syncing, lastSync, syncError, onFetch, isEn
 
 type FilterTab = 'all' | OrderStatus
 
-export default function OrdersTab({ products }: { products: StockProduct[] }) {
+export default function OrdersTab({ products, onPush, onFetch, sheetsConnected }: {
+  products: StockProduct[]
+  onPush?: (orders: PurchaseOrder[]) => Promise<boolean>
+  onFetch?: () => Promise<PurchaseOrder[] | null>
+  sheetsConnected?: boolean
+}) {
   const { orders, addOrder, updateOrder, setTracking, markReceived, deleteOrder, replaceAll } = useOrderStore()
-  const sheets = useOrdersSheets()
   const [filter,       setFilter]       = useState<FilterTab>('all')
   const [showCreate,   setShowCreate]   = useState(false)
   const [editOrder,    setEditOrder]    = useState<PurchaseOrder | null>(null)
   const [trackOrder,   setTrackOrder]   = useState<PurchaseOrder | null>(null)
+  const [syncing,      setSyncing]      = useState(false)
+  const [lastSync,     setLastSync]     = useState<string | null>(null)
+  const [syncError,    setSyncError]    = useState(false)
 
-  // fetch on mount when URL is set
+  // fetch from main sheet on mount
   useEffect(() => {
-    if (!sheets.url) return
-    sheets.fetch().then(fetched => {
-      if (fetched?.length) replaceAll(fetched)
+    if (!onFetch) return
+    setSyncing(true)
+    onFetch().then(fetched => {
+      setSyncing(false)
+      if (fetched) {
+        replaceAll(fetched)
+        setLastSync(new Date().toLocaleTimeString('th-TH'))
+        setSyncError(false)
+      } else {
+        setSyncError(true)
+      }
     })
-  }, [sheets.url])
+  }, [])
 
-  // helper: push current orders then call the original mutation
-  async function withSync(mutation: () => void) {
-    mutation()
-    // push after state settles
-    setTimeout(() => sheets.push(orders), 50)
+  async function pushOrders(latest: PurchaseOrder[]) {
+    if (!onPush) return
+    setSyncing(true); setSyncError(false)
+    const ok = await onPush(latest)
+    setSyncing(false)
+    if (ok) setLastSync(new Date().toLocaleTimeString('th-TH'))
+    else setSyncError(true)
+  }
+
+  // helper: push after state settles
+  function withSync(mutation: () => PurchaseOrder[]) {
+    const latest = mutation()
+    setTimeout(() => pushOrders(latest), 50)
   }
 
   const filtered = orders.filter(o => filter === 'all' || o.status === filter)
@@ -577,16 +599,32 @@ export default function OrdersTab({ products }: { products: StockProduct[] }) {
   return (
     <div className="px-4 md:px-6 py-4 max-w-2xl mx-auto">
 
-      {/* Google Sheet banner */}
-      <SheetsBanner
-        url={sheets.url}
-        onSave={sheets.saveUrl}
-        syncing={sheets.syncing}
-        lastSync={sheets.lastSync}
-        syncError={sheets.syncError}
-        isEnvConfigured={sheets.isEnvConfigured}
-        onFetch={() => sheets.fetch().then(f => { if (f?.length) replaceAll(f) })}
-      />
+      {/* Sync status banner — shown only when sheet is connected */}
+      {sheetsConnected && (
+        <div className={`rounded-xl px-4 py-3 flex items-center gap-3 mb-4 border ${
+          syncError ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'
+        }`}>
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${syncError ? 'bg-red-100' : 'bg-green-100'}`}>
+            {syncError ? <CloudOff size={14} className="text-red-500" /> : <Cloud size={14} className="text-green-600" />}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[12px] font-semibold text-brand-dark">
+              {syncError ? 'ซิงค์ไม่สำเร็จ' : 'เชื่อมต่อ Google Sheet แล้ว'}
+            </p>
+            <p className="text-[10px] text-brand-dark/40">
+              {syncing ? 'กำลังซิงค์...' : lastSync ? `ซิงค์ล่าสุด ${lastSync}` : 'พร้อมซิงค์'}
+            </p>
+          </div>
+          <button
+            onClick={() => onFetch && onFetch().then(f => { if (f) { replaceAll(f); setLastSync(new Date().toLocaleTimeString('th-TH')); setSyncError(false) } else setSyncError(true) })}
+            disabled={syncing}
+            className="flex items-center gap-1 text-[11px] text-brand-blue border border-brand-blue/20 px-2.5 py-1.5 rounded-lg hover:bg-brand-pale disabled:opacity-40 transition-all"
+          >
+            {syncing ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+            ดึงข้อมูล
+          </button>
+        </div>
+      )}
 
       {/* top bar */}
       <div className="flex items-center justify-between mb-4">
@@ -634,15 +672,17 @@ export default function OrdersTab({ products }: { products: StockProduct[] }) {
               order={order}
               products={products}
               onDelete={() => {
+                const updated = orders.filter(o => o.id !== order.id)
                 deleteOrder(order.id)
-                if (sheets.url) setTimeout(() => sheets.push(orders.filter(o => o.id !== order.id)), 100)
+                setTimeout(() => pushOrders(updated), 100)
               }}
               onEdit={() => setEditOrder(order)}
               onSetTracking={() => setTrackOrder(order)}
               onMarkReceived={() => {
-                markReceived(order.id)
                 const today = new Date().toISOString().slice(0, 10)
-                if (sheets.url) setTimeout(() => sheets.push(orders.map(o => o.id === order.id ? { ...o, status: 'received', receivedAt: today } : o)), 100)
+                markReceived(order.id)
+                const updated = orders.map(o => o.id === order.id ? { ...o, status: 'received' as const, receivedAt: today } : o)
+                setTimeout(() => pushOrders(updated), 100)
               }}
             />
           ))}
@@ -656,7 +696,7 @@ export default function OrdersTab({ products }: { products: StockProduct[] }) {
           onClose={() => setShowCreate(false)}
           onSave={data => {
             const newOrder = addOrder(data)
-            if (sheets.url) setTimeout(() => sheets.push([...orders, newOrder]), 100)
+            setTimeout(() => pushOrders([...orders, newOrder]), 100)
           }}
         />
       )}
@@ -667,7 +707,7 @@ export default function OrdersTab({ products }: { products: StockProduct[] }) {
           onClose={() => setEditOrder(null)}
           onSave={data => {
             updateOrder(editOrder.id, data)
-            if (sheets.url) setTimeout(() => sheets.push(orders.map(o => o.id === editOrder.id ? { ...o, ...data } : o)), 100)
+            setTimeout(() => pushOrders(orders.map(o => o.id === editOrder.id ? { ...o, ...data } : o)), 100)
           }}
         />
       )}
@@ -677,7 +717,7 @@ export default function OrdersTab({ products }: { products: StockProduct[] }) {
           onClose={() => setTrackOrder(null)}
           onSave={(carrier, tracking) => {
             setTracking(trackOrder.id, carrier, tracking)
-            if (sheets.url) setTimeout(() => sheets.push(orders.map(o => o.id === trackOrder.id ? { ...o, carrier, trackingNumber: tracking, status: 'in_transit' } : o)), 100)
+            setTimeout(() => pushOrders(orders.map(o => o.id === trackOrder.id ? { ...o, carrier, trackingNumber: tracking, status: 'in_transit' as const } : o)), 100)
           }}
         />
       )}

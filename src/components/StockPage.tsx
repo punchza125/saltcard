@@ -4,7 +4,7 @@ import {
   ChevronDown, ChevronUp, X, Check, RefreshCw, AlertTriangle, Upload, Cloud, CloudOff,
   Package2, BarChart2, Truck,
 } from 'lucide-react'
-import type { StockProduct, StockUnit, DayReport } from '../types'
+import type { StockProduct, StockUnit, DayReport, PurchaseOrder } from '../types'
 import { useStockStore, type SyncPreviewItem, type InventorySnapshotItem } from '../hooks/useStockStore'
 import { formatThaiDate, parseInventoryReport } from '../utils/parser'
 import OrdersTab from './OrdersTab'
@@ -1006,6 +1006,8 @@ interface StockPageProps {
   reports: DayReport[]
   sheetsUrl?: string
   onPushStock?: (s: object) => Promise<boolean>
+  onPushOrders?: (orders: PurchaseOrder[]) => Promise<boolean>
+  onFetchOrders?: () => Promise<PurchaseOrder[] | null>
   readOnly?: boolean
 }
 
@@ -1076,7 +1078,7 @@ function SubTabBar({ active, onChange, pendingCount }: {
   )
 }
 
-export default function StockPage({ reports, sheetsUrl, onPushStock, readOnly }: StockPageProps) {
+export default function StockPage({ reports, sheetsUrl, onPushStock, onPushOrders, onFetchOrders, readOnly }: StockPageProps) {
   const [stockTab, setStockTab] = useState<'stock' | 'orders'>('stock')
   const { orders } = useOrderStore()
   const pendingOrderCount = orders.filter(o => o.status !== 'received').length
@@ -1205,7 +1207,7 @@ export default function StockPage({ reports, sheetsUrl, onPushStock, readOnly }:
     return (
       <>
         <SubTabBar active={stockTab} onChange={setStockTab} pendingCount={pendingOrderCount} />
-        <OrdersTab products={stock.products} />
+        <OrdersTab products={stock.products} onPush={onPushOrders} onFetch={onFetchOrders} sheetsConnected={!!sheetsUrl} />
       </>
     )
   }

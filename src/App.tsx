@@ -168,6 +168,8 @@ export default function App() {
             reports={store.reports}
             sheetsUrl={sheetsUrl}
             onPushStock={handlePushStock}
+            onPushOrders={pushOrders}
+            onFetchOrders={fetchOrders}
             readOnly={!!ENV_SHEETS_URL}
           />
         )}
