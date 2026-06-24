@@ -172,6 +172,9 @@ export default function App() {
           <StockPage
             reports={store.reports}
             sheetsUrl={sheetsUrl}
+            ordersUrl={ordersSheets.url}
+            isOrdersEnv={ordersSheets.isEnvConfigured}
+            onSaveOrdersUrl={ordersSheets.saveUrl}
             onPushStock={handlePushStock}
             onPushOrders={effectivePushOrders}
             onFetchOrders={effectiveFetchOrders}

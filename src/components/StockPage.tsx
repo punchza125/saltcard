@@ -1005,6 +1005,9 @@ function ProductRow({
 interface StockPageProps {
   reports: DayReport[]
   sheetsUrl?: string
+  ordersUrl?: string
+  isOrdersEnv?: boolean
+  onSaveOrdersUrl?: (url: string) => void
   onPushStock?: (s: object) => Promise<boolean>
   onPushOrders?: (orders: PurchaseOrder[]) => Promise<boolean>
   onFetchOrders?: () => Promise<PurchaseOrder[] | null>
@@ -1078,7 +1081,7 @@ function SubTabBar({ active, onChange, pendingCount }: {
   )
 }
 
-export default function StockPage({ reports, sheetsUrl, onPushStock, onPushOrders, onFetchOrders, readOnly }: StockPageProps) {
+export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, onSaveOrdersUrl, onPushStock, onPushOrders, onFetchOrders, readOnly }: StockPageProps) {
   const [stockTab, setStockTab] = useState<'stock' | 'orders'>('stock')
   const { orders } = useOrderStore()
   const pendingOrderCount = orders.filter(o => o.status !== 'received').length
@@ -1207,7 +1210,7 @@ export default function StockPage({ reports, sheetsUrl, onPushStock, onPushOrder
     return (
       <>
         <SubTabBar active={stockTab} onChange={setStockTab} pendingCount={pendingOrderCount} />
-        <OrdersTab products={stock.products} onPush={onPushOrders} onFetch={onFetchOrders} sheetsConnected={!!sheetsUrl} sheetsUrl={sheetsUrl} />
+        <OrdersTab products={stock.products} onPush={onPushOrders} onFetch={onFetchOrders} sheetsConnected={!!(sheetsUrl || ordersUrl)} ordersUrl={ordersUrl} isOrdersEnv={isOrdersEnv} onSaveOrdersUrl={onSaveOrdersUrl} />
       </>
     )
   }

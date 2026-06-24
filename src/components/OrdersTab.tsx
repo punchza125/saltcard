@@ -557,12 +557,14 @@ function SheetsBanner({ url, onSave, syncing, lastSync, syncError, onFetch, isEn
 
 type FilterTab = 'all' | OrderStatus
 
-export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, sheetsUrl }: {
+export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, ordersUrl, isOrdersEnv, onSaveOrdersUrl }: {
   products: StockProduct[]
   onPush?: (orders: PurchaseOrder[]) => Promise<boolean>
   onFetch?: () => Promise<PurchaseOrder[] | null>
   sheetsConnected?: boolean
-  sheetsUrl?: string
+  ordersUrl?: string
+  isOrdersEnv?: boolean
+  onSaveOrdersUrl?: (url: string) => void
 }) {
   const { orders, addOrder, updateOrder, setTracking, markReceived, deleteOrder, replaceAll } = useOrderStore()
   const [filter,       setFilter]       = useState<FilterTab>('all')
@@ -574,16 +576,30 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
   const [syncError,    setSyncError]    = useState(false)
   const [urlTesting,   setUrlTesting]   = useState(false)
   const [urlStatus,    setUrlStatus]    = useState<'ok' | 'fail' | null>(null)
+  const [showUrlEdit,  setShowUrlEdit]  = useState(false)
+  const [urlDraft,     setUrlDraft]     = useState('')
 
-  async function testSheetsUrl() {
-    if (!sheetsUrl) return
+  async function testUrl(u: string) {
+    if (!u) return
     setUrlTesting(true); setUrlStatus(null)
     try {
-      const res = await fetch(`${sheetsUrl}?action=dates`)
+      const res = await fetch(`${u}?action=dates`)
       const json = await res.json()
       setUrlStatus(json.ok === true ? 'ok' : 'fail')
     } catch { setUrlStatus('fail') }
     finally { setUrlTesting(false) }
+  }
+
+  function openUrlEdit() {
+    setUrlDraft(ordersUrl ?? '')
+    setShowUrlEdit(true)
+    setUrlStatus(null)
+  }
+
+  function saveUrlEdit() {
+    const trimmed = urlDraft.trim()
+    if (trimmed && onSaveOrdersUrl) onSaveOrdersUrl(trimmed)
+    setShowUrlEdit(false)
   }
 
   // fetch from main sheet on mount
@@ -663,27 +679,79 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
             </button>
           </div>
 
-          {/* URL debug row */}
-          {sheetsUrl && (
-            <div className="flex items-center gap-2 pl-11">
-              <p className="text-[10px] text-brand-dark/40 truncate flex-1 font-mono">
-                {sheetsUrl.length > 50 ? '…' + sheetsUrl.slice(-47) : sheetsUrl}
-              </p>
-              <button
-                onClick={testSheetsUrl}
-                disabled={urlTesting}
-                className={`flex-shrink-0 text-[10px] px-2 py-1 rounded-lg border font-medium transition-all ${
-                  urlStatus === 'ok'   ? 'border-green-300 text-green-600 bg-green-50' :
-                  urlStatus === 'fail' ? 'border-red-300 text-red-500 bg-red-50' :
-                  'border-brand-blue/20 text-brand-blue hover:bg-brand-pale'
-                } disabled:opacity-40`}
-              >
-                {urlTesting ? <Loader2 size={10} className="animate-spin inline" /> :
-                 urlStatus === 'ok' ? '✓ URL ถูก' :
-                 urlStatus === 'fail' ? '✗ URL ผิด' : 'เช็ค URL'}
-              </button>
-            </div>
-          )}
+          {/* URL section */}
+          <div className="pl-11 flex flex-col gap-1.5">
+            {!showUrlEdit ? (
+              <div className="flex items-center gap-2">
+                <p className="text-[10px] text-brand-dark/50 break-all flex-1 font-mono leading-relaxed">
+                  {ordersUrl || 'ยังไม่ได้ตั้ง URL'}
+                </p>
+                <div className="flex gap-1.5 flex-shrink-0">
+                  <button
+                    onClick={() => testUrl(ordersUrl ?? '')}
+                    disabled={urlTesting || !ordersUrl}
+                    className={`text-[10px] px-2 py-1 rounded-lg border font-medium transition-all ${
+                      urlStatus === 'ok'   ? 'border-green-300 text-green-600 bg-green-50' :
+                      urlStatus === 'fail' ? 'border-red-300 text-red-500 bg-red-50' :
+                      'border-brand-blue/20 text-brand-blue hover:bg-brand-pale'
+                    } disabled:opacity-40`}
+                  >
+                    {urlTesting ? <Loader2 size={10} className="animate-spin inline" /> :
+                     urlStatus === 'ok' ? '✓ ใช้ได้' :
+                     urlStatus === 'fail' ? '✗ ผิด' : 'เช็ค'}
+                  </button>
+                  <button
+                    onClick={openUrlEdit}
+                    className="text-[10px] px-2 py-1 rounded-lg border border-brand-blue/20 text-brand-blue hover:bg-brand-pale transition-all"
+                  >
+                    <Pencil size={10} className="inline mr-0.5" />แก้
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {isOrdersEnv && (
+                  <p className="text-[9px] text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">
+                    URL นี้มาจาก Vercel env var (VITE_ORDERS_URL) — ต้องแก้ใน Vercel แล้ว Redeploy
+                  </p>
+                )}
+                <textarea
+                  value={urlDraft}
+                  onChange={e => setUrlDraft(e.target.value)}
+                  disabled={isOrdersEnv}
+                  rows={3}
+                  className="text-[10px] font-mono w-full border border-brand-blue/30 rounded-lg px-2 py-1.5 resize-none bg-white disabled:bg-gray-50 disabled:text-gray-400 focus:outline-none focus:border-brand-blue"
+                  placeholder="https://script.google.com/macros/s/.../exec"
+                />
+                <div className="flex gap-2 justify-end">
+                  <button onClick={() => setShowUrlEdit(false)} className="text-[10px] px-2.5 py-1 rounded-lg border border-gray-200 text-brand-dark/50 hover:bg-gray-50">
+                    ยกเลิก
+                  </button>
+                  <button
+                    onClick={() => testUrl(urlDraft)}
+                    disabled={urlTesting || !urlDraft.trim()}
+                    className={`text-[10px] px-2.5 py-1 rounded-lg border font-medium transition-all ${
+                      urlStatus === 'ok' ? 'border-green-300 text-green-600 bg-green-50' :
+                      urlStatus === 'fail' ? 'border-red-300 text-red-500 bg-red-50' :
+                      'border-brand-blue/20 text-brand-blue hover:bg-brand-pale'
+                    } disabled:opacity-40`}
+                  >
+                    {urlTesting ? <Loader2 size={10} className="animate-spin inline mr-1" /> : null}
+                    {urlStatus === 'ok' ? '✓ ใช้ได้' : urlStatus === 'fail' ? '✗ ผิด' : 'ทดสอบ'}
+                  </button>
+                  {!isOrdersEnv && (
+                    <button
+                      onClick={saveUrlEdit}
+                      disabled={!urlDraft.trim()}
+                      className="text-[10px] px-2.5 py-1 rounded-lg bg-brand-blue text-white font-medium disabled:opacity-40 active:scale-95 transition-all"
+                    >
+                      บันทึก
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
