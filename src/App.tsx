@@ -148,7 +148,7 @@ export default function App() {
 
   return (
     // h-dvh = dynamic viewport height — ป้องกัน nav ลอยตอน iOS Safari address bar เปลี่ยนขนาด
-    <div className="w-full flex flex-col bg-white md:bg-[#f0f4fb] md:min-h-screen md:shadow-xl md:shadow-brand-blue/10"
+    <div className="w-full flex flex-col bg-white md:bg-[#f0f4fb] md:min-h-screen"
       style={{ height: '100dvh' }}>
       <Header
         reportCount={store.reports.length}
