@@ -608,7 +608,9 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
     setSyncing(true)
     onFetch().then(fetched => {
       setSyncing(false)
-      if (fetched) {
+      // Only replace local data if: got actual orders, OR env-configured (sheet = source of truth)
+      // On localhost without env URL, don't clear local orders when sheet returns empty
+      if (fetched && (fetched.length > 0 || isOrdersEnv)) {
         replaceAll(fetched)
         setLastSync(new Date().toLocaleTimeString('th-TH'))
         setSyncError(false)
