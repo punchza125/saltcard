@@ -66,6 +66,38 @@ function doGet(e) {
 
     if (action === 'dates') return jsonOk({})   // health-check endpoint
 
+    if (action === 'track') {
+      const number = e.parameter && e.parameter.number
+      const slug   = e.parameter && e.parameter.slug
+      if (!number || !slug) return jsonErr('missing number or slug')
+
+      const props  = PropertiesService.getScriptProperties()
+      const apiKey = props.getProperty('AFTERSHIP_API_KEY')
+      if (!apiKey) return jsonErr('AFTERSHIP_API_KEY not set in Script Properties')
+
+      const headers = { 'aftership-api-key': apiKey, 'Content-Type': 'application/json' }
+      const trackUrl = 'https://api.aftership.com/v4/trackings/' + slug + '/' + encodeURIComponent(number)
+
+      let resp = UrlFetchApp.fetch(trackUrl, { headers: headers, muteHttpExceptions: true })
+      let data = JSON.parse(resp.getContentText())
+
+      // If tracking not yet registered in AfterShip, add it first then re-fetch
+      if (data.meta && data.meta.code === 4004) {
+        UrlFetchApp.fetch('https://api.aftership.com/v4/trackings', {
+          method: 'post',
+          headers: headers,
+          payload: JSON.stringify({ tracking: { slug: slug, tracking_number: number } }),
+          muteHttpExceptions: true,
+        })
+        resp = UrlFetchApp.fetch(trackUrl, { headers: headers, muteHttpExceptions: true })
+        data = JSON.parse(resp.getContentText())
+      }
+
+      if (!data.data || !data.data.tracking) return jsonErr(data.meta && data.meta.message || 'api error')
+      const t = data.data.tracking
+      return jsonOk({ tracking: { tag: t.tag, checkpoints: t.checkpoints || [] } })
+    }
+
     if (action === 'save' || action === 'saveOrders') {
       const data = e.parameter && e.parameter.data
       if (!data) return jsonErr('missing data')

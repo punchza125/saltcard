@@ -444,7 +444,7 @@ function OrderCard({
           </div>
 
           {/* AfterShip status panel */}
-          {hasAfterShip && (
+          {hasAfterShip(order.carrier ?? '') && (
             <div>
               {!showTrack ? (
                 <button onClick={loadTracking}

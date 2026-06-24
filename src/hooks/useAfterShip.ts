@@ -1,4 +1,5 @@
-const API_KEY = import.meta.env.VITE_AFTERSHIP_API_KEY as string | undefined
+const ENV_URL = import.meta.env.VITE_ORDERS_URL as string | undefined
+const URL_KEY = 'saltcard_orders_sheets_url'
 
 const SLUGS: Record<string, string> = {
   kerry:    'kerry-express-th',
@@ -10,14 +11,14 @@ const SLUGS: Record<string, string> = {
 }
 
 export const TAG_TH: Record<string, string> = {
-  Pending:         'รอดำเนินการ',
-  InfoReceived:    'รับข้อมูลแล้ว',
-  InTransit:       'อยู่ระหว่างขนส่ง',
-  OutForDelivery:  'กำลังนำส่ง',
-  AttemptFail:     'จัดส่งไม่สำเร็จ',
-  Delivered:       'จัดส่งแล้ว ✓',
-  Exception:       'มีปัญหา',
-  Expired:         'หมดอายุ',
+  Pending:        'รอดำเนินการ',
+  InfoReceived:   'รับข้อมูลแล้ว',
+  InTransit:      'อยู่ระหว่างขนส่ง',
+  OutForDelivery: 'กำลังนำส่ง',
+  AttemptFail:    'จัดส่งไม่สำเร็จ',
+  Delivered:      'จัดส่งแล้ว ✓',
+  Exception:      'มีปัญหา',
+  Expired:        'หมดอายุ',
 }
 
 export interface Checkpoint {
@@ -32,22 +33,25 @@ export interface TrackingResult {
   checkpoints: Checkpoint[]
 }
 
+function getOrdersUrl(): string | null {
+  return ENV_URL ?? localStorage.getItem(URL_KEY) ?? null
+}
+
+export function hasAfterShip(carrierId: string): boolean {
+  return !!getOrdersUrl() && !!SLUGS[carrierId]
+}
+
 export async function fetchTracking(carrierId: string, trackingNumber: string): Promise<TrackingResult | null> {
-  if (!API_KEY) return null
+  const u    = getOrdersUrl()
   const slug = SLUGS[carrierId]
-  if (!slug) return null
+  if (!u || !slug) return null
   try {
-    const res = await fetch(
-      `https://api.aftership.com/v4/trackings/${slug}/${encodeURIComponent(trackingNumber)}`,
-      { headers: { 'aftership-api-key': API_KEY, 'Content-Type': 'application/json' } },
-    )
+    const res  = await fetch(`${u}?action=track&slug=${encodeURIComponent(slug)}&number=${encodeURIComponent(trackingNumber)}`)
     const json = await res.json()
-    if (json.meta?.code !== 200) return null
+    if (!json.ok) return null
     return {
-      tag:         json.data?.tracking?.tag ?? 'Unknown',
-      checkpoints: json.data?.tracking?.checkpoints ?? [],
+      tag:         json.tracking?.tag ?? 'Unknown',
+      checkpoints: json.tracking?.checkpoints ?? [],
     }
   } catch { return null }
 }
-
-export const hasAfterShip = !!API_KEY
