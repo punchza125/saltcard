@@ -66,7 +66,7 @@ function doGet(e) {
 
     if (action === 'dates') return jsonOk({})   // health-check endpoint
 
-    if (action === 'fetch') {
+    if (action === 'fetch' || action === 'fetchOrders') {
       const orderSheet = getSheet(ORDER_SHEET, ORDER_HEADERS)
       const itemSheet  = getSheet(ITEMS_SHEET,  ITEM_HEADERS)
       const orders = sheetToObjects(orderSheet)
@@ -108,7 +108,7 @@ function doPost(e) {
     initSheets()
     const action = e.parameter && e.parameter.action
 
-    if (action === 'save') {
+    if (action === 'save' || action === 'saveOrders') {
       const orders = JSON.parse(e.postData.contents)
       saveAllOrders(orders)
       return jsonOk({ saved: orders.length })
