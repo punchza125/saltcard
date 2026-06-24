@@ -9,6 +9,7 @@ import SheetsConfigModal from './components/SheetsConfigModal'
 import { useStore } from './hooks/useStore'
 import { usePassionStore } from './hooks/usePassionStore'
 import { useSheets } from './hooks/useSheets'
+import { useOrdersSheets } from './hooks/useOrdersSheets'
 import { useStockStore } from './hooks/useStockStore'
 import type { DayReport, MachineReport } from './types'
 
@@ -69,6 +70,10 @@ export default function App() {
 
   const sheetsConfig = sheetsUrl ? { url: sheetsUrl } : null
   const { syncStatus, syncMessage, lastSynced, pushReport, fetchAll, pushStock, fetchStock, pushMachine, fetchMachine, pushOrders, fetchOrders } = useSheets(sheetsConfig)
+  // If VITE_ORDERS_URL is set, route orders to the separate SaltOrder sheet
+  const ordersSheets = useOrdersSheets()
+  const effectivePushOrders = ordersSheets.isEnvConfigured ? ordersSheets.push : pushOrders
+  const effectiveFetchOrders = ordersSheets.isEnvConfigured ? ordersSheets.fetch : fetchOrders
 
   // ถ้ามี ENV_SHEETS_URL (deployed version) → โหลดจาก Sheets ทุกครั้งที่เปิดแอป
   // ถ้าไม่มี (local dev) → โหลดเฉพาะตอนยังไม่มีข้อมูล
@@ -168,8 +173,8 @@ export default function App() {
             reports={store.reports}
             sheetsUrl={sheetsUrl}
             onPushStock={handlePushStock}
-            onPushOrders={pushOrders}
-            onFetchOrders={fetchOrders}
+            onPushOrders={effectivePushOrders}
+            onFetchOrders={effectiveFetchOrders}
             readOnly={!!ENV_SHEETS_URL}
           />
         )}
