@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react'
 import {
-  Plus, Package, CheckCircle2, Clock,
+  Plus, Package, CheckCircle2, Clock, Truck,
   ChevronDown, X, Pencil, Trash2, Search,
-  Cloud, CloudOff, RefreshCw, Loader2,
+  Cloud, CloudOff, RefreshCw, Loader2, Copy, ExternalLink, Check,
 } from 'lucide-react'
-import type { PurchaseOrder, OrderItem, OrderStatus, StockProduct, OrderMember } from '../types'
-import { ORDER_MEMBERS } from '../types'
+import type { PurchaseOrder, OrderItem, OrderStatus, StockProduct, OrderMember, CarrierId } from '../types'
+import { ORDER_MEMBERS, CARRIERS } from '../types'
 import { useOrderStore } from '../hooks/useOrderStore'
 import { formatThaiDate } from '../utils/parser'
 
@@ -238,18 +238,91 @@ function CreateOrderModal({
   )
 }
 
+// ── TrackingModal ─────────────────────────────────────────────────────────────
+
+function TrackingModal({ order, onClose, onSave }: {
+  order: PurchaseOrder
+  onClose: () => void
+  onSave: (carrier: CarrierId, tracking: string) => void
+}) {
+  const [carrier,  setCarrier]  = useState<CarrierId>(order.carrier ?? 'kerry')
+  const [tracking, setTracking] = useState(order.trackingNumber ?? '')
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40">
+      <div className="bg-white w-full md:max-w-sm rounded-t-3xl md:rounded-2xl shadow-2xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-[14px] font-bold text-brand-dark">ใส่เลข Tracking</p>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-brand-pale flex items-center justify-center">
+            <X size={15} className="text-brand-dark/50" />
+          </button>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <label className="text-[11px] font-semibold text-brand-dark/40 uppercase tracking-wider">บริษัทขนส่ง</label>
+            <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+              {CARRIERS.map(c => (
+                <button key={c.id} onClick={() => setCarrier(c.id as CarrierId)}
+                  className={`py-2 px-3 rounded-xl text-[12px] font-medium border transition-all text-left ${
+                    carrier === c.id
+                      ? 'bg-brand-blue text-white border-brand-blue'
+                      : 'bg-white border-brand-blue/15 text-brand-dark/60 hover:border-brand-blue/40'
+                  }`}
+                >{c.label}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-[11px] font-semibold text-brand-dark/40 uppercase tracking-wider">เลข Tracking</label>
+            <input
+              autoFocus
+              value={tracking}
+              onChange={e => setTracking(e.target.value)}
+              placeholder="EG123456789TH"
+              className="mt-1.5 w-full border border-brand-blue/15 rounded-xl px-3 py-2.5 text-[14px] font-mono outline-none focus:border-brand-blue"
+            />
+          </div>
+        </div>
+        <button
+          onClick={() => { if (tracking.trim()) { onSave(carrier, tracking.trim()); onClose() } }}
+          disabled={!tracking.trim()}
+          className="mt-4 w-full py-3 bg-brand-blue text-white rounded-xl font-semibold text-[14px] disabled:opacity-40 active:scale-[0.98] transition-all"
+        >
+          บันทึก Tracking
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── OrderCard ────────────────────────────────────────────────────────────────
 
 function OrderCard({
-  order, products, onDelete, onEdit, onMarkReceived,
+  order, products, onDelete, onEdit, onSetTracking, onMarkReceived,
 }: {
   order: PurchaseOrder
   products: StockProduct[]
   onDelete: () => void
   onEdit: () => void
+  onSetTracking: () => void
   onMarkReceived: () => void
 }) {
-  const meta = STATUS_META[order.status]
+  const [copied, setCopied] = useState(false)
+  const meta    = STATUS_META[order.status]
+  const carrier = CARRIERS.find(c => c.id === order.carrier)
+
+  function handleCopy() {
+    if (!order.trackingNumber) return
+    navigator.clipboard.writeText(order.trackingNumber).catch(() => {})
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  function openTracking() {
+    if (!carrier || !order.trackingNumber) return
+    const url = carrier.trackUrl(order.trackingNumber)
+    if (url) window.open(url, '_blank')
+  }
 
   return (
     <div className={`rounded-xl border overflow-hidden transition-all ${
@@ -300,6 +373,35 @@ function OrderCard({
         )}
       </div>
 
+      {/* tracking row */}
+      {order.status !== 'received' && (
+        <div className="px-3 pb-1.5 space-y-1.5">
+          {order.trackingNumber ? (
+            <div className="flex items-center gap-1.5 bg-white/60 rounded-lg px-2 py-1 border border-blue-100">
+              <Truck size={10} className="text-blue-400 flex-shrink-0" />
+              <span className="text-[10px] text-brand-dark/35 flex-shrink-0">{carrier?.label}</span>
+              <span className="text-[10px] font-mono font-semibold text-brand-dark flex-1 truncate">{order.trackingNumber}</span>
+              <button onClick={handleCopy} title="คัดลอก" className="w-5 h-5 flex items-center justify-center text-brand-dark/30 hover:text-brand-dark transition-colors">
+                {copied ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} />}
+              </button>
+              {carrier?.trackUrl(order.trackingNumber) && (
+                <button onClick={openTracking} title="เปิดเว็บขนส่ง" className="w-5 h-5 flex items-center justify-center text-brand-dark/30 hover:text-brand-dark transition-colors">
+                  <ExternalLink size={10} />
+                </button>
+              )}
+              <button onClick={onSetTracking} title="แก้ไข" className="w-5 h-5 flex items-center justify-center text-brand-dark/30 hover:text-brand-dark transition-colors">
+                <Pencil size={10} />
+              </button>
+            </div>
+          ) : (
+            <button onClick={onSetTracking}
+              className="w-full flex items-center justify-center gap-1 py-1 text-[10px] font-medium text-brand-blue/70 border border-dashed border-brand-blue/20 rounded-lg hover:border-brand-blue/40 hover:text-brand-blue transition-colors">
+              <Truck size={10} /> ใส่เลข Tracking
+            </button>
+          )}
+        </div>
+      )}
+
       {/* confirm button */}
       {order.status !== 'received' && (
         <div className="px-3 pb-2.5">
@@ -326,10 +428,11 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
   isOrdersEnv?: boolean
   onSaveOrdersUrl?: (url: string) => void
 }) {
-  const { orders, addOrder, updateOrder, markReceived, deleteOrder, replaceAll } = useOrderStore()
+  const { orders, addOrder, updateOrder, setTracking, markReceived, deleteOrder, replaceAll } = useOrderStore()
   const [filter,      setFilter]      = useState<FilterTab>('all')
   const [showCreate,  setShowCreate]  = useState(false)
   const [editOrder,   setEditOrder]   = useState<PurchaseOrder | null>(null)
+  const [trackOrder,  setTrackOrder]  = useState<PurchaseOrder | null>(null)
   const [syncing,     setSyncing]     = useState(false)
   const [lastSync,    setLastSync]    = useState<string | null>(null)
   const [syncError,   setSyncError]   = useState(false)
@@ -565,6 +668,7 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
                 setTimeout(() => pushOrders(orders.filter(o => o.id !== order.id)), 100)
               }}
               onEdit={() => setEditOrder(order)}
+              onSetTracking={() => setTrackOrder(order)}
               onMarkReceived={() => {
                 const today = new Date().toISOString().slice(0, 10)
                 markReceived(order.id)
@@ -594,6 +698,16 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
           onSave={data => {
             updateOrder(editOrder.id, data)
             setTimeout(() => pushOrders(orders.map(o => o.id === editOrder.id ? { ...o, ...data } : o)), 100)
+          }}
+        />
+      )}
+      {trackOrder && (
+        <TrackingModal
+          order={trackOrder}
+          onClose={() => setTrackOrder(null)}
+          onSave={(carrier, tracking) => {
+            setTracking(trackOrder.id, carrier, tracking)
+            setTimeout(() => pushOrders(orders.map(o => o.id === trackOrder.id ? { ...o, carrier, trackingNumber: tracking, status: 'in_transit' as const } : o)), 100)
           }}
         />
       )}
