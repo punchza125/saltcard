@@ -362,13 +362,13 @@ function OrderCard({
       order.status === 'received' ? 'opacity-60' : ''
     } ${meta.bg}`}>
 
-      {/* header row */}
-      <div className="flex items-center justify-between px-3 pt-2.5 pb-1.5 gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className={`text-[10px] font-bold flex items-center gap-1 px-1.5 py-0.5 rounded-full border flex-shrink-0 ${meta.bg} ${meta.color}`}>
+      {/* header + actions in one row */}
+      <div className="flex items-center justify-between px-3 pt-2 pb-1.5 gap-2">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <span className={`text-[10px] font-bold flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border flex-shrink-0 ${meta.bg} ${meta.color}`}>
             {meta.icon} {meta.label}
           </span>
-          <span className="text-[11px] text-brand-dark/40 truncate">
+          <span className="text-[10px] text-brand-dark/40 truncate">
             {formatThaiDate(order.createdAt)}
             {order.orderedBy && <span className="text-brand-blue/70 font-medium"> · {order.orderedBy}</span>}
             {order.supplier && <span className="text-brand-dark/30"> · {order.supplier}</span>}
@@ -376,20 +376,26 @@ function OrderCard({
           </span>
         </div>
         <div className="flex items-center gap-0.5 flex-shrink-0">
+          {order.status === 'ordered' && (
+            <button onClick={onSetTracking}
+              className="flex items-center gap-0.5 px-2 py-1 bg-brand-blue text-white text-[10px] font-semibold rounded-lg hover:bg-brand-light active:scale-95 transition-all">
+              <Truck size={10} /> Tracking
+            </button>
+          )}
           {order.status !== 'received' && (
             <button onClick={onEdit} className="w-6 h-6 rounded-full hover:bg-white/60 flex items-center justify-center transition-colors">
-              <Pencil size={11} className="text-brand-dark/30" />
+              <Pencil size={10} className="text-brand-dark/30" />
             </button>
           )}
           <button onClick={() => { if (confirm('ลบรายการนี้?')) onDelete() }}
             className="w-6 h-6 rounded-full hover:bg-red-100 flex items-center justify-center transition-colors">
-            <Trash2 size={11} className="text-red-300 hover:text-red-500" />
+            <Trash2 size={10} className="text-red-300 hover:text-red-500" />
           </button>
         </div>
       </div>
 
       {/* items */}
-      <div className="px-3 pb-2 space-y-0.5">
+      <div className="px-3 pb-1.5 space-y-0.5">
         {order.items.map((item, i) => {
           const product = products.find(p => p.id === item.productId)
           return (
@@ -402,92 +408,67 @@ function OrderCard({
           )
         })}
         {order.notes && (
-          <p className="text-[10px] text-brand-dark/35 italic pt-1 border-t border-brand-dark/8">{order.notes}</p>
+          <p className="text-[10px] text-brand-dark/35 italic">{order.notes}</p>
         )}
       </div>
 
-      {/* tracking row (in_transit) */}
-      {order.status === 'in_transit' && order.trackingNumber && (
-        <div className="mx-3 mb-2 space-y-1.5">
-          <div className="flex items-center gap-2 bg-white/60 rounded-lg px-2.5 py-1.5 border border-blue-100">
-            <Truck size={11} className="text-blue-400 flex-shrink-0" />
-            <span className="text-[10px] text-brand-dark/40 flex-shrink-0">{carrier?.label}</span>
-            <span className="text-[11px] font-mono font-semibold text-brand-dark flex-1 truncate">{order.trackingNumber}</span>
-            <button onClick={handleCopy} className="w-6 h-6 rounded-md bg-brand-pale flex items-center justify-center hover:bg-brand-blue hover:text-white transition-all group">
-              {copied ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} className="text-brand-dark/40 group-hover:text-white" />}
-            </button>
-            {carrier?.trackUrl(order.trackingNumber) && (
-              <button onClick={openTracking} className="w-6 h-6 rounded-md bg-brand-pale flex items-center justify-center hover:bg-brand-blue transition-all group">
-                <ExternalLink size={10} className="text-brand-dark/40 group-hover:text-white" />
+      {/* tracking + action row (in_transit) */}
+      {order.status === 'in_transit' && (
+        <div className="px-3 pb-2 space-y-1">
+          {order.trackingNumber && (
+            <div className="flex items-center gap-1.5 bg-white/60 rounded-lg px-2 py-1 border border-blue-100">
+              <Truck size={10} className="text-blue-400 flex-shrink-0" />
+              <span className="text-[10px] text-brand-dark/35 flex-shrink-0">{carrier?.label}</span>
+              <span className="text-[10px] font-mono font-semibold text-brand-dark flex-1 truncate">{order.trackingNumber}</span>
+              {hasAfterShip(order.carrier ?? '') && !showTrack && (
+                <button onClick={loadTracking} title="ดูสถานะ" className="w-5 h-5 flex items-center justify-center text-blue-400 hover:text-blue-600 transition-colors">
+                  <RefreshCw size={10} />
+                </button>
+              )}
+              <button onClick={handleCopy} className="w-5 h-5 flex items-center justify-center text-brand-dark/30 hover:text-brand-dark transition-colors">
+                {copied ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} />}
               </button>
-            )}
-          </div>
+              {carrier?.trackUrl(order.trackingNumber) && (
+                <button onClick={openTracking} className="w-5 h-5 flex items-center justify-center text-brand-dark/30 hover:text-brand-dark transition-colors">
+                  <ExternalLink size={10} />
+                </button>
+              )}
+            </div>
+          )}
 
-          {/* AfterShip */}
-          {hasAfterShip(order.carrier ?? '') && (
-            !showTrack ? (
-              <button onClick={loadTracking}
-                className="w-full flex items-center justify-center gap-1 py-1.5 text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-100 rounded-lg hover:bg-blue-100 transition-colors">
-                <RefreshCw size={10} /> ดูสถานะจากขนส่ง
-              </button>
-            ) : (
-              <div className="bg-white/80 rounded-lg border border-blue-100 overflow-hidden">
-                <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-blue-50">
-                  <span className="text-[10px] font-semibold text-blue-700">
-                    {trackLoading ? 'กำลังโหลด...' : trackError != null ? 'โหลดไม่สำเร็จ' : tracking ? (TAG_TH[tracking.tag] ?? tracking.tag) : ''}
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    {tracking && !trackLoading && (
-                      <button onClick={loadTracking} className="text-[10px] text-blue-400 hover:text-blue-600 flex items-center gap-0.5">
-                        <RefreshCw size={9} />
-                      </button>
-                    )}
-                    <button onClick={() => { setShowTrack(false); setTracking(null) }} className="text-brand-dark/30 hover:text-brand-dark">
-                      <X size={11} />
-                    </button>
-                  </div>
+          {/* AfterShip expanded panel */}
+          {showTrack && (
+            <div className="bg-white/80 rounded-lg border border-blue-100 overflow-hidden">
+              <div className="flex items-center justify-between px-2.5 py-1 border-b border-blue-50">
+                <span className="text-[10px] font-semibold text-blue-700">
+                  {trackLoading ? 'กำลังโหลด...' : trackError != null ? 'โหลดไม่สำเร็จ' : tracking ? (TAG_TH[tracking.tag] ?? tracking.tag) : ''}
+                </span>
+                <div className="flex items-center gap-1">
+                  {tracking && !trackLoading && <button onClick={loadTracking}><RefreshCw size={9} className="text-blue-400" /></button>}
+                  <button onClick={() => { setShowTrack(false); setTracking(null) }}><X size={10} className="text-brand-dark/30" /></button>
                 </div>
-                {trackLoading && <div className="flex justify-center py-3"><Loader2 size={14} className="animate-spin text-blue-400" /></div>}
-                {trackError != null && <p className="text-[10px] text-red-400 px-2.5 py-1.5">{trackError}</p>}
-                {tracking && !trackLoading && (
-                  <div className="divide-y divide-blue-50 max-h-36 overflow-y-auto">
-                    {tracking.checkpoints.slice().reverse().slice(0, 6).map((cp, i) => (
-                      <div key={i} className="px-2.5 py-1.5">
-                        <p className="text-[10px] text-brand-dark/70 leading-snug">{cp.message}</p>
-                        {cp.location && <p className="text-[9px] text-brand-dark/40">{cp.location}</p>}
-                        <p className="text-[9px] text-brand-dark/30">{new Date(cp.created_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}</p>
-                      </div>
-                    ))}
-                    {tracking.checkpoints.length === 0 && <p className="text-[10px] text-brand-dark/40 px-2.5 py-1.5">ยังไม่มีการอัปเดต</p>}
-                  </div>
-                )}
               </div>
-            )
+              {trackLoading && <div className="flex justify-center py-2"><Loader2 size={12} className="animate-spin text-blue-400" /></div>}
+              {trackError != null && <p className="text-[10px] text-red-400 px-2.5 py-1">{trackError}</p>}
+              {tracking && !trackLoading && (
+                <div className="divide-y divide-blue-50 max-h-32 overflow-y-auto">
+                  {tracking.checkpoints.slice().reverse().slice(0, 5).map((cp, i) => (
+                    <div key={i} className="px-2.5 py-1">
+                      <p className="text-[10px] text-brand-dark/70 leading-snug">{cp.message}</p>
+                      {cp.location && <p className="text-[9px] text-brand-dark/40">{cp.location}</p>}
+                      <p className="text-[9px] text-brand-dark/30">{new Date(cp.created_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}</p>
+                    </div>
+                  ))}
+                  {tracking.checkpoints.length === 0 && <p className="text-[10px] text-brand-dark/40 px-2.5 py-1">ยังไม่มีการอัปเดต</p>}
+                </div>
+              )}
+            </div>
           )}
-        </div>
-      )}
 
-      {/* actions */}
-      {order.status !== 'received' && (
-        <div className="flex gap-1.5 px-3 pb-2.5">
-          {order.status === 'ordered' && (
-            <button onClick={onSetTracking}
-              className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-brand-blue text-white text-[11px] font-semibold rounded-lg hover:bg-brand-light active:scale-95 transition-all">
-              <Truck size={11} /> ใส่เลข Tracking
-            </button>
-          )}
-          {order.status === 'in_transit' && (
-            <>
-              <button onClick={onSetTracking}
-                className="py-1.5 px-2.5 border border-brand-blue/20 text-brand-blue text-[11px] font-medium rounded-lg hover:bg-brand-pale transition-colors">
-                แก้ Tracking
-              </button>
-              <button onClick={onMarkReceived}
-                className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-emerald-500 text-white text-[11px] font-semibold rounded-lg hover:bg-emerald-600 active:scale-95 transition-all">
-                <CheckCircle2 size={11} /> รับสินค้าแล้ว
-              </button>
-            </>
-          )}
+          <button onClick={onMarkReceived}
+            className="w-full flex items-center justify-center gap-1 py-1.5 bg-emerald-500 text-white text-[11px] font-semibold rounded-lg hover:bg-emerald-600 active:scale-95 transition-all">
+            <CheckCircle2 size={11} /> รับสินค้าแล้ว
+          </button>
         </div>
       )}
     </div>
