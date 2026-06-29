@@ -1,29 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react'
 import {
-  Plus, Package, Truck, CheckCircle2, Clock,
-  Copy, ExternalLink, ChevronDown, X, Check,
-  Pencil, Trash2, Search, Link, Cloud, CloudOff, RefreshCw, Loader2,
+  Plus, Package, CheckCircle2, Clock,
+  ChevronDown, X, Pencil, Trash2, Search,
+  Cloud, CloudOff, RefreshCw, Loader2,
 } from 'lucide-react'
-import type { PurchaseOrder, OrderItem, OrderStatus, StockProduct, CarrierId, OrderMember } from '../types'
-import { CARRIERS, ORDER_MEMBERS } from '../types'
+import type { PurchaseOrder, OrderItem, OrderStatus, StockProduct, OrderMember } from '../types'
+import { ORDER_MEMBERS } from '../types'
 import { useOrderStore } from '../hooks/useOrderStore'
 import { formatThaiDate } from '../utils/parser'
-import { fetchTracking, hasAfterShip, TAG_TH, type TrackingResult } from '../hooks/useAfterShip'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_META: Record<OrderStatus, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
-  ordered:    { label: 'รอ Tracking',    color: 'text-amber-600',   bg: 'bg-amber-50 border-amber-200',   icon: <Clock size={13} />        },
-  in_transit: { label: 'กำลังจัดส่ง',   color: 'text-blue-600',    bg: 'bg-blue-50 border-blue-200',     icon: <Truck size={13} />        },
-  received:   { label: 'รับแล้ว',        color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200', icon: <CheckCircle2 size={13} /> },
-}
-
-function carrierId(id: CarrierId | undefined) {
-  return CARRIERS.find(c => c.id === id)
-}
-
-function copyText(text: string) {
-  navigator.clipboard.writeText(text).catch(() => {})
+  ordered:    { label: 'รอรับสินค้า', color: 'text-amber-600',   bg: 'bg-amber-50 border-amber-200',     icon: <Clock size={10} />        },
+  in_transit: { label: 'รอรับสินค้า', color: 'text-amber-600',   bg: 'bg-amber-50 border-amber-200',     icon: <Clock size={10} />        },
+  received:   { label: 'รับแล้ว',     color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200', icon: <CheckCircle2 size={10} /> },
 }
 
 // ── CreateOrderModal ──────────────────────────────────────────────────────────
@@ -160,7 +151,6 @@ function CreateOrderModal({
                           />
                         </div>
                         <div className="max-h-[160px] overflow-y-auto">
-                          {/* custom name option */}
                           {search && !filtered.some(p => p.name.toLowerCase() === search.toLowerCase()) && (
                             <button
                               onClick={() => { setItem(i, { name: search, productId: undefined }); setSearch(''); setOpenIdx(null) }}
@@ -248,121 +238,25 @@ function CreateOrderModal({
   )
 }
 
-// ── TrackingModal ─────────────────────────────────────────────────────────────
-
-function TrackingModal({ order, onClose, onSave }: {
-  order: PurchaseOrder
-  onClose: () => void
-  onSave: (carrier: CarrierId, tracking: string) => void
-}) {
-  const [carrier,  setCarrier]  = useState<CarrierId>(order.carrier ?? 'kerry')
-  const [tracking, setTracking] = useState(order.trackingNumber ?? '')
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40">
-      <div className="bg-white w-full md:max-w-sm rounded-t-3xl md:rounded-2xl shadow-2xl p-5">
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-[14px] font-bold text-brand-dark">ใส่เลข Tracking</p>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-brand-pale flex items-center justify-center">
-            <X size={15} className="text-brand-dark/50" />
-          </button>
-        </div>
-
-        <div className="space-y-3">
-          <div>
-            <label className="text-[11px] font-semibold text-brand-dark/40 uppercase tracking-wider">บริษัทขนส่ง</label>
-            <div className="mt-1.5 grid grid-cols-2 gap-1.5">
-              {CARRIERS.map(c => (
-                <button key={c.id} onClick={() => setCarrier(c.id as CarrierId)}
-                  className={`py-2 px-3 rounded-xl text-[12px] font-medium border transition-all text-left ${
-                    carrier === c.id
-                      ? 'bg-brand-blue text-white border-brand-blue'
-                      : 'bg-white border-brand-blue/15 text-brand-dark/60 hover:border-brand-blue/40'
-                  }`}
-                >{c.label}</button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-[11px] font-semibold text-brand-dark/40 uppercase tracking-wider">เลข Tracking</label>
-            <input
-              autoFocus
-              value={tracking}
-              onChange={e => setTracking(e.target.value)}
-              placeholder="EG123456789TH"
-              className="mt-1.5 w-full border border-brand-blue/15 rounded-xl px-3 py-2.5 text-[14px] font-mono outline-none focus:border-brand-blue"
-            />
-          </div>
-        </div>
-
-        <button
-          onClick={() => { if (tracking.trim()) { onSave(carrier, tracking.trim()); onClose() } }}
-          disabled={!tracking.trim()}
-          className="mt-4 w-full py-3 bg-brand-blue text-white rounded-xl font-semibold text-[14px] disabled:opacity-40 active:scale-[0.98] transition-all"
-        >
-          บันทึก Tracking
-        </button>
-      </div>
-    </div>
-  )
-}
-
 // ── OrderCard ────────────────────────────────────────────────────────────────
 
 function OrderCard({
-  order, products, onDelete, onEdit, onSetTracking, onMarkReceived,
+  order, products, onDelete, onEdit, onMarkReceived,
 }: {
   order: PurchaseOrder
   products: StockProduct[]
   onDelete: () => void
   onEdit: () => void
-  onSetTracking: () => void
   onMarkReceived: () => void
 }) {
-  const [copied,       setCopied]       = useState(false)
-  const [tracking,     setTracking]     = useState<TrackingResult | null>(null)
-  const [trackLoading, setTrackLoading] = useState(false)
-  const [trackError,   setTrackError]   = useState<string | null>(null)
-  const [showTrack,    setShowTrack]    = useState(false)
-  const meta    = STATUS_META[order.status]
-  const carrier = carrierId(order.carrier)
-
-  async function loadTracking() {
-    if (!order.carrier || !order.trackingNumber) return
-    setTrackLoading(true); setTrackError(null); setShowTrack(true)
-    try {
-      const result = await fetchTracking(order.carrier, order.trackingNumber)
-      if (result) {
-        setTracking(result)
-        if (result.tag === 'Delivered') onMarkReceived()
-      } else setTrackError('ไม่พบข้อมูล')
-    } catch (e: unknown) {
-      setTrackError(e instanceof Error ? e.message : 'unknown error')
-    } finally {
-      setTrackLoading(false)
-    }
-  }
-
-  function handleCopy() {
-    if (!order.trackingNumber) return
-    copyText(order.trackingNumber)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  function openTracking() {
-    if (!carrier || !order.trackingNumber) return
-    const url = carrier.trackUrl(order.trackingNumber)
-    if (url) window.open(url, '_blank')
-  }
+  const meta = STATUS_META[order.status]
 
   return (
     <div className={`rounded-xl border overflow-hidden transition-all ${
       order.status === 'received' ? 'opacity-60' : ''
     } ${meta.bg}`}>
 
-      {/* header + actions in one row */}
+      {/* header row */}
       <div className="flex items-center justify-between px-3 pt-2 pb-1.5 gap-2">
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <span className={`text-[10px] font-bold flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border flex-shrink-0 ${meta.bg} ${meta.color}`}>
@@ -376,12 +270,6 @@ function OrderCard({
           </span>
         </div>
         <div className="flex items-center gap-0.5 flex-shrink-0">
-          {order.status === 'ordered' && (
-            <button onClick={onSetTracking}
-              className="flex items-center gap-0.5 px-2 py-1 bg-brand-blue text-white text-[10px] font-semibold rounded-lg hover:bg-brand-light active:scale-95 transition-all">
-              <Truck size={10} /> Tracking
-            </button>
-          )}
           {order.status !== 'received' && (
             <button onClick={onEdit} className="w-6 h-6 rounded-full hover:bg-white/60 flex items-center justify-center transition-colors">
               <Pencil size={10} className="text-brand-dark/30" />
@@ -412,62 +300,12 @@ function OrderCard({
         )}
       </div>
 
-      {/* tracking + action row (in_transit) */}
-      {order.status === 'in_transit' && (
-        <div className="px-3 pb-2 space-y-1">
-          {order.trackingNumber && (
-            <div className="flex items-center gap-1.5 bg-white/60 rounded-lg px-2 py-1 border border-blue-100">
-              <Truck size={10} className="text-blue-400 flex-shrink-0" />
-              <span className="text-[10px] text-brand-dark/35 flex-shrink-0">{carrier?.label}</span>
-              <span className="text-[10px] font-mono font-semibold text-brand-dark flex-1 truncate">{order.trackingNumber}</span>
-              {hasAfterShip(order.carrier ?? '') && !showTrack && (
-                <button onClick={loadTracking} title="ดูสถานะ" className="w-5 h-5 flex items-center justify-center text-blue-400 hover:text-blue-600 transition-colors">
-                  <RefreshCw size={10} />
-                </button>
-              )}
-              <button onClick={handleCopy} className="w-5 h-5 flex items-center justify-center text-brand-dark/30 hover:text-brand-dark transition-colors">
-                {copied ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} />}
-              </button>
-              {carrier?.trackUrl(order.trackingNumber) && (
-                <button onClick={openTracking} className="w-5 h-5 flex items-center justify-center text-brand-dark/30 hover:text-brand-dark transition-colors">
-                  <ExternalLink size={10} />
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* AfterShip expanded panel */}
-          {showTrack && (
-            <div className="bg-white/80 rounded-lg border border-blue-100 overflow-hidden">
-              <div className="flex items-center justify-between px-2.5 py-1 border-b border-blue-50">
-                <span className="text-[10px] font-semibold text-blue-700">
-                  {trackLoading ? 'กำลังโหลด...' : trackError != null ? 'โหลดไม่สำเร็จ' : tracking ? (TAG_TH[tracking.tag] ?? tracking.tag) : ''}
-                </span>
-                <div className="flex items-center gap-1">
-                  {tracking && !trackLoading && <button onClick={loadTracking}><RefreshCw size={9} className="text-blue-400" /></button>}
-                  <button onClick={() => { setShowTrack(false); setTracking(null) }}><X size={10} className="text-brand-dark/30" /></button>
-                </div>
-              </div>
-              {trackLoading && <div className="flex justify-center py-2"><Loader2 size={12} className="animate-spin text-blue-400" /></div>}
-              {trackError != null && <p className="text-[10px] text-red-400 px-2.5 py-1">{trackError}</p>}
-              {tracking && !trackLoading && (
-                <div className="divide-y divide-blue-50 max-h-32 overflow-y-auto">
-                  {tracking.checkpoints.slice().reverse().slice(0, 5).map((cp, i) => (
-                    <div key={i} className="px-2.5 py-1">
-                      <p className="text-[10px] text-brand-dark/70 leading-snug">{cp.message}</p>
-                      {cp.location && <p className="text-[9px] text-brand-dark/40">{cp.location}</p>}
-                      <p className="text-[9px] text-brand-dark/30">{new Date(cp.created_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}</p>
-                    </div>
-                  ))}
-                  {tracking.checkpoints.length === 0 && <p className="text-[10px] text-brand-dark/40 px-2.5 py-1">ยังไม่มีการอัปเดต</p>}
-                </div>
-              )}
-            </div>
-          )}
-
+      {/* confirm button */}
+      {order.status !== 'received' && (
+        <div className="px-3 pb-2.5">
           <button onClick={onMarkReceived}
             className="w-full flex items-center justify-center gap-1 py-1.5 bg-emerald-500 text-white text-[11px] font-semibold rounded-lg hover:bg-emerald-600 active:scale-95 transition-all">
-            <CheckCircle2 size={11} /> รับสินค้าแล้ว
+            <CheckCircle2 size={11} /> ยืนยันรับสินค้า
           </button>
         </div>
       )}
@@ -475,108 +313,9 @@ function OrderCard({
   )
 }
 
-// ── SheetsBanner ─────────────────────────────────────────────────────────────
-
-function SheetsBanner({ url, onSave, syncing, lastSync, syncError, onFetch, isEnvConfigured }: {
-  url: string
-  onSave: (u: string) => void
-  syncing: boolean
-  lastSync: string | null
-  syncError: boolean
-  onFetch: () => void
-  isEnvConfigured: boolean
-}) {
-  const [editing, setEditing] = useState(!url)
-  const [draft,   setDraft]   = useState(url)
-  const [testing, setTesting] = useState(false)
-  const [testOk,  setTestOk]  = useState<boolean | null>(null)
-  const { testUrl } = useOrdersSheets()
-
-  async function handleTest() {
-    setTesting(true); setTestOk(null)
-    const ok = await testUrl(draft)
-    setTestOk(ok); setTesting(false)
-  }
-
-  if (!editing && url) {
-    return (
-      <div className={`rounded-xl px-4 py-3 flex items-center gap-3 mb-4 border ${
-        syncError ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'
-      }`}>
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${syncError ? 'bg-red-100' : 'bg-green-100'}`}>
-          {syncError ? <CloudOff size={14} className="text-red-500" /> : <Cloud size={14} className="text-green-600" />}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[12px] font-semibold text-brand-dark">
-            {syncError ? 'ซิงค์ไม่สำเร็จ' : 'เชื่อมต่อ Google Sheet แล้ว'}
-          </p>
-          <p className="text-[10px] text-brand-dark/40">
-            {syncing ? 'กำลังซิงค์...' : lastSync ? `ซิงค์ล่าสุด ${lastSync}` : 'พร้อมซิงค์'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <button onClick={onFetch} disabled={syncing}
-            className="flex items-center gap-1 text-[11px] text-brand-blue border border-brand-blue/20 px-2.5 py-1.5 rounded-lg hover:bg-brand-pale disabled:opacity-40 transition-all">
-            {syncing ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
-            ดึงข้อมูล
-          </button>
-          {!isEnvConfigured && (
-            <button onClick={() => setEditing(true)}
-              className="text-[11px] text-brand-dark/40 hover:text-brand-dark px-2 py-1.5 rounded-lg hover:bg-brand-pale transition-colors">
-              แก้ไข
-            </button>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  // env configured but no local URL — don't show config form
-  if (isEnvConfigured) return null
-
-  return (
-    <div className="rounded-xl border border-brand-blue/15 bg-brand-pale/40 p-4 mb-4 space-y-3">
-      <div className="flex items-center gap-2">
-        <Link size={14} className="text-brand-blue flex-shrink-0" />
-        <p className="text-[12px] font-semibold text-brand-dark">เชื่อมต่อ Google Sheet สำหรับ Orders</p>
-      </div>
-      <p className="text-[11px] text-brand-dark/40 leading-relaxed">
-        สร้าง Google Sheet ใหม่ → วาง OrdersCode.gs ใน Apps Script → Deploy เป็น Web App แล้วใส่ URL ด้านล่าง
-      </p>
-      <div className="flex gap-2">
-        <input
-          value={draft}
-          onChange={e => { setDraft(e.target.value); setTestOk(null) }}
-          placeholder="https://script.google.com/macros/s/..."
-          className="flex-1 border border-brand-blue/15 rounded-xl px-3 py-2 text-[12px] outline-none focus:border-brand-blue bg-white"
-        />
-        <button onClick={handleTest} disabled={!draft || testing}
-          className="px-3 py-2 border border-brand-blue/20 rounded-xl text-[12px] text-brand-blue hover:bg-brand-pale disabled:opacity-40 transition-all flex-shrink-0">
-          {testing ? <Loader2 size={13} className="animate-spin" /> : 'ทดสอบ'}
-        </button>
-      </div>
-      {testOk === true  && <p className="text-[11px] text-emerald-600">✓ เชื่อมต่อสำเร็จ</p>}
-      {testOk === false && <p className="text-[11px] text-red-500">✗ เชื่อมต่อไม่ได้ ตรวจสอบ URL</p>}
-      <div className="flex gap-2">
-        <button
-          onClick={() => { onSave(draft); setEditing(false) }}
-          disabled={!draft}
-          className="flex-1 py-2 bg-brand-blue text-white rounded-xl text-[12px] font-semibold disabled:opacity-40 transition-all"
-        >บันทึก</button>
-        {url && (
-          <button onClick={() => setEditing(false)}
-            className="px-4 py-2 border border-brand-blue/15 rounded-xl text-[12px] text-brand-dark/50 hover:bg-brand-pale transition-colors">
-            ยกเลิก
-          </button>
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ── OrdersTab (main) ─────────────────────────────────────────────────────────
 
-type FilterTab = 'all' | OrderStatus
+type FilterTab = 'all' | 'pending' | 'received'
 
 export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, ordersUrl, isOrdersEnv, onSaveOrdersUrl }: {
   products: StockProduct[]
@@ -587,18 +326,17 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
   isOrdersEnv?: boolean
   onSaveOrdersUrl?: (url: string) => void
 }) {
-  const { orders, addOrder, updateOrder, setTracking, markReceived, deleteOrder, replaceAll } = useOrderStore()
-  const [filter,       setFilter]       = useState<FilterTab>('all')
-  const [showCreate,   setShowCreate]   = useState(false)
-  const [editOrder,    setEditOrder]    = useState<PurchaseOrder | null>(null)
-  const [trackOrder,   setTrackOrder]   = useState<PurchaseOrder | null>(null)
-  const [syncing,      setSyncing]      = useState(false)
-  const [lastSync,     setLastSync]     = useState<string | null>(null)
-  const [syncError,    setSyncError]    = useState(false)
-  const [urlTesting,   setUrlTesting]   = useState(false)
-  const [urlStatus,    setUrlStatus]    = useState<'ok' | 'fail' | null>(null)
-  const [showUrlEdit,  setShowUrlEdit]  = useState(false)
-  const [urlDraft,     setUrlDraft]     = useState('')
+  const { orders, addOrder, updateOrder, markReceived, deleteOrder, replaceAll } = useOrderStore()
+  const [filter,      setFilter]      = useState<FilterTab>('all')
+  const [showCreate,  setShowCreate]  = useState(false)
+  const [editOrder,   setEditOrder]   = useState<PurchaseOrder | null>(null)
+  const [syncing,     setSyncing]     = useState(false)
+  const [lastSync,    setLastSync]    = useState<string | null>(null)
+  const [syncError,   setSyncError]   = useState(false)
+  const [urlTesting,  setUrlTesting]  = useState(false)
+  const [urlStatus,   setUrlStatus]   = useState<'ok' | 'fail' | null>(null)
+  const [showUrlEdit, setShowUrlEdit] = useState(false)
+  const [urlDraft,    setUrlDraft]    = useState('')
 
   async function testUrl(u: string) {
     if (!u) return
@@ -611,26 +349,17 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
     finally { setUrlTesting(false) }
   }
 
-  function openUrlEdit() {
-    setUrlDraft(ordersUrl ?? '')
-    setShowUrlEdit(true)
-    setUrlStatus(null)
-  }
-
   function saveUrlEdit() {
     const trimmed = urlDraft.trim()
     if (trimmed && onSaveOrdersUrl) onSaveOrdersUrl(trimmed)
     setShowUrlEdit(false)
   }
 
-  // fetch from main sheet on mount
   useEffect(() => {
     if (!onFetch) return
     setSyncing(true)
     onFetch().then(fetched => {
       setSyncing(false)
-      // Only replace local data if: got actual orders, OR env-configured (sheet = source of truth)
-      // On localhost without env URL, don't clear local orders when sheet returns empty
       if (fetched && (fetched.length > 0 || isOrdersEnv)) {
         replaceAll(fetched)
         setLastSync(new Date().toLocaleTimeString('th-TH'))
@@ -650,32 +379,35 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
     else setSyncError(true)
   }
 
-  // helper: push after state settles
   function withSync(mutation: () => PurchaseOrder[]) {
     const latest = mutation()
     setTimeout(() => pushOrders(latest), 50)
   }
 
-  const filtered = orders.filter(o => filter === 'all' || o.status === filter)
+  const isPending = (o: PurchaseOrder) => o.status === 'ordered' || o.status === 'in_transit'
+
+  const filtered = orders.filter(o => {
+    if (filter === 'all') return true
+    if (filter === 'pending') return isPending(o)
+    return o.status === 'received'
+  })
 
   const counts = {
-    all:        orders.length,
-    ordered:    orders.filter(o => o.status === 'ordered').length,
-    in_transit: orders.filter(o => o.status === 'in_transit').length,
-    received:   orders.filter(o => o.status === 'received').length,
+    all:      orders.length,
+    pending:  orders.filter(isPending).length,
+    received: orders.filter(o => o.status === 'received').length,
   }
 
   const TABS: { id: FilterTab; label: string; count: number }[] = [
-    { id: 'all',        label: 'ทั้งหมด',     count: counts.all },
-    { id: 'ordered',    label: 'รอ Tracking', count: counts.ordered },
-    { id: 'in_transit', label: 'กำลังจัดส่ง', count: counts.in_transit },
-    { id: 'received',   label: 'รับแล้ว',     count: counts.received },
+    { id: 'all',      label: 'ทั้งหมด',   count: counts.all },
+    { id: 'pending',  label: 'รอรับ',     count: counts.pending },
+    { id: 'received', label: 'รับแล้ว',   count: counts.received },
   ]
 
   return (
     <div className="px-4 md:px-6 py-4 max-w-2xl mx-auto">
 
-      {/* Sync status banner — shown only when sheet is connected */}
+      {/* Sync status banner */}
       {sheetsConnected && (
         <div className={`rounded-xl px-4 py-3 flex flex-col gap-2 mb-4 border ${
           syncError ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'
@@ -693,7 +425,10 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
               </p>
             </div>
             <button
-              onClick={() => onFetch && onFetch().then(f => { if (f) { replaceAll(f); setLastSync(new Date().toLocaleTimeString('th-TH')); setSyncError(false) } else setSyncError(true) })}
+              onClick={() => onFetch && onFetch().then(f => {
+                if (f) { replaceAll(f); setLastSync(new Date().toLocaleTimeString('th-TH')); setSyncError(false) }
+                else setSyncError(true)
+              })}
               disabled={syncing}
               className="flex items-center gap-1 text-[11px] text-brand-blue border border-brand-blue/20 px-2.5 py-1.5 rounded-lg hover:bg-brand-pale disabled:opacity-40 transition-all"
             >
@@ -723,12 +458,14 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
                      urlStatus === 'ok' ? '✓ ใช้ได้' :
                      urlStatus === 'fail' ? '✗ ผิด' : 'เช็ค'}
                   </button>
-                  <button
-                    onClick={openUrlEdit}
-                    className="text-[10px] px-2 py-1 rounded-lg border border-brand-blue/20 text-brand-blue hover:bg-brand-pale transition-all"
-                  >
-                    <Pencil size={10} className="inline mr-0.5" />แก้
-                  </button>
+                  {!isOrdersEnv && (
+                    <button
+                      onClick={() => { setUrlDraft(ordersUrl ?? ''); setShowUrlEdit(true); setUrlStatus(null) }}
+                      className="text-[10px] px-2 py-1 rounded-lg border border-brand-blue/20 text-brand-blue hover:bg-brand-pale transition-all"
+                    >
+                      <Pencil size={10} className="inline mr-0.5" />แก้
+                    </button>
+                  )}
                 </div>
               </div>
             ) : (
@@ -790,10 +527,10 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
       </div>
 
       {/* filter tabs */}
-      <div className="flex gap-1 bg-brand-pale/50 p-1 rounded-xl mb-4 overflow-x-auto scrollbar-none">
+      <div className="flex gap-1 bg-brand-pale/50 p-1 rounded-xl mb-4">
         {TABS.map(tab => (
           <button key={tab.id} onClick={() => setFilter(tab.id)}
-            className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all ${
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all ${
               filter === tab.id ? 'bg-white text-brand-dark shadow-sm' : 'text-brand-dark/50 hover:text-brand-dark'
             }`}
           >
@@ -817,24 +554,21 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
           <p className="text-[12px] text-brand-dark/30 mt-1">กด "+ สั่งซื้อใหม่" เพื่อเริ่มต้น</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {filtered.map(order => (
             <OrderCard
               key={order.id}
               order={order}
               products={products}
               onDelete={() => {
-                const updated = orders.filter(o => o.id !== order.id)
                 deleteOrder(order.id)
-                setTimeout(() => pushOrders(updated), 100)
+                setTimeout(() => pushOrders(orders.filter(o => o.id !== order.id)), 100)
               }}
               onEdit={() => setEditOrder(order)}
-              onSetTracking={() => setTrackOrder(order)}
               onMarkReceived={() => {
                 const today = new Date().toISOString().slice(0, 10)
                 markReceived(order.id)
-                const updated = orders.map(o => o.id === order.id ? { ...o, status: 'received' as const, receivedAt: today } : o)
-                setTimeout(() => pushOrders(updated), 100)
+                setTimeout(() => pushOrders(orders.map(o => o.id === order.id ? { ...o, status: 'received' as const, receivedAt: today } : o)), 100)
               }}
             />
           ))}
@@ -860,16 +594,6 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
           onSave={data => {
             updateOrder(editOrder.id, data)
             setTimeout(() => pushOrders(orders.map(o => o.id === editOrder.id ? { ...o, ...data } : o)), 100)
-          }}
-        />
-      )}
-      {trackOrder && (
-        <TrackingModal
-          order={trackOrder}
-          onClose={() => setTrackOrder(null)}
-          onSave={(carrier, tracking) => {
-            setTracking(trackOrder.id, carrier, tracking)
-            setTimeout(() => pushOrders(orders.map(o => o.id === trackOrder.id ? { ...o, carrier, trackingNumber: tracking, status: 'in_transit' as const } : o)), 100)
           }}
         />
       )}
