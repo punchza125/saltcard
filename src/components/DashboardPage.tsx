@@ -380,11 +380,19 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
           </div>
         )}
         {syncStatus === 'success' && lastSynced && (
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand-blue/10 border border-brand-blue/20">
+          <div className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand-blue/10 border border-brand-blue/20">
             <svg className="w-3 h-3 text-brand-blue flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
             </svg>
             <span className="text-[11px] text-brand-blue font-medium whitespace-nowrap">ข้อมูลล่าสุด {lastSynced}</span>
+            {showLuffyGood && (
+              <img
+                src="/pic/luffyGood.gif"
+                alt="luffy good"
+                className="absolute -top-8 -right-8 w-12 h-12 object-contain pointer-events-none"
+                style={{ animation: 'luffyPop 2.5s ease forwards' }}
+              />
+            )}
           </div>
         )}
 
@@ -504,14 +512,6 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
                 alt="luffy"
                 className="absolute bottom-0 right-0 h-full w-full object-contain object-bottom"
               />
-              {showLuffyGood && (
-                <img
-                  src="/pic/luffyGood.gif"
-                  alt="luffy good"
-                  className="absolute bottom-0 -left-20 h-full w-20 object-contain object-bottom"
-                  style={{ animation: 'luffyPop 2.5s ease forwards' }}
-                />
-              )}
             </div>
           </div>
         ) : vsYesterday ? (() => {
