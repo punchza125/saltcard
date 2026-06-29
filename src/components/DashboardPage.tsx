@@ -14,6 +14,8 @@ interface DashboardPageProps {
   taxRate?: number
   activeBranch: string       // which branch is selected (for display only — reports are pre-filtered)
   setActiveBranch: (s: string) => void
+  syncStatus?: 'idle' | 'syncing' | 'success' | 'error'
+  lastSynced?: string
 }
 
 function calcDayProfit(report: DayReport, products: StockProduct[], taxRate: number) {
@@ -67,7 +69,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   )
 }
 
-export default function DashboardPage({ reports, stockProducts = [], taxRate = 15, activeBranch, setActiveBranch }: DashboardPageProps) {
+export default function DashboardPage({ reports, stockProducts = [], taxRate = 15, activeBranch, setActiveBranch, syncStatus, lastSynced }: DashboardPageProps) {
   // Reports are already filtered by branch at App level — always use area totals here
   const selectedSite = 'ทั้งหมด'
   const [rangeMode, setRangeMode] = useState<RangeMode>('day')
@@ -356,6 +358,25 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
           <p className="text-brand-dark/40 text-[12px]">
             {filteredReports.length} วัน · {filteredReports[0] ? formatThaiDate(filteredReports[0].date) : ''} – {filteredReports[filteredReports.length-1] ? formatThaiDate(filteredReports[filteredReports.length-1].date) : ''}
           </p>
+        )}
+
+        {/* Sync status badge */}
+        {syncStatus === 'syncing' && (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100">
+            <svg className="animate-spin w-3 h-3 text-brand-blue flex-shrink-0" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+            </svg>
+            <span className="text-[11px] text-brand-blue font-medium whitespace-nowrap">กำลังดึงข้อมูล...</span>
+          </div>
+        )}
+        {syncStatus === 'success' && lastSynced && (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-50 border border-green-100">
+            <svg className="w-3 h-3 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+            </svg>
+            <span className="text-[11px] text-green-600 font-medium whitespace-nowrap">อัพเดตแล้ว {lastSynced}</span>
+          </div>
         )}
 
       </div>

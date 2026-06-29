@@ -169,7 +169,7 @@ export default function App() {
 
       {/* main scrolls inside — ไม่ใช้ body scroll เพื่อให้ nav ไม่ลอย */}
       <main className="flex-1 overflow-y-auto md:overflow-visible">
-        {activeTab === 'dashboard' && <DashboardPage reports={activeReports} stockProducts={stock.products} taxRate={stock.taxRate} activeBranch={selectedSite} setActiveBranch={setSelectedSite} />}
+        {activeTab === 'dashboard' && <DashboardPage reports={activeReports} stockProducts={stock.products} taxRate={stock.taxRate} activeBranch={selectedSite} setActiveBranch={setSelectedSite} syncStatus={syncStatus} lastSynced={lastSynced ?? undefined} />}
         {activeTab === 'stock' && (
           <StockPage
             reports={store.reports}
