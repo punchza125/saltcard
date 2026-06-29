@@ -4,12 +4,13 @@ interface StatCardProps {
   label: string
   value: string
   sub?: string
+  sub2?: string
   accent?: boolean
   icon?: React.ReactNode
   delay?: number
 }
 
-export default function StatCard({ label, value, sub, accent, icon, delay = 0 }: StatCardProps) {
+export default function StatCard({ label, value, sub, sub2, accent, icon, delay = 0 }: StatCardProps) {
   return (
     <div
       className={`rounded-2xl p-4 animate-fade-up card-hover ${
@@ -34,6 +35,11 @@ export default function StatCard({ label, value, sub, accent, icon, delay = 0 }:
       {sub && (
         <div className={`text-[11px] mt-1.5 ${accent ? 'text-white/60' : 'text-brand-dark/40'}`}>
           {sub}
+        </div>
+      )}
+      {sub2 && (
+        <div className={`text-[10px] mt-1 ${accent ? 'text-white/50' : 'text-brand-dark/30'}`}>
+          {sub2}
         </div>
       )}
     </div>

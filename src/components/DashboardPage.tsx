@@ -111,6 +111,11 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
     return { totalAmount, totalVolume, avgPerPiece }
   }, [filteredReports, selectedSite])
 
+  const allTimeTotal = useMemo(
+    () => reports.reduce((s, r) => s + siteAmt(r, selectedSite), 0),
+    [reports, selectedSite]
+  )
+
   // branch comparison (for sites card — shows each site's share)
   const branchComparison = useMemo(() => {
     const sites = Array.from(new Set(filteredReports.flatMap(r => r.sites.map(s => s.name)))).sort()
@@ -355,7 +360,7 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
 
       {/* ── Stat cards: 2 cols mobile → 4 cols desktop ─ */}
       <div className="px-4 md:px-6 grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        <StatCard label="ยอดขายรวม" value={`฿${formatBaht(stats.totalAmount)}`} sub={activeBranch !== 'ทั้งหมด' ? activeBranch : `${filteredReports.length} วัน`} accent icon={<TrendingUp size={12} />} delay={0} />
+        <StatCard label="ยอดขายรวม" value={`฿${formatBaht(stats.totalAmount)}`} sub={activeBranch !== 'ทั้งหมด' ? activeBranch : `${filteredReports.length} วัน`} sub2={filteredReports.length < reports.length ? `สะสมทั้งหมด ฿${formatBaht(allTimeTotal)}` : undefined} accent icon={<TrendingUp size={12} />} delay={0} />
         <StatCard label="จำนวนชิ้น" value={`${stats.totalVolume.toLocaleString()}`} sub={`เฉลี่ย ฿${formatBaht(stats.avgPerPiece)}/ชิ้น`} icon={<Package size={12} />} delay={50} />
 
         {/* Luffy — 7-day comparison card */}
