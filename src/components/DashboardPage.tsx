@@ -371,11 +371,11 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
           </div>
         )}
         {syncStatus === 'success' && lastSynced && (
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-50 border border-green-100">
-            <svg className="w-3 h-3 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand-blue/10 border border-brand-blue/20">
+            <svg className="w-3 h-3 text-brand-blue flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
             </svg>
-            <span className="text-[11px] text-green-600 font-medium whitespace-nowrap">อัพเดตแล้ว {lastSynced}</span>
+            <span className="text-[11px] text-brand-blue font-medium whitespace-nowrap">ข้อมูลล่าสุด {lastSynced}</span>
           </div>
         )}
 
