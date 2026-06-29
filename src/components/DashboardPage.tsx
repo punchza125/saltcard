@@ -389,7 +389,7 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
               <img
                 src="/pic/luffyGood.gif"
                 alt="luffy good"
-                className="absolute -top-8 -right-8 w-12 h-12 object-contain pointer-events-none"
+                className="absolute -top-10 right-0 w-12 h-12 object-contain pointer-events-none"
                 style={{ animation: 'luffyPop 2.5s ease forwards' }}
               />
             )}
