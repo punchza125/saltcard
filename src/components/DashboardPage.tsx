@@ -491,8 +491,8 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
             {/* pikachu */}
             <div className="relative w-28 flex-shrink-0 self-stretch">
               <img
-                src="/pic/pikachu.png"
-                alt="pikachu"
+                src="/pic/luffynigga.gif"
+                alt="luffy"
                 className="absolute bottom-0 right-0 h-full w-full object-contain object-bottom"
               />
             </div>
