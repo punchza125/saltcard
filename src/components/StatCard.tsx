@@ -14,7 +14,7 @@ interface StatCardProps {
 export default function StatCard({ label, value, sub, sub2, accent, icon, delay = 0, animKey }: StatCardProps) {
   return (
     <div
-      className={`rounded-2xl p-4 animate-fade-up card-hover ${
+      className={`rounded-2xl p-4 animate-pop-in card-hover ${
         accent
           ? 'border border-brand-blue'
           : 'bg-white border border-brand-blue/10'
@@ -30,16 +30,16 @@ export default function StatCard({ label, value, sub, sub2, accent, icon, delay 
         {icon && <span>{icon}</span>}
         {label}
       </div>
-      <div key={animKey} className={`text-[22px] font-bold leading-none animate-fade-up ${accent ? 'text-white' : 'text-brand-dark'}`}>
+      <div key={animKey} className={`text-[22px] font-bold leading-none animate-pop-in ${accent ? 'text-white' : 'text-brand-dark'}`}>
         {value}
       </div>
       {sub && (
-        <div key={`sub-${animKey}`} className={`text-[11px] mt-1.5 animate-fade-up ${accent ? 'text-white/60' : 'text-brand-dark/40'}`} style={{ animationDelay: '30ms' }}>
+        <div key={`sub-${animKey}`} className={`text-[11px] mt-1.5 animate-pop-in ${accent ? 'text-white/60' : 'text-brand-dark/40'}`} style={{ animationDelay: '30ms' }}>
           {sub}
         </div>
       )}
       {sub2 && (
-        <div key={`sub2-${animKey}`} className={`text-[10px] mt-1 animate-fade-up ${accent ? 'text-white/50' : 'text-brand-dark/30'}`} style={{ animationDelay: '50ms' }}>
+        <div key={`sub2-${animKey}`} className={`text-[10px] mt-1 animate-pop-in ${accent ? 'text-white/50' : 'text-brand-dark/30'}`} style={{ animationDelay: '50ms' }}>
           {sub2}
         </div>
       )}

@@ -341,7 +341,7 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
               </button>
               <button className="flex-1 md:w-56 text-center py-2 px-3 rounded-lg hover:bg-white/70 transition-colors"
                 onClick={() => setShowCalendar(v => !v)}>
-                <p key={currentIdx} className="text-brand-dark font-medium text-[14px] whitespace-nowrap animate-fade-up">
+                <p key={currentIdx} className="text-brand-dark font-medium text-[14px] whitespace-nowrap animate-pop-in">
                   {selectedReport ? formatThaiDateFull(selectedReport.date) : '-'}
                 </p>
               </button>
