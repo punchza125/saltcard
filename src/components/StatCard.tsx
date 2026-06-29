@@ -8,9 +8,10 @@ interface StatCardProps {
   accent?: boolean
   icon?: React.ReactNode
   delay?: number
+  animKey?: string | number
 }
 
-export default function StatCard({ label, value, sub, sub2, accent, icon, delay = 0 }: StatCardProps) {
+export default function StatCard({ label, value, sub, sub2, accent, icon, delay = 0, animKey }: StatCardProps) {
   return (
     <div
       className={`rounded-2xl p-4 animate-fade-up card-hover ${
@@ -29,16 +30,16 @@ export default function StatCard({ label, value, sub, sub2, accent, icon, delay 
         {icon && <span>{icon}</span>}
         {label}
       </div>
-      <div className={`text-[22px] font-bold leading-none ${accent ? 'text-white' : 'text-brand-dark'}`}>
+      <div key={animKey} className={`text-[22px] font-bold leading-none animate-fade-up ${accent ? 'text-white' : 'text-brand-dark'}`}>
         {value}
       </div>
       {sub && (
-        <div className={`text-[11px] mt-1.5 ${accent ? 'text-white/60' : 'text-brand-dark/40'}`}>
+        <div key={`sub-${animKey}`} className={`text-[11px] mt-1.5 animate-fade-up ${accent ? 'text-white/60' : 'text-brand-dark/40'}`} style={{ animationDelay: '30ms' }}>
           {sub}
         </div>
       )}
       {sub2 && (
-        <div className={`text-[10px] mt-1 ${accent ? 'text-white/50' : 'text-brand-dark/30'}`}>
+        <div key={`sub2-${animKey}`} className={`text-[10px] mt-1 animate-fade-up ${accent ? 'text-white/50' : 'text-brand-dark/30'}`} style={{ animationDelay: '50ms' }}>
           {sub2}
         </div>
       )}

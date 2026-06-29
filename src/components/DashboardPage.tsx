@@ -382,9 +382,9 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
       </div>
 
       {/* ── Stat cards: 2 cols mobile → 4 cols desktop ─ */}
-      <div key={`stats-${currentIdx}-${rangeMode}`} className="px-4 md:px-6 grid grid-cols-2 md:grid-cols-4 gap-3 mb-5" style={{ animation: 'fadeUp 0.3s ease both' }}>
-        <StatCard label="ยอดขายรวม" value={`฿${formatBaht(stats.totalAmount)}`} sub={activeBranch !== 'ทั้งหมด' ? activeBranch : `${filteredReports.length} วัน`} sub2={cumulativeTotal != null ? `สะสม ณ วันนี้ ฿${formatBaht(cumulativeTotal)}` : undefined} accent icon={<TrendingUp size={12} />} delay={0} />
-        <StatCard label="จำนวนชิ้น" value={`${stats.totalVolume.toLocaleString()}`} sub={`เฉลี่ย ฿${formatBaht(stats.avgPerPiece)}/ชิ้น`} icon={<Package size={12} />} delay={50} />
+      <div className="px-4 md:px-6 grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <StatCard label="ยอดขายรวม" value={`฿${formatBaht(stats.totalAmount)}`} sub={activeBranch !== 'ทั้งหมด' ? activeBranch : `${filteredReports.length} วัน`} sub2={cumulativeTotal != null ? `สะสม ณ วันนี้ ฿${formatBaht(cumulativeTotal)}` : undefined} accent icon={<TrendingUp size={12} />} delay={0} animKey={currentIdx} />
+        <StatCard label="จำนวนชิ้น" value={`${stats.totalVolume.toLocaleString()}`} sub={`เฉลี่ย ฿${formatBaht(stats.avgPerPiece)}/ชิ้น`} icon={<Package size={12} />} delay={50} animKey={currentIdx} />
 
         {/* Luffy — 7-day comparison card */}
         {weekStats && (() => {
@@ -585,7 +585,7 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
       )}
 
       {/* ── Main content: stacked mobile → 2-col desktop ─ */}
-      <div key={`content-${currentIdx}-${rangeMode}`} className="md:px-6 md:grid md:grid-cols-3 md:gap-5 md:items-start" style={{ animation: 'fadeUp 0.35s ease both' }}>
+      <div className="md:px-6 md:grid md:grid-cols-3 md:gap-5 md:items-start">
 
         {/* Left column (2/3) */}
         <div className="md:col-span-2 space-y-4">
