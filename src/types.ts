@@ -105,6 +105,7 @@ export const CARRIERS = [
   { id: 'jt',       label: 'J&T Express',      trackUrl: (n: string) => `https://www.jtexpress.co.th/index/query/gzquery.html?bills=${n}` },
   { id: 'ninja',    label: 'Ninja Van',         trackUrl: () => `https://www.ninjavan.co/th-th/tracking` },
   { id: 'dhl',      label: 'DHL',               trackUrl: (n: string) => `https://www.dhl.com/th-th/home/tracking.html?tracking-id=${n}` },
+  { id: 'kex',      label: 'KEX Express',       trackUrl: (n: string) => `https://www.kexpress.co.th/tracking/?trackNumber=${n}` },
   { id: 'other',    label: 'อื่นๆ',             trackUrl: () => '' },
 ] as const
 
