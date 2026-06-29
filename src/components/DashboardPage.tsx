@@ -81,6 +81,15 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
     (reports[reports.length - 1]?.date ?? new Date().toISOString().slice(0, 10)).slice(0, 7)
   )
   const calendarRef = useRef<HTMLDivElement>(null)
+  const [showLuffyGood, setShowLuffyGood] = useState(false)
+  const prevSyncStatus = useRef(syncStatus)
+  useEffect(() => {
+    if (prevSyncStatus.current === 'syncing' && syncStatus === 'success') {
+      setShowLuffyGood(true)
+      setTimeout(() => setShowLuffyGood(false), 2500)
+    }
+    prevSyncStatus.current = syncStatus
+  }, [syncStatus])
 
   // helper: get amount/volume for a report, optionally filtered to one site
   function siteAmt(r: DayReport, site: string) {
@@ -488,13 +497,21 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
                 )}
               </div>
             </div>
-            {/* pikachu */}
+            {/* luffy */}
             <div className="relative w-28 flex-shrink-0 self-stretch">
               <img
                 src="/pic/luffynigga.gif"
                 alt="luffy"
                 className="absolute bottom-0 right-0 h-full w-full object-contain object-bottom"
               />
+              {showLuffyGood && (
+                <img
+                  src="/pic/luffyGood.gif"
+                  alt="luffy good"
+                  className="absolute bottom-0 -left-20 h-full w-20 object-contain object-bottom"
+                  style={{ animation: 'luffyPop 2.5s ease forwards' }}
+                />
+              )}
             </div>
           </div>
         ) : vsYesterday ? (() => {

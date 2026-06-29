@@ -85,6 +85,13 @@ button:not(:disabled):active {
   transform: scale(0.95);
 }
 
+@keyframes luffyPop {
+  0%   { opacity: 0; transform: translateY(20px) scale(0.7); }
+  15%  { opacity: 1; transform: translateY(0) scale(1.1); }
+  25%  { transform: scale(1); }
+  75%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: translateY(10px) scale(0.9); }
+}
 .animate-fade-up { animation: fadeUp 0.4s ease both; }
 .animate-pop-in  { animation: popIn  0.35s ease both; }
 .animate-delay-1 { animation-delay: 0.05s; }
