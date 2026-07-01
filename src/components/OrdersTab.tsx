@@ -490,21 +490,20 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
   const isPending = (o: PurchaseOrder) => o.status === 'ordered' || o.status === 'in_transit'
 
   const filtered = orders.filter(o => {
-    if (filter === 'all') return true
+    if (filter === 'received') return o.status === 'received'
     if (filter === 'pending') return isPending(o)
-    return o.status === 'received'
+    return isPending(o) // 'all' แสดงเฉพาะรอรับ ไม่รวมรับแล้ว
   })
 
   const counts = {
-    all:      orders.length,
+    all:      orders.filter(isPending).length,
     pending:  orders.filter(isPending).length,
     received: orders.filter(o => o.status === 'received').length,
   }
 
   const TABS: { id: FilterTab; label: string; count: number }[] = [
-    { id: 'all',      label: 'ทั้งหมด',   count: counts.all },
-    { id: 'pending',  label: 'รอรับ',     count: counts.pending },
-    { id: 'received', label: 'รับแล้ว',   count: counts.received },
+    { id: 'all',      label: 'รอรับ',    count: counts.all },
+    { id: 'received', label: 'รับแล้ว',  count: counts.received },
   ]
 
   return (
