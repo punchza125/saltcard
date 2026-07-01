@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Sector
+  Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Sector, ReferenceLine
 } from 'recharts'
 import { ChevronLeft, ChevronRight, TrendingUp, Package, MapPin } from 'lucide-react'
 import type { DayReport, StockProduct } from '../types'
@@ -231,6 +231,14 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
       date: formatThaiDate(r.date),
       ยอดขาย: siteAmt(r, selectedSite),
     })), [reports, selectedSite])
+
+  const { support, resistance } = useMemo(() => {
+    if (trendData.length < 5) return { support: null, resistance: null }
+    const vals = trendData.map(d => d['ยอดขาย']).sort((a, b) => a - b)
+    const p25 = vals[Math.floor(vals.length * 0.25)]
+    const p75 = vals[Math.floor(vals.length * 0.75)]
+    return { support: p25, resistance: p75 }
+  }, [trendData])
 
   const goodsData = useMemo(() => {
     const map = new Map<string, { name: string; volume: number; amount: number }>()
@@ -626,6 +634,14 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
                       tickFormatter={v => v >= 1000 ? `${Math.round(v/1000)}K` : String(v)} />
                     <Tooltip content={<CustomTooltip />} />
                     <Area type="monotone" dataKey="ยอดขาย" stroke="#1a52b3" strokeWidth={2} fill="url(#grad1)" />
+                    {support != null && (
+                      <ReferenceLine y={support} stroke="#10b981" strokeDasharray="5 3" strokeWidth={1.5}
+                        label={{ value: `แนวรับ ฿${formatBaht(support)}`, position: 'insideTopLeft', fontSize: 9, fill: '#10b981', dy: 4 }} />
+                    )}
+                    {resistance != null && (
+                      <ReferenceLine y={resistance} stroke="#f59e0b" strokeDasharray="5 3" strokeWidth={1.5}
+                        label={{ value: `แนวต้าน ฿${formatBaht(resistance)}`, position: 'insideTopLeft', fontSize: 9, fill: '#f59e0b', dy: 4 }} />
+                    )}
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
