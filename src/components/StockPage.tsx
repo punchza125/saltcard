@@ -1133,8 +1133,8 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
         </>
       )}
 
-      {/* category filter — scrollable */}
-      <div className="flex gap-1.5 overflow-x-auto pb-0.5 -mx-1 px-1 scrollbar-none">
+      {/* category filter — wrap ลงหลายบรรทัดเมื่อหมวดเยอะ */}
+      <div className="flex flex-wrap gap-1.5">
         {(() => {
           // รวมหมวดที่ผู้ใช้สร้างเองเข้าไปในแถบ filter ด้วย ('อื่นๆ' อยู่ท้ายเสมอ)
           const set = new Set<string>(CATEGORIES.filter(c => c !== 'อื่นๆ'))
