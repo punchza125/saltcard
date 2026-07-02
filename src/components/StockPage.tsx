@@ -249,6 +249,31 @@ function SyncModal({
 }
 
 // ── ProductModal ──────────────────────────────────────────────────────────────
+// ช่องจำนวนพร้อมปุ่ม −/+ กดปรับได้ไม่ต้องพิมพ์
+function QtyStepper({ suffix, value, onChange, onStep }: {
+  suffix: string
+  value: string
+  onChange: (v: string) => void
+  onStep: (dir: 1 | -1) => void
+}) {
+  return (
+    <div>
+      <div className="flex items-center bg-white border border-brand-blue/15 rounded-xl overflow-hidden focus-within:border-brand-blue transition-colors">
+        <button type="button" onClick={() => onStep(-1)}
+          className="w-9 self-stretch flex items-center justify-center text-brand-dark/40 hover:bg-brand-pale text-[17px] font-semibold flex-shrink-0">−</button>
+        <input
+          type="number" min={0} inputMode="numeric"
+          className="w-full min-w-0 text-center text-[16px] font-bold text-brand-dark outline-none py-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          value={value} onChange={e => onChange(e.target.value)}
+        />
+        <button type="button" onClick={() => onStep(1)}
+          className="w-9 self-stretch flex items-center justify-center text-brand-blue hover:bg-brand-pale text-[17px] font-semibold flex-shrink-0">+</button>
+      </div>
+      <p className="text-[10px] text-brand-dark/40 text-center mt-1">{suffix}</p>
+    </div>
+  )
+}
+
 function ProductModal({
   initial,
   onSave,
@@ -303,7 +328,27 @@ function ProductModal({
   function boxHint(packs: string) {
     const n = Number(packs)
     if (!hasConversion || isNaN(n) || n <= 0) return ''
-    return ` (≈ ${(n / ppb).toFixed(1)} Box)`
+    return `≈ ${(n / ppb).toFixed(1)} Box`
+  }
+
+  const totalPacks = hasConversion
+    ? Math.round(Number(qtyBox || 0) * ppb + Number(qtyPack || 0))
+    : Number(qtyPack || 0)
+
+  function stepBox(dir: 1 | -1) {
+    setQtyBox(String(Math.max(0, Number(qtyBox || 0) + dir)))
+  }
+
+  // ปุ่ม −/+ ของ Pack ทดข้าม Box ให้อัตโนมัติ (เช่น 23→24 Pack กลายเป็น +1 Box)
+  function stepPack(dir: 1 | -1) {
+    const p = Number(qtyPack || 0), b = Number(qtyBox || 0)
+    if (!hasConversion) { setQtyPack(String(Math.max(0, p + dir))); return }
+    let np = p + dir, nb = b
+    if (np >= ppb) { np -= ppb; nb += 1 }
+    else if (np < 0) {
+      if (b > 0) { np += ppb; nb -= 1 } else np = 0
+    }
+    setQtyPack(String(np)); setQtyBox(String(nb))
   }
 
   function handleSave() {
@@ -324,83 +369,38 @@ function ProductModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-brand-dark text-[15px]">
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40">
+      <div className="bg-white w-full md:max-w-sm rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col">
+
+        {/* header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 flex-shrink-0">
+          <h3 className="text-[15px] font-bold text-brand-dark">
             {initial ? 'แก้ไขสินค้า' : 'เพิ่มสินค้าใหม่'}
           </h3>
-          <button onClick={onClose} className="text-brand-dark/40 hover:text-brand-dark"><X size={18} /></button>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-brand-pale flex items-center justify-center">
+            <X size={15} className="text-brand-dark/50" />
+          </button>
         </div>
 
-        <div className="space-y-3">
+        <div className="overflow-y-auto flex-1 px-5 pb-4 space-y-4">
+
+          {/* name */}
           <div>
-            <label className="text-[12px] text-brand-dark/60 mb-1 block">ชื่อสินค้า</label>
+            <label className="text-[11px] font-semibold text-brand-dark/40 uppercase tracking-wider">ชื่อสินค้า</label>
             <input
-              className="w-full border border-brand-blue/20 rounded-lg px-3 py-2 text-[13px] outline-none focus:border-brand-blue"
+              autoFocus={!initial}
+              className="mt-1.5 w-full border border-brand-blue/15 rounded-xl px-3 py-2.5 text-[13px] outline-none focus:border-brand-blue"
               value={name} onChange={e => setName(e.target.value)}
               placeholder="เช่น One Piece OP-15"
             />
           </div>
 
-          <div>
-            <label className="text-[12px] text-brand-dark/60 mb-1 block">Pack ต่อ 1 {unit}</label>
-            <input
-              type="number" min={0}
-              className="w-full border border-brand-blue/20 rounded-lg px-3 py-2 text-[13px] outline-none focus:border-brand-blue"
-              value={packsPerBox} onChange={e => setPacksPerBox(e.target.value)}
-              placeholder="0 = ไม่แปลง"
-            />
-          </div>
-
-          {hasConversion && (
-            <p className="text-[11px] text-brand-blue/60 bg-brand-pale/50 rounded-lg px-3 py-2">
-              1 {unit} = {ppb} Pack — ระบบเก็บสต๊อกเป็น Pack และแปลงกลับให้อัตโนมัติ
-            </p>
-          )}
-
-          <div>
-            <label className="text-[12px] text-brand-dark/60 mb-1 block">ในมือ</label>
-            {hasConversion ? (
-              <>
-                <div className="flex gap-2">
-                  <div className="flex-1 relative">
-                    <input
-                      type="number" min={0}
-                      className="w-full border border-brand-blue/20 rounded-lg pl-3 pr-11 py-2 text-[13px] outline-none focus:border-brand-blue"
-                      value={qtyBox} onChange={e => setQtyBox(e.target.value)}
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-brand-dark/40 pointer-events-none">{unit}</span>
-                  </div>
-                  <div className="flex-1 relative">
-                    <input
-                      type="number" min={0}
-                      className="w-full border border-brand-blue/20 rounded-lg pl-3 pr-11 py-2 text-[13px] outline-none focus:border-brand-blue"
-                      value={qtyPack} onChange={e => setQtyPack(e.target.value)}
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-brand-dark/40 pointer-events-none">Pack</span>
-                  </div>
-                </div>
-                <p className="text-[11px] text-brand-dark/40 mt-1">
-                  = {Math.round(Number(qtyBox || 0) * ppb + Number(qtyPack || 0))} Pack
-                </p>
-              </>
-            ) : (
-              <input
-                type="number" min={0}
-                className="w-full border border-brand-blue/20 rounded-lg px-3 py-2 text-[13px] outline-none focus:border-brand-blue"
-                value={qtyPack} onChange={e => setQtyPack(e.target.value)}
-              />
-            )}
-          </div>
-
-
           {/* category */}
           <div>
-            <label className="text-[12px] text-brand-dark/60 mb-1.5 block">
-              หมวดหมู่ <span className="text-brand-dark/30">(ไม่เลือก = อื่นๆ)</span>
+            <label className="text-[11px] font-semibold text-brand-dark/40 uppercase tracking-wider">
+              หมวดหมู่ <span className="font-normal normal-case text-brand-dark/30">(ไม่เลือก = อื่นๆ)</span>
             </label>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
               {catChips.map(c => (
                 <button key={c} type="button"
                   onClick={() => setCategory(category === c ? '' : c)}
@@ -424,73 +424,101 @@ function ProductModal({
               <div className="flex gap-1.5 mt-2">
                 <input
                   autoFocus
-                  className="flex-1 border border-brand-blue/20 rounded-lg px-3 py-1.5 text-[12px] outline-none focus:border-brand-blue"
+                  className="flex-1 border border-brand-blue/15 rounded-xl px-3 py-2 text-[12px] outline-none focus:border-brand-blue"
                   value={newCat} onChange={e => setNewCat(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') addNewCat() }}
                   placeholder="ชื่อหมวดหมู่ใหม่"
                 />
                 <button type="button" onClick={addNewCat} disabled={!newCat.trim()}
-                  className="px-3 py-1.5 rounded-lg bg-brand-blue text-white text-[12px] font-medium disabled:opacity-40 active:scale-95 transition-all">
+                  className="px-3.5 py-2 rounded-xl bg-brand-blue text-white text-[12px] font-semibold disabled:opacity-40 active:scale-95 transition-all">
                   เพิ่ม
                 </button>
               </div>
             )}
           </div>
 
-          {/* keyword */}
-          <div>
-            <label className="text-[12px] text-brand-dark/60 mb-1 block">
-              Keyword จับคู่รายงาน
-              <span className="ml-1 text-brand-dark/30">(ไม่บังคับ)</span>
-            </label>
-            <input
-              className="w-full border border-brand-blue/20 rounded-lg px-3 py-2 text-[13px] outline-none focus:border-brand-blue font-mono"
-              value={keyword} onChange={e => setKeyword(e.target.value)}
-              placeholder='เช่น "PRB-02" หรือ "OP-15"'
-            />
-            <p className="text-[10px] text-brand-dark/30 mt-1">
-              ระบบจะค้นหา keyword นี้ในชื่อสินค้าของ Goods Aspect แล้วหักสต๊อกอัตโนมัติ
-            </p>
+          {/* qty */}
+          <div className="bg-brand-pale/40 rounded-2xl p-3.5 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-semibold text-brand-dark/40 uppercase tracking-wider">จำนวนในมือ</label>
+              <span className="text-[12px] font-bold text-brand-blue">= {isNaN(totalPacks) ? '–' : totalPacks} Pack</span>
+            </div>
+            {hasConversion ? (
+              <div className="grid grid-cols-2 gap-2">
+                <QtyStepper suffix="Box"  value={qtyBox}  onChange={setQtyBox}  onStep={stepBox} />
+                <QtyStepper suffix="Pack" value={qtyPack} onChange={setQtyPack} onStep={stepPack} />
+              </div>
+            ) : (
+              <QtyStepper suffix="Pack" value={qtyPack} onChange={setQtyPack} onStep={stepPack} />
+            )}
+            <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-brand-blue/10">
+              <span className="text-[12px] text-brand-dark/50">Pack ต่อ 1 Box</span>
+              <input
+                type="number" min={0}
+                className="w-20 text-center border border-brand-blue/15 rounded-lg px-2 py-1.5 text-[13px] font-semibold bg-white outline-none focus:border-brand-blue"
+                value={packsPerBox} onChange={e => setPacksPerBox(e.target.value)}
+              />
+            </div>
           </div>
 
-          <div className="bg-brand-pale/50 rounded-xl p-3 space-y-2">
-            <p className="text-[11px] text-brand-dark/50 font-medium">ขีดเตือน (Pack)</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-[12px] text-yellow-600 mb-1 flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" /> ใกล้หมด (≤)
-                </label>
+          {/* thresholds */}
+          <div>
+            <label className="text-[11px] font-semibold text-brand-dark/40 uppercase tracking-wider">ขีดเตือนสต๊อก (Pack)</label>
+            <div className="grid grid-cols-2 gap-2 mt-1.5">
+              <div className="rounded-xl border border-yellow-200 bg-yellow-50/50 p-3">
+                <p className="text-[11px] text-yellow-600 font-medium flex items-center gap-1 mb-1">
+                  <span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" /> ใกล้หมด ≤
+                </p>
                 <input
                   type="number" min={0}
-                  className="w-full border border-yellow-200 rounded-lg px-3 py-2 text-[13px] outline-none focus:border-yellow-400"
+                  className="w-full bg-transparent text-[16px] font-bold text-brand-dark outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   value={yellowAt} onChange={e => setYellowAt(e.target.value)}
                 />
-                <p className="text-[10px] text-brand-dark/30 mt-0.5">{boxHint(yellowAt)}</p>
+                <p className="text-[10px] text-brand-dark/30 h-3">{boxHint(yellowAt)}</p>
               </div>
-              <div>
-                <label className="text-[12px] text-red-500 mb-1 flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> กำลังจะหมด (≤)
-                </label>
+              <div className="rounded-xl border border-red-200 bg-red-50/50 p-3">
+                <p className="text-[11px] text-red-500 font-medium flex items-center gap-1 mb-1">
+                  <span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> กำลังจะหมด ≤
+                </p>
                 <input
                   type="number" min={0}
-                  className="w-full border border-red-200 rounded-lg px-3 py-2 text-[13px] outline-none focus:border-red-400"
+                  className="w-full bg-transparent text-[16px] font-bold text-brand-dark outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   value={redAt} onChange={e => setRedAt(e.target.value)}
                 />
-                <p className="text-[10px] text-brand-dark/30 mt-0.5">{boxHint(redAt)}</p>
+                <p className="text-[10px] text-brand-dark/30 h-3">{boxHint(redAt)}</p>
               </div>
             </div>
           </div>
 
-          {error && <p className="text-red-500 text-[12px]">{error}</p>}
+          {/* keyword */}
+          <div>
+            <label className="text-[11px] font-semibold text-brand-dark/40 uppercase tracking-wider">
+              Keyword จับคู่รายงาน <span className="font-normal normal-case text-brand-dark/30">(ไม่บังคับ)</span>
+            </label>
+            <input
+              className="mt-1.5 w-full border border-brand-blue/15 rounded-xl px-3 py-2.5 text-[13px] outline-none focus:border-brand-blue font-mono"
+              value={keyword} onChange={e => setKeyword(e.target.value)}
+              placeholder='เช่น "PRB-02" หรือ "OP-15"'
+            />
+            <p className="text-[10px] text-brand-dark/30 mt-1">
+              ใช้จับคู่ชื่อสินค้าใน Goods Aspect เพื่อหักสต๊อกอัตโนมัติ
+            </p>
+          </div>
+
+          {error && (
+            <p className="text-red-500 text-[12px] bg-red-50 border border-red-100 rounded-xl px-3 py-2">{error}</p>
+          )}
         </div>
 
-        <div className="flex gap-2 mt-5">
-          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-brand-blue/20 text-[13px] text-brand-dark/60 hover:bg-brand-pale/50">
+        {/* footer */}
+        <div className="px-5 pb-5 pt-3 flex-shrink-0 border-t border-brand-blue/8 flex gap-2">
+          <button onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-brand-blue/15 text-[13px] text-brand-dark/60 hover:bg-brand-pale/50 transition-colors">
             ยกเลิก
           </button>
           <button
             onClick={handleSave}
-            className="flex-1 py-2 rounded-lg bg-brand-blue text-white text-[13px] font-medium hover:bg-brand-light active:scale-95 transition-all flex items-center justify-center gap-1"
+            className="flex-[2] py-2.5 rounded-xl bg-brand-blue text-white text-[13px] font-semibold hover:bg-brand-light active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
           >
             <Check size={14} /> บันทึก
           </button>
