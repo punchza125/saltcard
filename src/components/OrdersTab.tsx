@@ -419,7 +419,7 @@ function OrderCard({
 
 type FilterTab = 'all' | 'pending' | 'received'
 
-export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, ordersUrl, isOrdersEnv, onSaveOrdersUrl }: {
+export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, ordersUrl, isOrdersEnv, onSaveOrdersUrl, onStockLog }: {
   products: StockProduct[]
   onPush?: (orders: PurchaseOrder[]) => Promise<boolean>
   onFetch?: () => Promise<PurchaseOrder[] | null>
@@ -427,6 +427,8 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
   ordersUrl?: string
   isOrdersEnv?: boolean
   onSaveOrdersUrl?: (url: string) => void
+  // ซิงค์สต็อกจากรายการสั่งซื้อ: incoming = สั่งใหม่, received = ยืนยันรับ, cancel = ลบรายการที่ยังไม่รับ
+  onStockLog?: (items: OrderItem[], kind: 'incoming' | 'received' | 'cancel') => void
 }) {
   const { orders, addOrder, updateOrder, setTracking, markReceived, deleteOrder, replaceAll } = useOrderStore()
   const [filter,      setFilter]      = useState<FilterTab>('all')
@@ -663,6 +665,7 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
               order={order}
               products={products}
               onDelete={() => {
+                if (order.status !== 'received') onStockLog?.(order.items, 'cancel')
                 deleteOrder(order.id)
                 setTimeout(() => pushOrders(orders.filter(o => o.id !== order.id)), 100)
               }}
@@ -670,6 +673,7 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
               onSetTracking={() => setTrackOrder(order)}
               onMarkReceived={() => {
                 const today = new Date().toISOString().slice(0, 10)
+                onStockLog?.(order.items, 'received')
                 markReceived(order.id)
                 setTimeout(() => pushOrders(orders.map(o => o.id === order.id ? { ...o, status: 'received' as const, receivedAt: today } : o)), 100)
               }}
@@ -685,6 +689,7 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
           onClose={() => setShowCreate(false)}
           onSave={data => {
             const newOrder = addOrder(data)
+            onStockLog?.(data.items, 'incoming')
             setTimeout(() => pushOrders([...orders, newOrder]), 100)
           }}
         />

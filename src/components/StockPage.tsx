@@ -508,21 +508,8 @@ function ProductModal({
 // ── LogModal ──────────────────────────────────────────────────────────────────
 type LogMode = 'incoming' | 'received' | 'out' | 'adjust'
 
+// 'สั่งมาแล้ว' / 'ได้รับของแล้ว' ถูกตัดออก — สต็อกซิงค์จากระบบติดตามสินค้า (OrdersTab) แทน
 const LOG_MODES: { key: LogMode; label: string; sub: string; color: string; activeClass: string }[] = [
-  {
-    key: 'incoming',
-    label: 'สั่งมาแล้ว',
-    sub: 'รอของมาส่ง',
-    color: 'text-blue-600',
-    activeClass: 'bg-blue-500 text-white',
-  },
-  {
-    key: 'received',
-    label: 'ได้รับของแล้ว',
-    sub: 'ของถึงมือแล้ว',
-    color: 'text-emerald-600',
-    activeClass: 'bg-emerald-500 text-white',
-  },
   {
     key: 'out',
     label: 'จ่ายออก',
@@ -548,7 +535,7 @@ function LogModal({
   onLog: (delta: number, note: string, kind: LogMode, deductIncoming: boolean) => void
   onClose: () => void
 }) {
-  const [mode,            setMode]            = useState<LogMode>('incoming')
+  const [mode,            setMode]            = useState<LogMode>('out')
   const [amount,          setAmount]          = useState('1')
   const [note,            setNote]            = useState('')
   const [deductIncoming,  setDeductIncoming]  = useState(true)
@@ -1210,7 +1197,18 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
     return (
       <>
         <SubTabBar active={stockTab} onChange={setStockTab} pendingCount={pendingOrderCount} />
-        <OrdersTab products={stock.products} onPush={onPushOrders} onFetch={onFetchOrders} sheetsConnected={!!(sheetsUrl || ordersUrl)} ordersUrl={ordersUrl} isOrdersEnv={isOrdersEnv} onSaveOrdersUrl={onSaveOrdersUrl} />
+        <OrdersTab products={stock.products} onPush={onPushOrders} onFetch={onFetchOrders} sheetsConnected={!!(sheetsUrl || ordersUrl)} ordersUrl={ordersUrl} isOrdersEnv={isOrdersEnv} onSaveOrdersUrl={onSaveOrdersUrl}
+          onStockLog={(items, kind) => {
+            items.forEach(it => {
+              if (!it.productId) return
+              const p = stock.products.find(pp => pp.id === it.productId)
+              if (!p) return
+              const packs = it.unit === 'Box' && p.packsPerBox > 0 ? it.qty * p.packsPerBox : it.qty
+              if (kind === 'incoming')      logEntry(p.id, packs,  `สั่งซื้อ ${it.qty} ${it.unit}`, 'incoming')
+              else if (kind === 'cancel')   logEntry(p.id, -packs, 'ยกเลิกรายการสั่งซื้อ', 'incoming')
+              else                          logEntry(p.id, packs,  `รับสินค้า ${it.qty} ${it.unit}`, 'received', undefined, true)
+            })
+          }} />
       </>
     )
   }

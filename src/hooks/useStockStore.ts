@@ -112,7 +112,7 @@ export function useStockStore() {
       products: s.products.map(p => {
         if (p.id !== productId) return p
         if (kind === 'incoming') {
-          return { ...p, qtyIncoming: p.qtyIncoming + delta }
+          return { ...p, qtyIncoming: Math.max(0, p.qtyIncoming + delta) }
         }
         if (kind === 'received') {
           const deduct = deductIncoming ? Math.min(p.qtyIncoming, delta) : 0
