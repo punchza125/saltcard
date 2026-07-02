@@ -269,16 +269,14 @@ function ProductModal({
   const [buyPrice,    setBuyPrice]    = useState(String(initial?.buyPricePerBox   ?? ''))
   const [sellPack,    setSellPack]    = useState(String(initial?.sellPricePerPack ?? ''))
   const [sellBox,     setSellBox]     = useState(String(initial?.sellPricePerBox  ?? ''))
-  const [qtyInput,    setQtyInput]    = useState(() => {
-    if (!initial) return '0'
-    const p = initial.packsPerBox
-    return p > 0 ? String(Math.round(initial.qty / p * 1000) / 1000) : String(initial.qty)
-  })
-  const [incomingInput, setIncomingInput] = useState(() => {
-    if (!initial) return '0'
-    const p = initial.packsPerBox
-    return p > 0 ? String(Math.round((initial.qtyIncoming ?? 0) / p * 1000) / 1000) : String(initial.qtyIncoming ?? 0)
-  })
+  // แยกช่อง Box/Pack เพื่อไม่ต้องกรอกทศนิยม เช่น 1 Box 1 Pack
+  const initPpb  = initial?.packsPerBox ?? 0
+  const initQty  = initial?.qty ?? 0
+  const initInc  = initial?.qtyIncoming ?? 0
+  const [qtyBox,  setQtyBox]  = useState(() => initPpb > 0 ? String(Math.floor(initQty / initPpb)) : '0')
+  const [qtyPack, setQtyPack] = useState(() => initPpb > 0 ? String(initQty % initPpb) : String(initQty))
+  const [incBox,  setIncBox]  = useState(() => initPpb > 0 ? String(Math.floor(initInc / initPpb)) : '0')
+  const [incPack, setIncPack] = useState(() => initPpb > 0 ? String(initInc % initPpb) : String(initInc))
   const [yellowAt,    setYellowAt]    = useState(String(initial?.yellowAt    ?? 120))
   const [redAt,       setRedAt]       = useState(String(initial?.redAt       ?? 48))
   const [keyword,     setKeyword]     = useState(initial?.goodsKeyword       ?? '')
@@ -296,11 +294,13 @@ function ProductModal({
 
   function handleSave() {
     if (!name.trim()) return setError('กรุณาใส่ชื่อสินค้า')
-    const y = Number(yellowAt), r = Number(redAt), raw = Number(qtyInput), rawInc = Number(incomingInput)
-    if (isNaN(y) || isNaN(r) || isNaN(raw) || isNaN(rawInc)) return setError('กรุณาใส่ตัวเลขให้ถูกต้อง')
+    const y = Number(yellowAt), r = Number(redAt)
+    const qb = Number(qtyBox || 0), qp = Number(qtyPack || 0)
+    const ib = Number(incBox || 0), ip = Number(incPack || 0)
+    if ([y, r, qb, qp, ib, ip].some(isNaN)) return setError('กรุณาใส่ตัวเลขให้ถูกต้อง')
     if (r >= y) return setError('ขีดแดงต้องน้อยกว่าขีดเหลือง')
-    const q   = hasConversion ? Math.round(raw * ppb)    : raw
-    const inc = hasConversion ? Math.round(rawInc * ppb) : rawInc
+    const q   = hasConversion ? Math.round(qb * ppb + qp) : qp
+    const inc = hasConversion ? Math.round(ib * ppb + ip) : ip
     onSave(
       name.trim(), unit, ppb < 0 ? 0 : ppb, q, inc, y, r, keyword.trim(), category,
       buyPrice ? Number(buyPrice) : undefined,
@@ -357,38 +357,77 @@ function ProductModal({
             </p>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[12px] text-brand-dark/60 mb-1 block">
-                ในมือ ({hasConversion ? unit : 'Pack'})
-              </label>
+          <div>
+            <label className="text-[12px] text-brand-dark/60 mb-1 block">ในมือ</label>
+            {hasConversion ? (
+              <>
+                <div className="flex gap-2">
+                  <div className="flex-1 relative">
+                    <input
+                      type="number" min={0}
+                      className="w-full border border-brand-blue/20 rounded-lg pl-3 pr-11 py-2 text-[13px] outline-none focus:border-brand-blue"
+                      value={qtyBox} onChange={e => setQtyBox(e.target.value)}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-brand-dark/40 pointer-events-none">{unit}</span>
+                  </div>
+                  <div className="flex-1 relative">
+                    <input
+                      type="number" min={0}
+                      className="w-full border border-brand-blue/20 rounded-lg pl-3 pr-11 py-2 text-[13px] outline-none focus:border-brand-blue"
+                      value={qtyPack} onChange={e => setQtyPack(e.target.value)}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-brand-dark/40 pointer-events-none">Pack</span>
+                  </div>
+                </div>
+                <p className="text-[11px] text-brand-dark/40 mt-1">
+                  = {Math.round(Number(qtyBox || 0) * ppb + Number(qtyPack || 0))} Pack
+                </p>
+              </>
+            ) : (
               <input
                 type="number" min={0}
                 className="w-full border border-brand-blue/20 rounded-lg px-3 py-2 text-[13px] outline-none focus:border-brand-blue"
-                value={qtyInput} onChange={e => setQtyInput(e.target.value)}
+                value={qtyPack} onChange={e => setQtyPack(e.target.value)}
               />
-              {hasConversion && Number(qtyInput) > 0 && (
-                <p className="text-[11px] text-brand-dark/40 mt-1">
-                  = {Math.round(Number(qtyInput) * ppb)} Pack
+            )}
+          </div>
+
+          <div>
+            <label className="text-[12px] text-blue-500 mb-1 flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />
+              กำลังมา
+            </label>
+            {hasConversion ? (
+              <>
+                <div className="flex gap-2">
+                  <div className="flex-1 relative">
+                    <input
+                      type="number" min={0}
+                      className="w-full border border-blue-200 rounded-lg pl-3 pr-11 py-2 text-[13px] outline-none focus:border-blue-400"
+                      value={incBox} onChange={e => setIncBox(e.target.value)}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-blue-400/60 pointer-events-none">{unit}</span>
+                  </div>
+                  <div className="flex-1 relative">
+                    <input
+                      type="number" min={0}
+                      className="w-full border border-blue-200 rounded-lg pl-3 pr-11 py-2 text-[13px] outline-none focus:border-blue-400"
+                      value={incPack} onChange={e => setIncPack(e.target.value)}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-blue-400/60 pointer-events-none">Pack</span>
+                  </div>
+                </div>
+                <p className="text-[11px] text-blue-400/60 mt-1">
+                  = {Math.round(Number(incBox || 0) * ppb + Number(incPack || 0))} Pack
                 </p>
-              )}
-            </div>
-            <div>
-              <label className="text-[12px] text-blue-500 mb-1 flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />
-                กำลังมา ({hasConversion ? unit : 'Pack'})
-              </label>
+              </>
+            ) : (
               <input
                 type="number" min={0}
                 className="w-full border border-blue-200 rounded-lg px-3 py-2 text-[13px] outline-none focus:border-blue-400"
-                value={incomingInput} onChange={e => setIncomingInput(e.target.value)}
+                value={incPack} onChange={e => setIncPack(e.target.value)}
               />
-              {hasConversion && Number(incomingInput) > 0 && (
-                <p className="text-[11px] text-blue-400/60 mt-1">
-                  = {Math.round(Number(incomingInput) * ppb)} Pack
-                </p>
-              )}
-            </div>
+            )}
           </div>
 
           {/* category */}
