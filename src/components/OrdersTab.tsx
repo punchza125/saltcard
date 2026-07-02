@@ -40,9 +40,13 @@ function CreateOrderModal({
   const [openIdx,  setOpenIdx]  = useState<number | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
 
-  const filtered = products.filter(p =>
-    !search || p.name.toLowerCase().includes(search.toLowerCase())
-  ).slice(0, 8)
+  // ค้นแบบแยกคำ: ทุกคำต้องเจอในชื่อ/หมวด/keyword (ไม่สนลำดับ) และไม่จำกัดแค่ 8 รายการ
+  const searchTokens = search.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const filtered = products.filter(p => {
+    if (searchTokens.length === 0) return true
+    const hay = `${p.name} ${p.category} ${p.goodsKeyword}`.toLowerCase()
+    return searchTokens.every(t => hay.includes(t))
+  }).slice(0, 30)
 
   function setItem(i: number, patch: Partial<OrderItem>) {
     setItems(prev => prev.map((it, idx) => idx === i ? { ...it, ...patch } : it))
@@ -150,7 +154,7 @@ function CreateOrderModal({
                             className="w-full bg-white border border-brand-blue/15 rounded-lg px-2.5 py-1.5 text-[12px] outline-none focus:border-brand-blue"
                           />
                         </div>
-                        <div className="max-h-[160px] overflow-y-auto">
+                        <div className="max-h-[240px] overflow-y-auto">
                           {search && !filtered.some(p => p.name.toLowerCase() === search.toLowerCase()) && (
                             <button
                               onClick={() => { setItem(i, { name: search, productId: undefined }); setSearch(''); setOpenIdx(null) }}
