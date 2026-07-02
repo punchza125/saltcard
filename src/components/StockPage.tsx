@@ -908,8 +908,10 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
       <div className="bg-white rounded-2xl shadow-2xl px-10 py-7 flex flex-col items-center gap-3 animate-pop-in">
         {pushing ? (
           <>
-            <Loader2 size={30} className="animate-spin text-brand-blue" />
-            <p className="text-[14px] font-semibold text-brand-dark">กำลังบันทึกข้อมูล...</p>
+            <img src="/pic/doraemonGif.gif" alt="saving" className="w-24 h-24 object-contain" />
+            <p className="text-[14px] font-semibold text-brand-dark flex items-center gap-1.5">
+              <Loader2 size={14} className="animate-spin text-brand-blue" /> กำลังบันทึกข้อมูล...
+            </p>
             <p className="text-[11px] text-brand-dark/40">กรุณาอย่าเพิ่งปิดหน้านี้</p>
           </>
         ) : (
