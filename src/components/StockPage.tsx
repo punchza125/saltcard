@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import {
   Plus, Pencil, Trash2, ArrowUp, ArrowDown,
   ChevronDown, ChevronUp, X, Check, RefreshCw, AlertTriangle, Upload, Cloud, CloudOff,
-  Package2, BarChart2, Truck,
+  Package2, BarChart2, Truck, Loader2,
 } from 'lucide-react'
 import type { StockProduct, StockUnit, DayReport, PurchaseOrder } from '../types'
 import { useStockStore, type SyncPreviewItem, type InventorySnapshotItem } from '../hooks/useStockStore'
@@ -834,12 +834,19 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
   const [pushing,          setPushing]          = useState(false)
   const [pushOk,           setPushOk]           = useState<boolean | null>(null)
 
+  const [savedFlash, setSavedFlash] = useState(false)
+  function flashSaved() {
+    setSavedFlash(true)
+    setTimeout(() => setSavedFlash(false), 900)
+  }
+
   async function handlePushStock() {
     if (!onPushStock) return
     setPushing(true)
     const ok = await onPushStock(stock)  // ส่ง stock จาก instance นี้โดยตรง
     setPushOk(ok)
     setPushing(false)
+    if (ok) flashSaved()
     setTimeout(() => setPushOk(null), 3000)
   }
 
@@ -854,9 +861,32 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
       const ok = await onPushStock(stockRef.current)
       setPushOk(ok)
       setPushing(false)
+      if (ok) flashSaved()
       setTimeout(() => setPushOk(null), 3000)
     }, 400)
   }
+
+  // popup กลางจอระหว่างบันทึกขึ้น Google Sheet (แสดงทั้ง tab สต็อกและติดตามสินค้า)
+  const saveOverlay = (pushing || savedFlash) ? (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30">
+      <div className="bg-white rounded-2xl shadow-2xl px-10 py-7 flex flex-col items-center gap-3 animate-pop-in">
+        {pushing ? (
+          <>
+            <Loader2 size={30} className="animate-spin text-brand-blue" />
+            <p className="text-[14px] font-semibold text-brand-dark">กำลังบันทึกข้อมูล...</p>
+            <p className="text-[11px] text-brand-dark/40">กรุณาอย่าเพิ่งปิดหน้านี้</p>
+          </>
+        ) : (
+          <>
+            <div className="w-11 h-11 rounded-full bg-emerald-100 flex items-center justify-center">
+              <Check size={24} className="text-emerald-500" />
+            </div>
+            <p className="text-[14px] font-semibold text-emerald-600">บันทึกแล้ว</p>
+          </>
+        )}
+      </div>
+    </div>
+  ) : null
 
   // inventory snapshot
   const inventoryInputRef = useRef<HTMLInputElement>(null)
@@ -968,6 +998,7 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
             })
             schedulePushStock()
           }} />
+        {saveOverlay}
       </>
     )
   }
@@ -975,6 +1006,7 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
   return (
     <>
     <SubTabBar active={stockTab} onChange={setStockTab} pendingCount={pendingOrderCount} />
+    {saveOverlay}
     <div className="max-w-2xl mx-auto px-4 py-5 space-y-4">
 
       {/* sync banner — เจ้าของเท่านั้น */}
