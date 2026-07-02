@@ -309,6 +309,8 @@ function ProductModal({
   const [showNewCat,  setShowNewCat]  = useState(false)
   const [newCat,      setNewCat]      = useState('')
   const [delCatMode,  setDelCatMode]  = useState(false)
+  // ล้างยอด 'กำลังมา' ที่ค้างจากข้อมูลเก่า (ปกติยอดนี้ซิงค์จากระบบติดตามสินค้า)
+  const [clearIncoming, setClearIncoming] = useState(false)
 
   // หมวดหมู่ทั้งหมด = หมวดมาตรฐาน + หมวดที่ผู้ใช้สร้างเอง − หมวดที่ลบไปแล้ว ('อื่นๆ' อยู่ท้ายเสมอ)
   const { stock: allStock } = useStockStore()
@@ -371,7 +373,7 @@ function ProductModal({
     if ([y, r, qb, qp].some(isNaN)) return setError('กรุณาใส่ตัวเลขให้ถูกต้อง')
     if (r >= y) return setError('ขีดแดงต้องน้อยกว่าขีดเหลือง')
     const q   = hasConversion ? Math.round(qb * ppb + qp) : qp
-    const inc = initial?.qtyIncoming ?? 0
+    const inc = clearIncoming ? 0 : initial?.qtyIncoming ?? 0
     onSave(
       name.trim(), unit, ppb < 0 ? 0 : ppb, q, inc, y, r, keyword.trim(), category || 'อื่นๆ',
       initial?.buyPricePerBox,
@@ -495,6 +497,24 @@ function ProductModal({
                 value={packsPerBox} onChange={e => setPacksPerBox(e.target.value)}
               />
             </div>
+            {(initial?.qtyIncoming ?? 0) > 0 && (
+              <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-brand-blue/10">
+                <span className="text-[12px] text-blue-500 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />
+                  กำลังมา {clearIncoming
+                    ? <span className="text-brand-dark/30 line-through">{formatQty(initial!.qtyIncoming, ppb)}</span>
+                    : <strong>{formatQty(initial!.qtyIncoming, ppb)}</strong>}
+                </span>
+                <button type="button"
+                  onClick={() => setClearIncoming(v => !v)}
+                  className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium transition-all ${
+                    clearIncoming
+                      ? 'bg-brand-blue text-white border-transparent'
+                      : 'border-red-200 text-red-400 hover:border-red-400 hover:text-red-500'
+                  }`}
+                >{clearIncoming ? 'จะล้างเป็น 0 · กดยกเลิก' : 'ล้างยอด'}</button>
+              </div>
+            )}
           </div>
 
           {/* thresholds */}
