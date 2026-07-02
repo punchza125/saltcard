@@ -843,6 +843,21 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
     setTimeout(() => setPushOk(null), 3000)
   }
 
+  // push อัตโนมัติหลังแก้ไข — ใช้ ref เพื่ออ่าน stock ล่าสุดหลัง state settle
+  // (จำเป็นสำหรับเวอร์ชัน deploy ที่โหลดทับจาก Sheets ทุกครั้งที่เปิด)
+  const stockRef = useRef(stock)
+  useEffect(() => { stockRef.current = stock }, [stock])
+  function schedulePushStock() {
+    if (!onPushStock) return
+    setTimeout(async () => {
+      setPushing(true)
+      const ok = await onPushStock(stockRef.current)
+      setPushOk(ok)
+      setPushing(false)
+      setTimeout(() => setPushOk(null), 3000)
+    }, 400)
+  }
+
   // inventory snapshot
   const inventoryInputRef = useRef<HTMLInputElement>(null)
   const [snapshotItems,    setSnapshotItems]    = useState<InventorySnapshotItem[]>([])
@@ -933,6 +948,7 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
 
   function handleConfirmSync() {
     applySync(syncPreview, Array.from(selectedSyncDates))
+    schedulePushStock()
   }
 
   if (stockTab === 'orders') {
@@ -950,6 +966,7 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
               else if (kind === 'cancel')   logEntry(p.id, -packs, 'ยกเลิกรายการสั่งซื้อ', 'incoming')
               else                          logEntry(p.id, packs,  `รับสินค้า ${it.qty} ${it.unit}`, 'received', undefined, true)
             })
+            schedulePushStock()
           }} />
       </>
     )
@@ -1186,7 +1203,7 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
                 product={p}
                 resolvedGoodsName={resolveGoodsName(p)}
                 onEdit={() => setEditTarget(p)}
-                onDelete={() => removeProduct(p.id)}
+                onDelete={() => { removeProduct(p.id); schedulePushStock() }}
                 onSync={() => setSyncProduct(p)}
                 pendingSyncCount={pendingForProduct}
                 readOnly={readOnly}
@@ -1203,6 +1220,7 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
           onSave={(name, unit, ppb, qty, inc, yellowAt, redAt, kw, cat, buyPricePerBox, sellPricePerPack, sellPricePerBox) => {
             const id = addProduct(name, unit, ppb, qty, yellowAt, redAt, kw, cat)
             updateProduct(id, { buyPricePerBox, sellPricePerPack, sellPricePerBox })
+            schedulePushStock()
           }}
           onClose={() => setShowAdd(false)}
         />
@@ -1210,8 +1228,10 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
       {editTarget && (
         <ProductModal
           initial={editTarget}
-          onSave={(name, unit, ppb, qty, inc, yellowAt, redAt, kw, cat, buyPricePerBox, sellPricePerPack, sellPricePerBox) =>
-            updateProduct(editTarget.id, { name, unit, packsPerBox: ppb, qty, qtyIncoming: inc, yellowAt, redAt, goodsKeyword: kw, category: cat, buyPricePerBox, sellPricePerPack, sellPricePerBox })}
+          onSave={(name, unit, ppb, qty, inc, yellowAt, redAt, kw, cat, buyPricePerBox, sellPricePerPack, sellPricePerBox) => {
+            updateProduct(editTarget.id, { name, unit, packsPerBox: ppb, qty, qtyIncoming: inc, yellowAt, redAt, goodsKeyword: kw, category: cat, buyPricePerBox, sellPricePerPack, sellPricePerBox })
+            schedulePushStock()
+          }}
           onClose={() => setEditTarget(null)}
         />
       )}
@@ -1228,7 +1248,7 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
           items={snapshotItems}
           date={snapshotDate}
           unmatched={snapshotUnmatch}
-          onConfirm={() => applyInventorySnapshot(snapshotItems, snapshotDate)}
+          onConfirm={() => { applyInventorySnapshot(snapshotItems, snapshotDate); schedulePushStock() }}
           onClose={() => setShowSnapshot(false)}
         />
       )}
@@ -1236,7 +1256,7 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
         <SyncModal
           preview={productSyncPreview}
           pendingDates={productSyncPreview.map(i => i.date).filter((d, i, a) => a.indexOf(d) === i)}
-          onConfirm={() => applySyncProduct(productSyncPreview)}
+          onConfirm={() => { applySyncProduct(productSyncPreview); schedulePushStock() }}
           onClose={() => setSyncProduct(null)}
         />
       )}

@@ -77,20 +77,35 @@ export default function App() {
   const effectivePushOrders = hasOrdersUrl ? ordersSheets.push : pushOrders
   const effectiveFetchOrders = hasOrdersUrl ? ordersSheets.fetch : fetchOrders
 
-  // ถ้ามี ENV_SHEETS_URL (deployed version) → โหลดจาก Sheets ทุกครั้งที่เปิดแอป
-  // ถ้าไม่มี (local dev) → โหลดเฉพาะตอนยังไม่มีข้อมูล
+  const FETCH_TTL_MS = 10 * 60 * 1000 // 10 นาที
+  const FETCH_TS_KEY = 'saltcard_last_fetch_ts'
+
+  function isCacheStale() {
+    const ts = localStorage.getItem(FETCH_TS_KEY)
+    if (!ts) return true
+    return Date.now() - Number(ts) > FETCH_TTL_MS
+  }
+
+  function markFetched() {
+    localStorage.setItem(FETCH_TS_KEY, String(Date.now()))
+  }
+
   const didAutoFetch = useRef(false)
   useEffect(() => {
     if (didAutoFetch.current || !sheetsUrl) return
     didAutoFetch.current = true
     if (ENV_SHEETS_URL) {
-      // always fetch latest from Sheets — replace local data
-      fetchAll().then(fresh => {
-        if (fresh?.length) {
-          clearAll()
-          fresh.forEach(addReport)
-        }
-      })
+      // รายงานยอดขาย: ถ้า cache ยังไม่เก่าและมีข้อมูลอยู่แล้ว → ข้ามการดึง
+      // แต่สต๊อก/หน้าตู้ดึงสดเสมอ เพราะแก้ไขได้จากหลายเครื่อง
+      if (isCacheStale() || store.reports.length === 0) {
+        fetchAll().then(fresh => {
+          if (fresh?.length) {
+            clearAll()
+            fresh.forEach(addReport)
+            markFetched()
+          }
+        })
+      }
       fetchStock().then(raw => {
         if (!raw) return
         try { replaceStock(JSON.parse(raw)) } catch {}
@@ -180,7 +195,7 @@ export default function App() {
             onPushStock={handlePushStock}
             onPushOrders={effectivePushOrders}
             onFetchOrders={effectiveFetchOrders}
-            readOnly={!!ENV_SHEETS_URL}
+            readOnly={false}
           />
         )}
         {activeTab === 'machine' && (
