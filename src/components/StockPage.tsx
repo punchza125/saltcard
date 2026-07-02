@@ -277,6 +277,25 @@ function ProductModal({
   const [keyword,     setKeyword]     = useState(initial?.goodsKeyword       ?? '')
   const [category,    setCategory]    = useState(initial?.category           ?? '')
   const [error,       setError]       = useState('')
+  const [showNewCat,  setShowNewCat]  = useState(false)
+  const [newCat,      setNewCat]      = useState('')
+
+  // หมวดหมู่ทั้งหมด = หมวดมาตรฐาน + หมวดที่ผู้ใช้สร้างเองจากสินค้าที่มีอยู่ ('อื่นๆ' อยู่ท้ายเสมอ)
+  const { stock: allStock } = useStockStore()
+  const catChips = useMemo(() => {
+    const set = new Set<string>(CATEGORIES.filter(c => c !== 'อื่นๆ'))
+    allStock.products.forEach(p => { if (p.category && p.category !== 'อื่นๆ') set.add(p.category) })
+    if (category && category !== 'อื่นๆ') set.add(category)
+    return [...set, 'อื่นๆ']
+  }, [allStock.products, category])
+
+  function addNewCat() {
+    const c = newCat.trim()
+    if (!c) return
+    setCategory(c)
+    setNewCat('')
+    setShowNewCat(false)
+  }
 
   const ppb = Number(packsPerBox)
   const hasConversion = ppb > 0
@@ -296,7 +315,7 @@ function ProductModal({
     const q   = hasConversion ? Math.round(qb * ppb + qp) : qp
     const inc = initial?.qtyIncoming ?? 0
     onSave(
-      name.trim(), unit, ppb < 0 ? 0 : ppb, q, inc, y, r, keyword.trim(), category,
+      name.trim(), unit, ppb < 0 ? 0 : ppb, q, inc, y, r, keyword.trim(), category || 'อื่นๆ',
       initial?.buyPricePerBox,
       initial?.sellPricePerPack,
       initial?.sellPricePerBox,
@@ -378,9 +397,11 @@ function ProductModal({
 
           {/* category */}
           <div>
-            <label className="text-[12px] text-brand-dark/60 mb-1.5 block">หมวดหมู่</label>
+            <label className="text-[12px] text-brand-dark/60 mb-1.5 block">
+              หมวดหมู่ <span className="text-brand-dark/30">(ไม่เลือก = อื่นๆ)</span>
+            </label>
             <div className="flex flex-wrap gap-1.5">
-              {CATEGORIES.map(c => (
+              {catChips.map(c => (
                 <button key={c} type="button"
                   onClick={() => setCategory(category === c ? '' : c)}
                   className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
@@ -390,7 +411,30 @@ function ProductModal({
                   }`}
                 >{c}</button>
               ))}
+              <button type="button"
+                onClick={() => setShowNewCat(v => !v)}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-medium border border-dashed transition-all ${
+                  showNewCat
+                    ? 'border-brand-blue text-brand-blue bg-brand-pale/60'
+                    : 'border-brand-blue/30 text-brand-blue/60 hover:border-brand-blue/60 hover:text-brand-blue'
+                }`}
+              >+ เพิ่มเอง</button>
             </div>
+            {showNewCat && (
+              <div className="flex gap-1.5 mt-2">
+                <input
+                  autoFocus
+                  className="flex-1 border border-brand-blue/20 rounded-lg px-3 py-1.5 text-[12px] outline-none focus:border-brand-blue"
+                  value={newCat} onChange={e => setNewCat(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') addNewCat() }}
+                  placeholder="ชื่อหมวดหมู่ใหม่"
+                />
+                <button type="button" onClick={addNewCat} disabled={!newCat.trim()}
+                  className="px-3 py-1.5 rounded-lg bg-brand-blue text-white text-[12px] font-medium disabled:opacity-40 active:scale-95 transition-all">
+                  เพิ่ม
+                </button>
+              </div>
+            )}
           </div>
 
           {/* keyword */}
@@ -1014,7 +1058,12 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
 
       {/* category filter — scrollable */}
       <div className="flex gap-1.5 overflow-x-auto pb-0.5 -mx-1 px-1 scrollbar-none">
-        {(['ทั้งหมด', ...CATEGORIES] as string[]).map(c => {
+        {(() => {
+          // รวมหมวดที่ผู้ใช้สร้างเองเข้าไปในแถบ filter ด้วย ('อื่นๆ' อยู่ท้ายเสมอ)
+          const set = new Set<string>(CATEGORIES.filter(c => c !== 'อื่นๆ'))
+          stock.products.forEach(p => { if (p.category && p.category !== 'อื่นๆ') set.add(p.category) })
+          return ['ทั้งหมด', ...set, 'อื่นๆ']
+        })().map(c => {
           const count = c === 'ทั้งหมด'
             ? stock.products.length
             : stock.products.filter(p => c === 'อื่นๆ' ? (!p.category || p.category === 'อื่นๆ') : p.category === c).length
