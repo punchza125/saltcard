@@ -266,9 +266,6 @@ function ProductModal({
   const [name,        setName]        = useState(initial?.name          ?? '')
   const [unit,        setUnit]        = useState<StockUnit>(initial?.unit ?? 'Box')
   const [packsPerBox, setPacksPerBox] = useState(String(initial?.packsPerBox ?? 24))
-  const [buyPrice,    setBuyPrice]    = useState(String(initial?.buyPricePerBox   ?? ''))
-  const [sellPack,    setSellPack]    = useState(String(initial?.sellPricePerPack ?? ''))
-  const [sellBox,     setSellBox]     = useState(String(initial?.sellPricePerBox  ?? ''))
   // แยกช่อง Box/Pack เพื่อไม่ต้องกรอกทศนิยม เช่น 1 Box 1 Pack
   // 'กำลังมา' ไม่มีช่องกรอกแล้ว — ซิงค์จากระบบติดตามสินค้า (OrdersTab)
   const initPpb  = initial?.packsPerBox ?? 0
@@ -300,9 +297,9 @@ function ProductModal({
     const inc = initial?.qtyIncoming ?? 0
     onSave(
       name.trim(), unit, ppb < 0 ? 0 : ppb, q, inc, y, r, keyword.trim(), category,
-      buyPrice ? Number(buyPrice) : undefined,
-      sellPack ? Number(sellPack) : undefined,
-      sellBox  ? Number(sellBox)  : undefined,
+      initial?.buyPricePerBox,
+      initial?.sellPricePerPack,
+      initial?.sellPricePerBox,
     )
     onClose()
   }
@@ -447,40 +444,6 @@ function ProductModal({
                   value={redAt} onChange={e => setRedAt(e.target.value)}
                 />
                 <p className="text-[10px] text-brand-dark/30 mt-0.5">{boxHint(redAt)}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* ราคาซื้อ-ขาย */}
-          <div className="bg-emerald-50/60 rounded-xl p-3 space-y-2 border border-emerald-100">
-            <p className="text-[11px] text-emerald-700 font-medium">ราคา (สำหรับคำนวณกำไร)</p>
-            <div>
-              <label className="text-[12px] text-brand-dark/60 mb-1 block">ราคาซื้อต่อกล่อง (฿)</label>
-              <input
-                type="number" min={0}
-                className="w-full border border-emerald-200 rounded-lg px-3 py-2 text-[13px] outline-none focus:border-emerald-400"
-                value={buyPrice} onChange={e => setBuyPrice(e.target.value)}
-                placeholder="เช่น 14490"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[12px] text-brand-dark/60 mb-1 block">ราคาขายต่อซอง (฿)</label>
-                <input
-                  type="number" min={0}
-                  className="w-full border border-emerald-200 rounded-lg px-3 py-2 text-[13px] outline-none focus:border-emerald-400"
-                  value={sellPack} onChange={e => setSellPack(e.target.value)}
-                  placeholder="เช่น 350"
-                />
-              </div>
-              <div>
-                <label className="text-[12px] text-brand-dark/60 mb-1 block">ราคาขายต่อกล่อง (฿)</label>
-                <input
-                  type="number" min={0}
-                  className="w-full border border-emerald-200 rounded-lg px-3 py-2 text-[13px] outline-none focus:border-emerald-400"
-                  value={sellBox} onChange={e => setSellBox(e.target.value)}
-                  placeholder="ไม่บังคับ"
-                />
               </div>
             </div>
           </div>
