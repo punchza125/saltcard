@@ -505,279 +505,6 @@ function ProductModal({
   )
 }
 
-// ── LogModal ──────────────────────────────────────────────────────────────────
-type LogMode = 'incoming' | 'received' | 'out' | 'adjust'
-
-// 'สั่งมาแล้ว' / 'ได้รับของแล้ว' ถูกตัดออก — สต็อกซิงค์จากระบบติดตามสินค้า (OrdersTab) แทน
-const LOG_MODES: { key: LogMode; label: string; sub: string; color: string; activeClass: string }[] = [
-  {
-    key: 'out',
-    label: 'จ่ายออก',
-    sub: 'ขาย / ใช้ไป',
-    color: 'text-red-500',
-    activeClass: 'bg-red-500 text-white',
-  },
-  {
-    key: 'adjust',
-    label: 'ปรับยอด',
-    sub: 'ตั้งค่าใหม่',
-    color: 'text-purple-600',
-    activeClass: 'bg-purple-500 text-white',
-  },
-]
-
-function LogModal({
-  product,
-  onLog,
-  onClose,
-}: {
-  product: StockProduct
-  onLog: (delta: number, note: string, kind: LogMode, deductIncoming: boolean) => void
-  onClose: () => void
-}) {
-  const [mode,            setMode]            = useState<LogMode>('out')
-  const [amount,          setAmount]          = useState('1')
-  const [note,            setNote]            = useState('')
-  const [deductIncoming,  setDeductIncoming]  = useState(true)
-  const [adjustTarget,    setAdjustTarget]    = useState<'qty' | 'incoming'>('qty')
-
-  const ppb = product.packsPerBox
-  const hasConversion = ppb > 0
-  const isBoxInput = mode !== 'out' && hasConversion
-  const packCount  = isBoxInput ? Number(amount) * ppb : Number(amount)
-
-  // reset amount to match the target field when entering adjust mode or switching target
-  useEffect(() => {
-    if (mode === 'adjust') {
-      const base = adjustTarget === 'qty' ? product.qty : product.qtyIncoming
-      setAmount(hasConversion ? String(Math.round(base / ppb * 1000) / 1000) : String(base))
-    } else {
-      setAmount('1')
-    }
-  }, [mode, adjustTarget])
-
-  // adjust delta calculation
-  const adjustNewPacks = mode === 'adjust'
-    ? (hasConversion ? Math.round(Number(amount) * ppb) : Number(amount))
-    : 0
-  const adjustCurrentPacks = adjustTarget === 'qty' ? product.qty : product.qtyIncoming
-  const adjustDelta = adjustNewPacks - adjustCurrentPacks
-
-  function handleLog() {
-    if (mode === 'adjust') {
-      if (amount === '' || isNaN(Number(amount))) return
-      if (adjustTarget === 'incoming') {
-        onLog(adjustDelta, note.trim() || 'ปรับยอดกำลังมา', 'incoming', false)
-      } else {
-        onLog(adjustDelta, note.trim(), 'adjust', false)
-      }
-      onClose()
-      return
-    }
-    const n = Number(amount)
-    if (!n || n <= 0) return
-    const delta = mode === 'out' ? -packCount : packCount
-    onLog(delta, note.trim(), mode, deductIncoming)
-    onClose()
-  }
-
-  const modeConfig = LOG_MODES.find(m => m.key === mode)!
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5">
-
-        {/* header */}
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h3 className="font-semibold text-brand-dark text-[15px]">{product.name}</h3>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-[12px] text-brand-dark/50">
-                ในมือ <strong className="text-brand-dark">{formatQty(product.qty, ppb)}</strong>
-              </span>
-              {product.qtyIncoming > 0 && (
-                <span className="text-[12px] text-blue-500">
-                  · กำลังมา <strong>{formatQty(product.qtyIncoming, ppb)}</strong>
-                </span>
-              )}
-            </div>
-          </div>
-          <button onClick={onClose} className="text-brand-dark/40 hover:text-brand-dark mt-0.5"><X size={18} /></button>
-        </div>
-
-        {/* mode selector — card style */}
-        <div className="grid grid-cols-2 gap-2 mb-4">
-          {LOG_MODES.map(m => (
-            <button
-              key={m.key}
-              onClick={() => setMode(m.key)}
-              className={`rounded-xl py-2.5 px-1 text-center transition-all border ${
-                mode === m.key
-                  ? m.activeClass + ' border-transparent shadow-sm'
-                  : 'bg-white border-brand-blue/15 hover:bg-brand-pale/50'
-              }`}
-            >
-              <p className={`text-[12px] font-semibold ${mode === m.key ? 'text-white' : m.color}`}>
-                {m.label}
-              </p>
-              <p className={`text-[10px] mt-0.5 ${mode === m.key ? 'text-white/70' : 'text-brand-dark/40'}`}>
-                {m.sub}
-              </p>
-            </button>
-          ))}
-        </div>
-
-        <div className="space-y-3">
-          {/* adjust mode: show current qty + new qty input + diff */}
-          {mode === 'adjust' ? (
-            <div>
-              {/* toggle: ในมือ / กำลังมา */}
-              <div className="flex bg-brand-pale/60 rounded-xl p-1 mb-3">
-                {(['qty', 'incoming'] as const).map(t => (
-                  <button
-                    key={t}
-                    onClick={() => setAdjustTarget(t)}
-                    className={`flex-1 py-1.5 rounded-lg text-[12px] font-semibold transition-all ${
-                      adjustTarget === t
-                        ? 'bg-white shadow-sm text-purple-600'
-                        : 'text-brand-dark/40'
-                    }`}
-                  >
-                    {t === 'qty' ? 'ในมือ' : 'กำลังมา'}
-                  </button>
-                ))}
-              </div>
-
-              <div className="bg-brand-pale/50 rounded-xl px-4 py-3 mb-3 flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] text-brand-dark/40 mb-0.5">
-                    {adjustTarget === 'qty' ? 'ในมือปัจจุบัน' : 'กำลังมาปัจจุบัน'}
-                  </p>
-                  <p className={`text-[18px] font-bold leading-none ${adjustTarget === 'incoming' ? 'text-blue-600' : 'text-brand-dark'}`}>
-                    {formatQty(adjustCurrentPacks, ppb)}
-                  </p>
-                  {ppb > 0 && <p className="text-[10px] text-brand-dark/30 mt-0.5">{adjustCurrentPacks} Pack</p>}
-                </div>
-                <div className="text-right">
-                  {adjustDelta !== 0 && !isNaN(Number(amount)) && (
-                    <>
-                      <p className={`text-[13px] font-semibold ${adjustDelta > 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                        {adjustDelta > 0 ? '+' : '−'}{ppb > 0 ? formatQty(Math.abs(adjustDelta), ppb) : `${Math.abs(adjustDelta)} Pack`}
-                      </p>
-                      <p className="text-[10px] text-brand-dark/30">{adjustDelta > 0 ? 'เพิ่มขึ้น' : 'ลดลง'}</p>
-                    </>
-                  )}
-                  {adjustDelta === 0 && !isNaN(Number(amount)) && (
-                    <p className="text-[12px] text-brand-dark/30">ไม่มีการเปลี่ยนแปลง</p>
-                  )}
-                </div>
-              </div>
-              <label className="text-[12px] text-brand-dark/60 mb-1 block">
-                {adjustTarget === 'qty' ? 'ยอดในมือที่มีจริง' : 'ยอดกำลังมาที่แท้จริง'} ({hasConversion ? product.unit : 'Pack'})
-              </label>
-              <input
-                type="number" min={0}
-                className="w-full border border-purple-200 focus:border-purple-400 rounded-lg px-3 py-2.5 text-center text-xl font-bold outline-none transition-colors"
-                value={amount}
-                onChange={e => setAmount(e.target.value)}
-              />
-              {hasConversion && Number(amount) >= 0 && (
-                <p className="text-[11px] text-center mt-1 text-brand-dark/40">
-                  = {adjustNewPacks} Pack
-                </p>
-              )}
-            </div>
-          ) : (
-            /* amount for other modes */
-            <div>
-              <label className="text-[12px] text-brand-dark/60 mb-1 block">
-                {mode === 'out' ? 'จำนวน (Pack)' : `จำนวน (${hasConversion ? product.unit : 'Pack'})`}
-              </label>
-              <input
-                type="number" min={1}
-                className={`w-full border rounded-lg px-3 py-2.5 text-center text-xl font-bold outline-none transition-colors ${
-                  mode === 'incoming' ? 'border-blue-200 focus:border-blue-400'
-                  : mode === 'received' ? 'border-emerald-200 focus:border-emerald-400'
-                  : 'border-red-200 focus:border-red-400'
-                }`}
-                value={amount}
-                onChange={e => setAmount(e.target.value)}
-              />
-              {isBoxInput && Number(amount) > 0 && (
-                <p className="text-[11px] text-center mt-1 text-brand-dark/40">
-                  = {packCount} Pack
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* deduct incoming toggle — แสดงเมื่อ mode=received และมีของกำลังมา */}
-          {mode === 'received' && product.qtyIncoming > 0 && (
-            <button
-              onClick={() => setDeductIncoming(v => !v)}
-              className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 border transition-all text-left ${
-                deductIncoming
-                  ? 'bg-blue-50 border-blue-200'
-                  : 'bg-white border-brand-blue/15'
-              }`}
-            >
-              <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
-                deductIncoming ? 'bg-blue-500' : 'border-2 border-brand-dark/20'
-              }`}>
-                {deductIncoming && <Check size={10} className="text-white" />}
-              </div>
-              <div>
-                <p className="text-[12px] font-medium text-brand-dark">
-                  นำมาจากของที่สั่งไว้
-                </p>
-                <p className="text-[10px] text-brand-dark/40">
-                  ตัดออกจาก "กำลังมา" {formatQty(product.qtyIncoming, ppb)} อัตโนมัติ
-                </p>
-              </div>
-            </button>
-          )}
-
-          {/* note */}
-          <div>
-            <label className="text-[12px] text-brand-dark/60 mb-1 block">หมายเหตุ (ไม่บังคับ)</label>
-            <input
-              className="w-full border border-brand-blue/20 rounded-lg px-3 py-2 text-[13px] outline-none focus:border-brand-blue"
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              placeholder={
-                mode === 'incoming' ? 'เช่น Shopee, Tomokazu Kunii'
-                : mode === 'received' ? 'เช่น รับของแล้ว 15 พ.ค.'
-                : 'เช่น Facebook: Ken SY'
-              }
-            />
-          </div>
-        </div>
-
-        <div className="flex gap-2 mt-5">
-          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-brand-blue/20 text-[13px] text-brand-dark/60">
-            ยกเลิก
-          </button>
-          <button
-            onClick={handleLog}
-            className={`flex-1 py-2.5 rounded-lg text-white text-[13px] font-semibold active:scale-95 transition-all flex items-center justify-center gap-1.5 ${
-              mode === 'incoming' ? 'bg-blue-500 hover:bg-blue-600'
-              : mode === 'received' ? 'bg-emerald-500 hover:bg-emerald-600'
-              : mode === 'adjust' ? 'bg-purple-500 hover:bg-purple-600'
-              : 'bg-red-500 hover:bg-red-600'
-            }`}
-          >
-            <Check size={14} />
-            {mode === 'incoming' ? 'บันทึกการสั่ง'
-             : mode === 'received' ? 'ยืนยันรับของ'
-             : mode === 'adjust' ? (adjustTarget === 'incoming' ? 'ยืนยันปรับกำลังมา' : 'ยืนยันปรับยอด')
-             : 'ยืนยันจ่ายออก'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── ProductRow ────────────────────────────────────────────────────────────────
 
 const ENTRY_KIND_LABEL: Record<string, { label: string; color: string }> = {
@@ -801,7 +528,6 @@ function ProductRow({
   resolvedGoodsName,
   onEdit,
   onDelete,
-  onLog,
   onSync,
   pendingSyncCount,
   readOnly,
@@ -811,7 +537,6 @@ function ProductRow({
   resolvedGoodsName: string | null
   onEdit: () => void
   onDelete: () => void
-  onLog: () => void
   onSync: () => void
   pendingSyncCount: number
   readOnly?: boolean
@@ -913,11 +638,6 @@ function ProductRow({
 
         {/* actions */}
         <div className="flex items-center justify-end gap-0.5">
-          {!readOnly && (
-            <button onClick={onLog}
-              className="w-6 h-6 flex items-center justify-center rounded-md bg-brand-pale/80 text-brand-blue hover:bg-brand-blue hover:text-white transition-colors"
-            ><Plus size={12} /></button>
-          )}
           {!readOnly && pendingSyncCount > 0 && (
             <button onClick={onSync}
               className="relative w-6 h-6 flex items-center justify-center rounded-md bg-brand-blue/10 text-brand-blue hover:bg-brand-blue hover:text-white transition-colors"
@@ -1082,7 +802,6 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
 
   const [showAdd,          setShowAdd]          = useState(false)
   const [editTarget,       setEditTarget]       = useState<StockProduct | null>(null)
-  const [logTarget,        setLogTarget]        = useState<StockProduct | null>(null)
   const [filter,           setFilter]           = useState<'all' | 'red' | 'yellow' | 'green'>('all')
   const [catFilter,        setCatFilter]        = useState<string>('ทั้งหมด')
   const [showSync,         setShowSync]         = useState(false)
@@ -1440,7 +1159,6 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
                 resolvedGoodsName={resolveGoodsName(p)}
                 onEdit={() => setEditTarget(p)}
                 onDelete={() => removeProduct(p.id)}
-                onLog={() => setLogTarget(p)}
                 onSync={() => setSyncProduct(p)}
                 pendingSyncCount={pendingForProduct}
                 readOnly={readOnly}
@@ -1467,14 +1185,6 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
           onSave={(name, unit, ppb, qty, inc, yellowAt, redAt, kw, cat, buyPricePerBox, sellPricePerPack, sellPricePerBox) =>
             updateProduct(editTarget.id, { name, unit, packsPerBox: ppb, qty, qtyIncoming: inc, yellowAt, redAt, goodsKeyword: kw, category: cat, buyPricePerBox, sellPricePerPack, sellPricePerBox })}
           onClose={() => setEditTarget(null)}
-        />
-      )}
-      {logTarget && (
-        <LogModal
-          product={logTarget}
-          onLog={(delta, note, kind, deductIncoming) =>
-            logEntry(logTarget.id, delta, note, kind, undefined, deductIncoming)}
-          onClose={() => setLogTarget(null)}
         />
       )}
       {showSync && (
