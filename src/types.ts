@@ -94,6 +94,7 @@ export interface StockStore {
   entries: StockEntry[]
   syncedDates: string[]  // วันที่ที่ sync จากรายงานแล้ว
   taxRate: number        // ภาษี % เช่น 15
+  hiddenCategories?: string[]  // หมวดหมู่ที่ผู้ใช้ลบทิ้ง (ซ่อนจาก chips ทุกที่)
 }
 
 // ── Purchase Order / Shipping Tracking ──────────────────────────────────────

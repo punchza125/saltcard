@@ -278,6 +278,8 @@ function ProductModal({
   initial,
   onSave,
   onClose,
+  hiddenCategories = [],
+  onRemoveCategory,
 }: {
   initial?: StockProduct
   onSave: (
@@ -286,6 +288,8 @@ function ProductModal({
     buyPricePerBox?: number, sellPricePerPack?: number, sellPricePerBox?: number
   ) => void
   onClose: () => void
+  hiddenCategories?: string[]
+  onRemoveCategory?: (name: string) => void
 }) {
   const [name,        setName]        = useState(initial?.name          ?? '')
   // หน่วยที่ซื้อเป็น Box เสมอ — ตัด dropdown ทิ้งแล้ว (สินค้าเก่ายังคงหน่วยเดิม)
@@ -304,15 +308,17 @@ function ProductModal({
   const [error,       setError]       = useState('')
   const [showNewCat,  setShowNewCat]  = useState(false)
   const [newCat,      setNewCat]      = useState('')
+  const [delCatMode,  setDelCatMode]  = useState(false)
 
-  // หมวดหมู่ทั้งหมด = หมวดมาตรฐาน + หมวดที่ผู้ใช้สร้างเองจากสินค้าที่มีอยู่ ('อื่นๆ' อยู่ท้ายเสมอ)
+  // หมวดหมู่ทั้งหมด = หมวดมาตรฐาน + หมวดที่ผู้ใช้สร้างเอง − หมวดที่ลบไปแล้ว ('อื่นๆ' อยู่ท้ายเสมอ)
   const { stock: allStock } = useStockStore()
   const catChips = useMemo(() => {
-    const set = new Set<string>(CATEGORIES.filter(c => c !== 'อื่นๆ'))
-    allStock.products.forEach(p => { if (p.category && p.category !== 'อื่นๆ') set.add(p.category) })
+    const hidden = new Set(hiddenCategories)
+    const set = new Set<string>(CATEGORIES.filter(c => c !== 'อื่นๆ' && !hidden.has(c)))
+    allStock.products.forEach(p => { if (p.category && p.category !== 'อื่นๆ' && !hidden.has(p.category)) set.add(p.category) })
     if (category && category !== 'อื่นๆ') set.add(category)
     return [...set, 'อื่นๆ']
-  }, [allStock.products, category])
+  }, [allStock.products, category, hiddenCategories])
 
   function addNewCat() {
     const c = newCat.trim()
@@ -320,6 +326,13 @@ function ProductModal({
     setCategory(c)
     setNewCat('')
     setShowNewCat(false)
+  }
+
+  function handleDeleteCat(c: string) {
+    if (!onRemoveCategory) return
+    if (!confirm(`ลบหมวด "${c}"? สินค้าในหมวดนี้จะย้ายไป "อื่นๆ"`)) return
+    onRemoveCategory(c)
+    if (category === c) setCategory('')
   }
 
   const ppb = Number(packsPerBox)
@@ -401,24 +414,44 @@ function ProductModal({
               หมวดหมู่ <span className="font-normal normal-case text-brand-dark/30">(ไม่เลือก = อื่นๆ)</span>
             </label>
             <div className="flex flex-wrap gap-1.5 mt-1.5">
-              {catChips.map(c => (
-                <button key={c} type="button"
-                  onClick={() => setCategory(category === c ? '' : c)}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
-                    category === c
-                      ? 'bg-brand-blue text-white border-transparent'
-                      : 'bg-white text-brand-dark/60 border-brand-blue/20 hover:border-brand-blue/40'
+              {catChips.map(c => {
+                const deletable = delCatMode && c !== 'อื่นๆ'
+                return (
+                  <button key={c} type="button"
+                    onClick={() => deletable ? handleDeleteCat(c) : setCategory(category === c ? '' : c)}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all flex items-center gap-1 ${
+                      deletable
+                        ? 'bg-red-50 text-red-500 border-red-200 hover:bg-red-100'
+                        : category === c
+                          ? 'bg-brand-blue text-white border-transparent'
+                          : 'bg-white text-brand-dark/60 border-brand-blue/20 hover:border-brand-blue/40'
+                    }`}
+                  >
+                    {c}
+                    {deletable && <X size={10} />}
+                  </button>
+                )
+              })}
+              {!delCatMode && (
+                <button type="button"
+                  onClick={() => setShowNewCat(v => !v)}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium border border-dashed transition-all ${
+                    showNewCat
+                      ? 'border-brand-blue text-brand-blue bg-brand-pale/60'
+                      : 'border-brand-blue/30 text-brand-blue/60 hover:border-brand-blue/60 hover:text-brand-blue'
                   }`}
-                >{c}</button>
-              ))}
-              <button type="button"
-                onClick={() => setShowNewCat(v => !v)}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-medium border border-dashed transition-all ${
-                  showNewCat
-                    ? 'border-brand-blue text-brand-blue bg-brand-pale/60'
-                    : 'border-brand-blue/30 text-brand-blue/60 hover:border-brand-blue/60 hover:text-brand-blue'
-                }`}
-              >+ เพิ่มเอง</button>
+                >+ เพิ่มเอง</button>
+              )}
+              {onRemoveCategory && (
+                <button type="button"
+                  onClick={() => { setDelCatMode(v => !v); setShowNewCat(false) }}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium border border-dashed transition-all ${
+                    delCatMode
+                      ? 'border-red-400 text-red-500 bg-red-50'
+                      : 'border-red-200 text-red-300 hover:border-red-400 hover:text-red-500'
+                  }`}
+                >{delCatMode ? 'เสร็จสิ้น' : '− ลบหมวด'}</button>
+              )}
             </div>
             {showNewCat && (
               <div className="flex gap-1.5 mt-2">
@@ -816,7 +849,7 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
   const { orders } = useOrderStore()
   const pendingOrderCount = orders.filter(o => o.status !== 'received').length
   const {
-    stock, addProduct, updateProduct, removeProduct, logEntry,
+    stock, addProduct, updateProduct, removeProduct, removeCategory, logEntry,
     previewSync, applySync, previewSyncProduct, applySyncProduct,
     getPendingDates, resetSyncedDates,
     previewInventorySnapshot, applyInventorySnapshot,
@@ -1136,9 +1169,10 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
       {/* category filter — wrap ลงหลายบรรทัดเมื่อหมวดเยอะ */}
       <div className="flex flex-wrap gap-1.5">
         {(() => {
-          // รวมหมวดที่ผู้ใช้สร้างเองเข้าไปในแถบ filter ด้วย ('อื่นๆ' อยู่ท้ายเสมอ)
-          const set = new Set<string>(CATEGORIES.filter(c => c !== 'อื่นๆ'))
-          stock.products.forEach(p => { if (p.category && p.category !== 'อื่นๆ') set.add(p.category) })
+          // รวมหมวดที่ผู้ใช้สร้างเอง − หมวดที่ลบไปแล้ว ('อื่นๆ' อยู่ท้ายเสมอ)
+          const hidden = new Set(stock.hiddenCategories ?? [])
+          const set = new Set<string>(CATEGORIES.filter(c => c !== 'อื่นๆ' && !hidden.has(c)))
+          stock.products.forEach(p => { if (p.category && p.category !== 'อื่นๆ' && !hidden.has(p.category)) set.add(p.category) })
           return ['ทั้งหมด', ...set, 'อื่นๆ']
         })().map(c => {
           const count = c === 'ทั้งหมด'
@@ -1255,6 +1289,8 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
             schedulePushStock()
           }}
           onClose={() => setShowAdd(false)}
+          hiddenCategories={stock.hiddenCategories ?? []}
+          onRemoveCategory={c => { removeCategory(c); schedulePushStock() }}
         />
       )}
       {editTarget && (
@@ -1265,6 +1301,8 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
             schedulePushStock()
           }}
           onClose={() => setEditTarget(null)}
+          hiddenCategories={stock.hiddenCategories ?? []}
+          onRemoveCategory={c => { removeCategory(c); schedulePushStock() }}
         />
       )}
       {showSync && (

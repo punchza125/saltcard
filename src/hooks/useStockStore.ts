@@ -68,7 +68,12 @@ export function useStockStore() {
       id: crypto.randomUUID(),
       name, unit, packsPerBox, qty, qtyIncoming: 0, yellowAt, redAt, goodsKeyword, category,
     }
-    setStock(s => ({ ...s, products: [...s.products, product] }))
+    setStock(s => ({
+      ...s,
+      products: [...s.products, product],
+      // ใช้หมวดนี้อีกครั้ง = ปลดซ่อน
+      hiddenCategories: (s.hiddenCategories ?? []).filter(c => c !== category),
+    }))
     return product.id
   }
 
@@ -76,6 +81,9 @@ export function useStockStore() {
     setStock(s => ({
       ...s,
       products: s.products.map(p => p.id === id ? { ...p, ...patch } : p),
+      hiddenCategories: patch.category
+        ? (s.hiddenCategories ?? []).filter(c => c !== patch.category)
+        : s.hiddenCategories,
     }))
   }
 
@@ -298,9 +306,18 @@ export function useStockStore() {
     setStock(s => ({ ...s, taxRate: rate }))
   }
 
+  // ลบหมวดหมู่: ย้ายสินค้าในหมวดไป 'อื่นๆ' และซ่อนชื่อหมวดถาวร (ซิงค์ผ่าน Sheet)
+  function removeCategory(name: string) {
+    setStock(s => ({
+      ...s,
+      products: s.products.map(p => p.category === name ? { ...p, category: 'อื่นๆ' } : p),
+      hiddenCategories: Array.from(new Set([...(s.hiddenCategories ?? []), name])),
+    }))
+  }
+
   return {
     stock,
-    addProduct, updateProduct, removeProduct, logEntry,
+    addProduct, updateProduct, removeProduct, removeCategory, logEntry,
     previewSync, applySync, previewSyncProduct, applySyncProduct,
     getPendingDates, resetSyncedDates,
     previewInventorySnapshot, applyInventorySnapshot,
