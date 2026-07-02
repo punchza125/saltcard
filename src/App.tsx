@@ -94,9 +94,17 @@ export default function App() {
   useEffect(() => {
     if (didAutoFetch.current || !sheetsUrl) return
     didAutoFetch.current = true
+    // สต๊อก/หน้าตู้ดึงสดเสมอทุกเครื่อง (ทั้ง deploy และ local) เพราะแก้ไขได้จากหลายที่
+    fetchStock().then(raw => {
+      if (!raw) return
+      try { replaceStock(JSON.parse(raw)) } catch {}
+    })
+    fetchMachine().then(raw => {
+      if (!raw) return
+      try { setSheetsMachine(JSON.parse(raw)) } catch {}
+    })
     if (ENV_SHEETS_URL) {
       // รายงานยอดขาย: ถ้า cache ยังไม่เก่าและมีข้อมูลอยู่แล้ว → ข้ามการดึง
-      // แต่สต๊อก/หน้าตู้ดึงสดเสมอ เพราะแก้ไขได้จากหลายเครื่อง
       if (isCacheStale() || store.reports.length === 0) {
         fetchAll().then(fresh => {
           if (fresh?.length) {
@@ -106,14 +114,6 @@ export default function App() {
           }
         })
       }
-      fetchStock().then(raw => {
-        if (!raw) return
-        try { replaceStock(JSON.parse(raw)) } catch {}
-      })
-      fetchMachine().then(raw => {
-        if (!raw) return
-        try { setSheetsMachine(JSON.parse(raw)) } catch {}
-      })
     } else if (store.reports.length === 0) {
       fetchAll().then(reports => {
         if (reports?.length) reports.forEach(addReport)
