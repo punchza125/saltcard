@@ -443,14 +443,17 @@ function ProductModal({
                 >+ เพิ่มเอง</button>
               )}
               {onRemoveCategory && (
-                <button type="button"
-                  onClick={() => { setDelCatMode(v => !v); setShowNewCat(false) }}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium border border-dashed transition-all ${
-                    delCatMode
-                      ? 'border-red-400 text-red-500 bg-red-50'
-                      : 'border-red-200 text-red-300 hover:border-red-400 hover:text-red-500'
-                  }`}
-                >{delCatMode ? 'เสร็จสิ้น' : '− ลบหมวด'}</button>
+                delCatMode ? (
+                  <button type="button"
+                    onClick={() => setDelCatMode(false)}
+                    className="px-3 py-1 rounded-full text-[11px] font-semibold bg-brand-blue text-white flex items-center gap-1 active:scale-95 transition-all"
+                  ><Check size={11} /> เสร็จสิ้น</button>
+                ) : (
+                  <button type="button"
+                    onClick={() => { setDelCatMode(true); setShowNewCat(false) }}
+                    className="px-2.5 py-1 rounded-full text-[11px] font-medium border border-dashed border-red-200 text-red-300 hover:border-red-400 hover:text-red-500 transition-all"
+                  >− ลบหมวด</button>
+                )
               )}
             </div>
             {showNewCat && (
