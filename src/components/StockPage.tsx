@@ -795,6 +795,7 @@ interface StockPageProps {
   isOrdersEnv?: boolean
   onSaveOrdersUrl?: (url: string) => void
   onPushStock?: (s: object) => Promise<boolean>
+  onFetchStock?: () => Promise<string | null>
   onPushOrders?: (orders: PurchaseOrder[]) => Promise<boolean>
   onFetchOrders?: () => Promise<PurchaseOrder[] | null>
   readOnly?: boolean
@@ -867,7 +868,7 @@ function SubTabBar({ active, onChange, pendingCount }: {
   )
 }
 
-export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, onSaveOrdersUrl, onPushStock, onPushOrders, onFetchOrders, readOnly }: StockPageProps) {
+export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, onSaveOrdersUrl, onPushStock, onFetchStock, onPushOrders, onFetchOrders, readOnly }: StockPageProps) {
   const [stockTab, setStockTab] = useState<'stock' | 'orders'>('stock')
   const { orders } = useOrderStore()
   const pendingOrderCount = orders.filter(o => o.status !== 'received').length
@@ -876,8 +877,21 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
     previewSync, applySync, previewSyncProduct, applySyncProduct,
     getPendingDates, resetSyncedDates,
     previewInventorySnapshot, applyInventorySnapshot,
-    getStatus, getEntries, setTaxRate,
+    getStatus, getEntries, setTaxRate, replaceAll: replaceStock,
   } = useStockStore()
+
+  // ดึงสต๊อกล่าสุดจาก Sheet ทุกครั้งที่เข้าหน้านี้ กัน device อื่นแก้แล้วไม่เห็น
+  const [initialLoading, setInitialLoading] = useState(!!onFetchStock)
+  useEffect(() => {
+    if (!onFetchStock) return
+    let cancelled = false
+    onFetchStock().then(raw => {
+      if (cancelled) return
+      if (raw) { try { replaceStock(JSON.parse(raw)) } catch {} }
+      setInitialLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [])
 
   const [showAdd,          setShowAdd]          = useState(false)
   const [editTarget,       setEditTarget]       = useState<StockProduct | null>(null)
@@ -942,6 +956,18 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
             <p className="text-[14px] font-semibold text-emerald-600">บันทึกแล้ว</p>
           </>
         )}
+      </div>
+    </div>
+  ) : null
+
+  // popup กลางจอตอนกำลังโหลดสต๊อกล่าสุดจาก Sheet (แสดงตอนเข้าหน้านี้ครั้งแรกเท่านั้น)
+  const loadOverlay = initialLoading ? (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30">
+      <div className="bg-white rounded-2xl shadow-2xl px-10 py-7 flex flex-col items-center gap-3 animate-pop-in">
+        <img src="/pic/mickyGif.gif" alt="loading" className="w-24 h-24 object-contain" />
+        <p className="text-[14px] font-semibold text-brand-dark flex items-center gap-1.5">
+          <Loader2 size={14} className="animate-spin text-brand-blue" /> กำลังโหลดข้อมูลล่าสุด...
+        </p>
       </div>
     </div>
   ) : null
@@ -1057,6 +1083,7 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
             schedulePushStock()
           }} />
         {saveOverlay}
+        {loadOverlay}
       </>
     )
   }
@@ -1065,6 +1092,7 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
     <>
     <SubTabBar active={stockTab} onChange={setStockTab} pendingCount={pendingOrderCount} />
     {saveOverlay}
+    {loadOverlay}
     <div className="max-w-2xl mx-auto px-4 py-5 space-y-4">
 
       {/* sync banner — เจ้าของเท่านั้น */}

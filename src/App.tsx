@@ -193,6 +193,7 @@ export default function App() {
             isOrdersEnv={ordersSheets.isEnvConfigured}
             onSaveOrdersUrl={ordersSheets.saveUrl}
             onPushStock={handlePushStock}
+            onFetchStock={fetchStock}
             onPushOrders={effectivePushOrders}
             onFetchOrders={effectiveFetchOrders}
             readOnly={false}
