@@ -10,7 +10,6 @@ import { formatThaiDate, parseInventoryReport } from '../utils/parser'
 import OrdersTab from './OrdersTab'
 import { useOrderStore } from '../hooks/useOrderStore'
 
-const UNITS: StockUnit[] = ['Box', 'Pack', 'Carton', 'ชิ้น']
 
 const CATEGORIES = ['One Piece', 'Dragon Ball', 'Naruto', 'Pokémon', 'อื่นๆ'] as const
 
@@ -264,7 +263,8 @@ function ProductModal({
   onClose: () => void
 }) {
   const [name,        setName]        = useState(initial?.name          ?? '')
-  const [unit,        setUnit]        = useState<StockUnit>(initial?.unit ?? 'Box')
+  // หน่วยที่ซื้อเป็น Box เสมอ — ตัด dropdown ทิ้งแล้ว (สินค้าเก่ายังคงหน่วยเดิม)
+  const unit: StockUnit = initial?.unit ?? 'Box'
   const [packsPerBox, setPacksPerBox] = useState(String(initial?.packsPerBox ?? 24))
   // แยกช่อง Box/Pack เพื่อไม่ต้องกรอกทศนิยม เช่น 1 Box 1 Pack
   // 'กำลังมา' ไม่มีช่องกรอกแล้ว — ซิงค์จากระบบติดตามสินค้า (OrdersTab)
@@ -324,25 +324,14 @@ function ProductModal({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[12px] text-brand-dark/60 mb-1 block">หน่วยที่ซื้อ</label>
-              <select
-                className="w-full border border-brand-blue/20 rounded-lg px-3 py-2 text-[13px] outline-none focus:border-brand-blue bg-white"
-                value={unit} onChange={e => setUnit(e.target.value as StockUnit)}
-              >
-                {UNITS.map(u => <option key={u}>{u}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-[12px] text-brand-dark/60 mb-1 block">Pack ต่อ 1 {unit}</label>
-              <input
-                type="number" min={0}
-                className="w-full border border-brand-blue/20 rounded-lg px-3 py-2 text-[13px] outline-none focus:border-brand-blue"
-                value={packsPerBox} onChange={e => setPacksPerBox(e.target.value)}
-                placeholder="0 = ไม่แปลง"
-              />
-            </div>
+          <div>
+            <label className="text-[12px] text-brand-dark/60 mb-1 block">Pack ต่อ 1 {unit}</label>
+            <input
+              type="number" min={0}
+              className="w-full border border-brand-blue/20 rounded-lg px-3 py-2 text-[13px] outline-none focus:border-brand-blue"
+              value={packsPerBox} onChange={e => setPacksPerBox(e.target.value)}
+              placeholder="0 = ไม่แปลง"
+            />
           </div>
 
           {hasConversion && (
