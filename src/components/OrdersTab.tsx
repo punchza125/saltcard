@@ -2,9 +2,9 @@ import React, { useState, useRef, useEffect } from 'react'
 import {
   Plus, Package, CheckCircle2, Clock, Truck,
   ChevronDown, X, Pencil, Trash2, Search,
-  Cloud, CloudOff, RefreshCw, Loader2, Copy, ExternalLink, Check,
+  Cloud, CloudOff, RefreshCw, Loader2, Copy, ExternalLink, Check, Plane,
 } from 'lucide-react'
-import type { PurchaseOrder, OrderItem, OrderStatus, StockProduct, OrderMember, CarrierId } from '../types'
+import type { PurchaseOrder, OrderItem, OrderStatus, StockProduct, OrderMember, CarrierId, ShipMethod } from '../types'
 import { ORDER_MEMBERS, CARRIERS } from '../types'
 import { useOrderStore } from '../hooks/useOrderStore'
 import { formatThaiDate } from '../utils/parser'
@@ -32,6 +32,7 @@ function CreateOrderModal({
 }) {
   const [orderedBy, setOrderedBy] = useState<OrderMember | undefined>(initial?.orderedBy)
   const [supplier, setSupplier] = useState(initial?.supplier ?? '')
+  const [shipMethod, setShipMethod] = useState<ShipMethod | undefined>(initial?.shipMethod)
   const [notes,    setNotes]    = useState(initial?.notes ?? '')
   const [items,    setItems]    = useState<OrderItem[]>(
     initial?.items ?? [{ name: '', qty: 1, unit: 'Box' }]
@@ -71,7 +72,7 @@ function CreateOrderModal({
 
   function handleSave() {
     const validItems = items.filter(it => it.name.trim() && it.qty > 0)
-    onSave({ orderedBy, supplier: supplier.trim() || undefined, notes: notes.trim() || undefined, items: validItems })
+    onSave({ orderedBy, supplier: supplier.trim() || undefined, shipMethod, notes: notes.trim() || undefined, items: validItems })
     onClose()
   }
 
@@ -120,6 +121,29 @@ function CreateOrderModal({
               placeholder="ชื่อ supplier (ไม่บังคับ)"
               className="mt-1.5 w-full border border-brand-blue/15 rounded-xl px-3 py-2.5 text-[13px] outline-none focus:border-brand-blue"
             />
+          </div>
+
+          {/* ship method */}
+          <div>
+            <label className="text-[11px] font-semibold text-brand-dark/40 uppercase tracking-wider">แหล่งที่มา</label>
+            <div className="flex gap-2 mt-1.5">
+              <button type="button"
+                onClick={() => setShipMethod(undefined)}
+                className={`flex-1 py-2 rounded-xl text-[13px] font-semibold transition-all ${
+                  !shipMethod
+                    ? 'bg-brand-blue text-white shadow-sm shadow-brand-blue/30'
+                    : 'bg-brand-pale text-brand-dark/60 hover:bg-brand-blue/10'
+                }`}
+              >ในประเทศ</button>
+              <button type="button"
+                onClick={() => setShipMethod('air')}
+                className={`flex-1 py-2 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                  shipMethod === 'air'
+                    ? 'bg-sky-500 text-white shadow-sm shadow-sky-500/30'
+                    : 'bg-brand-pale text-brand-dark/60 hover:bg-sky-50'
+                }`}
+              ><Plane size={13} /> นำเข้าทางเครื่องบิน</button>
+            </div>
           </div>
 
           {/* items */}
@@ -339,6 +363,11 @@ function OrderCard({
           <span className={`text-[10px] font-bold flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border flex-shrink-0 ${meta.bg} ${meta.color}`}>
             {meta.icon} {meta.label}
           </span>
+          {order.shipMethod === 'air' && (
+            <span className="text-[10px] font-bold flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border border-sky-200 bg-sky-50 text-sky-600 flex-shrink-0">
+              <Plane size={10} /> เครื่องบิน
+            </span>
+          )}
           <span className="text-[10px] text-brand-dark/40 truncate">
             {formatThaiDate(order.createdAt)}
             {order.orderedBy && <span className="text-brand-blue/70 font-medium"> · {order.orderedBy}</span>}
@@ -436,6 +465,7 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
 }) {
   const { orders, addOrder, updateOrder, setTracking, markReceived, deleteOrder, replaceAll } = useOrderStore()
   const [filter,      setFilter]      = useState<FilterTab>('all')
+  const [airOnly,     setAirOnly]     = useState(false)
   const [showCreate,  setShowCreate]  = useState(false)
   const [editOrder,   setEditOrder]   = useState<PurchaseOrder | null>(null)
   const [trackOrder,  setTrackOrder]  = useState<PurchaseOrder | null>(null)
@@ -496,6 +526,7 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
   const isPending = (o: PurchaseOrder) => o.status === 'ordered' || o.status === 'in_transit'
 
   const filtered = orders.filter(o => {
+    if (airOnly && o.shipMethod !== 'air') return false
     if (filter === 'received') return o.status === 'received'
     if (filter === 'pending') return isPending(o)
     return isPending(o) // 'all' แสดงเฉพาะรอรับ ไม่รวมรับแล้ว
@@ -635,21 +666,32 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
       </div>
 
       {/* filter tabs */}
-      <div className="flex gap-1 bg-brand-pale/50 p-1 rounded-xl mb-4">
-        {TABS.map(tab => (
-          <button key={tab.id} onClick={() => setFilter(tab.id)}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all ${
-              filter === tab.id ? 'bg-white text-brand-dark shadow-sm' : 'text-brand-dark/50 hover:text-brand-dark'
-            }`}
-          >
-            {tab.label}
-            {tab.count > 0 && (
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                filter === tab.id ? 'bg-brand-blue text-white' : 'bg-brand-dark/10 text-brand-dark/50'
-              }`}>{tab.count}</span>
-            )}
-          </button>
-        ))}
+      <div className="flex items-center gap-2 mb-4">
+        <div className="flex gap-1 bg-brand-pale/50 p-1 rounded-xl flex-1">
+          {TABS.map(tab => (
+            <button key={tab.id} onClick={() => setFilter(tab.id)}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all ${
+                filter === tab.id ? 'bg-white text-brand-dark shadow-sm' : 'text-brand-dark/50 hover:text-brand-dark'
+              }`}
+            >
+              {tab.label}
+              {tab.count > 0 && (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                  filter === tab.id ? 'bg-brand-blue text-white' : 'bg-brand-dark/10 text-brand-dark/50'
+                }`}>{tab.count}</span>
+              )}
+            </button>
+          ))}
+        </div>
+        <button onClick={() => setAirOnly(v => !v)}
+          className={`flex-shrink-0 flex items-center gap-1 px-3 py-2 rounded-xl text-[12px] font-medium border transition-all ${
+            airOnly
+              ? 'bg-sky-500 text-white border-transparent'
+              : 'bg-white text-brand-dark/50 border-brand-blue/15 hover:border-sky-300 hover:text-sky-500'
+          }`}
+        >
+          <Plane size={13} /> เครื่องบิน
+        </button>
       </div>
 
       {/* order list */}

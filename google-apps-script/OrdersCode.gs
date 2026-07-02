@@ -10,7 +10,7 @@ const ITEMS_SHEET  = 'order_items'
 
 const ORDER_HEADERS = [
   'id', 'createdAt', 'orderedBy', 'supplier', 'status',
-  'carrier', 'trackingNumber', 'receivedAt', 'notes', 'updatedAt',
+  'carrier', 'trackingNumber', 'receivedAt', 'notes', 'updatedAt', 'shipMethod',
 ]
 const ITEM_HEADERS = [
   'orderId', 'productId', 'name', 'qty', 'unit',
@@ -29,6 +29,13 @@ function getSheet(name, headers) {
       .setBackground('#1a1a2e')
       .setFontColor('#ffffff')
     sheet.setFrozenRows(1)
+    return sheet
+  }
+  // migrate: เติม header คอลัมน์ใหม่ที่ยังไม่มีในชีทเก่า (เช่น shipMethod)
+  const existing = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0]
+  const missing = headers.filter(h => existing.indexOf(h) === -1)
+  if (missing.length > 0) {
+    sheet.getRange(1, existing.length + 1, 1, missing.length).setValues([missing])
   }
   return sheet
 }
@@ -122,6 +129,7 @@ function doGet(e) {
         carrier:        o.carrier   || undefined,
         trackingNumber: o.trackingNumber || undefined,
         receivedAt:     o.receivedAt    || undefined,
+        shipMethod:     o.shipMethod    || undefined,
         items: items
           .filter(it => String(it.orderId) === String(o.id))
           .map(it => ({
@@ -177,6 +185,7 @@ function saveAllOrders(orders) {
     const orderRows = orders.map(o => [
       o.id, o.createdAt, o.orderedBy || '', o.supplier || '', o.status,
       o.carrier || '', o.trackingNumber || '', o.receivedAt || '', o.notes || '', now,
+      o.shipMethod || '',
     ])
     orderSheet.getRange(2, 1, orderRows.length, ORDER_HEADERS.length).setValues(orderRows)
 

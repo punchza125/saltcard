@@ -124,6 +124,8 @@ export type OrderStatus = 'ordered' | 'in_transit' | 'received'
 export const ORDER_MEMBERS = ['Punch', 'Tai', 'Ranger', 'Mark'] as const
 export type OrderMember = typeof ORDER_MEMBERS[number]
 
+export type ShipMethod = 'domestic' | 'air'
+
 export interface PurchaseOrder {
   id: string
   createdAt: string       // ISO date
@@ -133,6 +135,7 @@ export interface PurchaseOrder {
   items: OrderItem[]
   carrier?: CarrierId
   trackingNumber?: string
+  shipMethod?: ShipMethod // 'air' = สั่งนำเข้าทางเครื่องบิน, ไม่ระบุ = ในประเทศ
   status: OrderStatus
   receivedAt?: string
 }
