@@ -233,7 +233,7 @@ export default function App() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className="flex-1 flex flex-col items-center justify-center pt-1 pb-2 relative"
+              className="flex-1 flex flex-col items-center justify-center pt-1.5 pb-1 relative"
             >
               <div className={`absolute top-0 left-3 right-3 h-0.5 rounded-full transition-all ${isActive ? 'bg-brand-blue' : 'bg-transparent'}`} />
               <div className={`rounded-xl px-4 py-1 mb-0.5 transition-all ${isActive ? 'bg-brand-blue/10' : ''}`}>

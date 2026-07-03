@@ -605,7 +605,7 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
 
       {/* toast มุมขวาล่างตอนกำลังซิงค์ (ดึงข้อมูล) — ไม่บล็อกหน้าจอ */}
       {syncing && !saving && (
-        <div className="fixed bottom-4 right-4 z-[60] animate-pop-in">
+        <div className="fixed right-4 z-[60] animate-pop-in bottom-[calc(env(safe-area-inset-bottom,0px)+5rem)] md:bottom-4">
           <div className="bg-white rounded-2xl shadow-xl border border-brand-blue/10 pl-3 pr-4 py-2.5 flex items-center gap-2.5">
             <img src="/pic/mickyGif.gif" alt="syncing" className="w-9 h-9 object-contain flex-shrink-0" />
             <p className="text-[12px] font-semibold text-brand-dark flex items-center gap-1.5">
