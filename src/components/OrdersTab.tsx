@@ -509,13 +509,20 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
     })
   }, [])
 
+  // saving = กำลัง push การแก้ไขขึ้น Sheet (แยกจาก syncing ซึ่งรวมการดึงข้อมูลตอนเปิดหน้า)
+  const [saving,     setSaving]     = useState(false)
+  const [savedFlash, setSavedFlash] = useState(false)
+
   async function pushOrders(latest: PurchaseOrder[]) {
     if (!onPush) return
-    setSyncing(true); setSyncError(false)
+    setSyncing(true); setSyncError(false); setSaving(true)
     const ok = await onPush(latest)
-    setSyncing(false)
-    if (ok) setLastSync(new Date().toLocaleTimeString('th-TH'))
-    else setSyncError(true)
+    setSyncing(false); setSaving(false)
+    if (ok) {
+      setLastSync(new Date().toLocaleTimeString('th-TH'))
+      setSavedFlash(true)
+      setTimeout(() => setSavedFlash(false), 900)
+    } else setSyncError(true)
   }
 
   function withSync(mutation: () => PurchaseOrder[]) {
@@ -545,6 +552,30 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
 
   return (
     <div className="px-4 md:px-6 py-4 max-w-2xl mx-auto">
+
+      {/* popup กลางจอระหว่างบันทึกการแก้ไขขึ้น Google Sheet */}
+      {(saving || savedFlash) && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-2xl shadow-2xl px-10 py-7 flex flex-col items-center gap-3 animate-pop-in">
+            {saving ? (
+              <>
+                <img src="/pic/doraemonGif.gif" alt="saving" className="w-24 h-24 object-contain" />
+                <p className="text-[14px] font-semibold text-brand-dark flex items-center gap-1.5">
+                  <Loader2 size={14} className="animate-spin text-brand-blue" /> กำลังบันทึกข้อมูล...
+                </p>
+                <p className="text-[11px] text-brand-dark/40">กรุณาอย่าเพิ่งปิดหน้านี้</p>
+              </>
+            ) : (
+              <>
+                <div className="w-11 h-11 rounded-full bg-emerald-100 flex items-center justify-center">
+                  <Check size={24} className="text-emerald-500" />
+                </div>
+                <p className="text-[14px] font-semibold text-emerald-600">บันทึกแล้ว</p>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Sync status banner */}
       {sheetsConnected && (
