@@ -33,11 +33,21 @@ export function useOrdersSheets() {
     if (!u) return false
     setSyncing(true); setSyncError(false)
     try {
-      // Send via GET param — GAS POST redirects to GET and loses the body
-      const data = encodeURIComponent(JSON.stringify(orders))
-      const res = await fetch(`${u}?action=save&data=${data}`)
-      const json = await res.json()
-      if (!json.ok) { setSyncError(true); return false }
+      // ส่งแบบ POST body ก่อน — GET แบบเดิมพังเมื่อ orders เยอะ/โน้ตยาว เพราะ URL ยาวเกิน limit
+      let ok = false
+      try {
+        const res = await fetch(`${u}?action=save`, { method: 'POST', body: JSON.stringify(orders) })
+        const json = await res.json()
+        ok = json.ok === true
+      } catch { ok = false }
+      if (!ok) {
+        // fallback: GET param แบบเดิม (เผื่อ deployment เก่า)
+        const data = encodeURIComponent(JSON.stringify(orders))
+        const res = await fetch(`${u}?action=save&data=${data}`)
+        const json = await res.json()
+        ok = json.ok === true
+      }
+      if (!ok) { setSyncError(true); return false }
       setLastSync(new Date().toLocaleTimeString('th-TH'))
       return true
     } catch {
