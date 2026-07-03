@@ -32,9 +32,10 @@
       min-height: 0;
       overflow: hidden;
     }
+    /* ห้ามใส่ -webkit-overflow-scrolling: touch — มันสร้าง stacking context บน iOS
+       ทำให้ modal (position: fixed) ใน main ถูกกดอยู่ใต้ header/nav */
     main {
       overscroll-behavior-y: contain;
-      -webkit-overflow-scrolling: touch;
     }
   }
 }

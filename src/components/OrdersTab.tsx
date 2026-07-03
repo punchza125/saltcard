@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Plus, Package, CheckCircle2, Clock, Truck,
   ChevronDown, X, Pencil, Trash2, Search,
@@ -96,8 +97,8 @@ function CreateOrderModal({
 
   const vv = useVisualViewport()
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/40">
+  return createPortal((
+    <div className="fixed inset-0 z-[100] bg-black/40">
       <div className="absolute inset-x-0 flex items-end md:items-center justify-center"
         style={vv ? { top: vv.top, height: vv.height } : { top: 0, height: '100%' }}>
       <div className="bg-white w-full md:max-w-lg rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[90vh] flex flex-col"
@@ -292,7 +293,7 @@ function CreateOrderModal({
       </div>
       </div>
     </div>
-  )
+  ), document.body)
 }
 
 // ── TrackingModal ─────────────────────────────────────────────────────────────
@@ -306,8 +307,8 @@ function TrackingModal({ order, onClose, onSave }: {
   const [tracking, setTracking] = useState(order.trackingNumber ?? '')
   const vv = useVisualViewport()
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/40">
+  return createPortal((
+    <div className="fixed inset-0 z-[100] bg-black/40">
       <div className="absolute inset-x-0 flex items-end md:items-center justify-center"
         style={vv ? { top: vv.top, height: vv.height } : { top: 0, height: '100%' }}>
       <div className="bg-white w-full md:max-w-sm rounded-t-3xl md:rounded-2xl shadow-2xl p-5 overflow-y-auto"
@@ -354,7 +355,7 @@ function TrackingModal({ order, onClose, onSave }: {
       </div>
       </div>
     </div>
-  )
+  ), document.body)
 }
 
 // ── OrderCard ────────────────────────────────────────────────────────────────
