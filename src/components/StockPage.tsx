@@ -13,6 +13,9 @@ import { useOrderStore } from '../hooks/useOrderStore'
 
 const CATEGORIES = ['One Piece', 'Dragon Ball', 'Naruto', 'Pokémon', 'อื่นๆ'] as const
 
+// ธงบอกว่ามีการแก้สต๊อกในเครื่องที่ยัง push ขึ้น Sheet ไม่สำเร็จ — กัน mount-fetch ดึงของเก่ามาทับ
+const STOCK_DIRTY_KEY = 'saltcard_stock_dirty'
+
 const STATUS_STYLE = {
   empty:  { dot: 'bg-gray-400',    badge: 'bg-gray-100 text-gray-500 border-gray-300',              label: 'หมดแล้ว',     card: 'bg-gray-50 border-gray-200',    header: 'bg-gray-100/60' },
   red:    { dot: 'bg-red-500',     badge: 'bg-red-50 text-red-600 border-red-200',                  label: 'กำลังจะหมด', card: 'bg-red-50/40 border-red-200',   header: 'bg-red-50/60' },
@@ -920,9 +923,16 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
   }, [orders, stock.products])
 
   // ดึงสต๊อกล่าสุดจาก Sheet ทุกครั้งที่เข้าหน้านี้ กัน device อื่นแก้แล้วไม่เห็น
+  // ยกเว้น: ถ้ามีการแก้ในเครื่องที่ยัง push ไม่สำเร็จ (dirty) จะไม่ดึงมาทับ — กันของที่เพิ่งรับหาย
   const [initialLoading, setInitialLoading] = useState(!!onFetchStock)
   useEffect(() => {
     if (!onFetchStock) return
+    if (localStorage.getItem(STOCK_DIRTY_KEY)) {
+      // มีการแก้ที่ยังไม่ได้บันทึกขึ้น Sheet → เก็บของในเครื่องไว้ แล้ว push ให้เสร็จแทน
+      setInitialLoading(false)
+      schedulePushStock()
+      return
+    }
     let cancelled = false
     onFetchStock().then(raw => {
       if (cancelled) return
@@ -955,7 +965,7 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
     const ok = await onPushStock(stock)  // ส่ง stock จาก instance นี้โดยตรง
     setPushOk(ok)
     setPushing(false)
-    if (ok) flashSaved()
+    if (ok) { flashSaved(); try { localStorage.removeItem(STOCK_DIRTY_KEY) } catch {} }
     setTimeout(() => setPushOk(null), 3000)
   }
 
@@ -965,12 +975,14 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
   useEffect(() => { stockRef.current = stock }, [stock])
   function schedulePushStock() {
     if (!onPushStock) return
+    // ทำ dirty ทันที (ก่อน push) — ถ้าหน้า remount ระหว่างรอ push จะไม่ถูกดึงของเก่ามาทับ
+    try { localStorage.setItem(STOCK_DIRTY_KEY, String(Date.now())) } catch {}
     setTimeout(async () => {
       setPushing(true)
       const ok = await onPushStock(stockRef.current)
       setPushOk(ok)
       setPushing(false)
-      if (ok) flashSaved()
+      if (ok) { flashSaved(); try { localStorage.removeItem(STOCK_DIRTY_KEY) } catch {} }
       setTimeout(() => setPushOk(null), 3000)
     }, 400)
   }
