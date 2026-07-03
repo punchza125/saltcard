@@ -36,6 +36,14 @@ function useVisualViewport(): { height: number; top: number } | null {
   return vv
 }
 
+// ระหว่างเปิด modal ให้ body มีคลาส modal-open (ใช้ซ่อน bottom nav ตอนคีย์บอร์ดเปิด)
+function useModalBodyClass() {
+  useEffect(() => {
+    document.body.classList.add('modal-open')
+    return () => document.body.classList.remove('modal-open')
+  }, [])
+}
+
 // ── CreateOrderModal ──────────────────────────────────────────────────────────
 
 function CreateOrderModal({
@@ -96,6 +104,7 @@ function CreateOrderModal({
   }
 
   const vv = useVisualViewport()
+  useModalBodyClass()
 
   return createPortal((
     <div className="fixed inset-0 z-[100] bg-black/40">
@@ -306,6 +315,7 @@ function TrackingModal({ order, onClose, onSave }: {
   const [carrier,  setCarrier]  = useState<CarrierId>(order.carrier ?? 'kerry')
   const [tracking, setTracking] = useState(order.trackingNumber ?? '')
   const vv = useVisualViewport()
+  useModalBodyClass()
 
   return createPortal((
     <div className="fixed inset-0 z-[100] bg-black/40">

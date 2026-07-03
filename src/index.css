@@ -37,6 +37,10 @@
     main {
       overscroll-behavior-y: contain;
     }
+    /* ซ่อน bottom nav ตอน modal เปิด — กันมันแทรกระหว่างปุ่มบันทึกกับคีย์บอร์ด */
+    body.modal-open [data-bottom-nav] {
+      display: none;
+    }
   }
 }
 

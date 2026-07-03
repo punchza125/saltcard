@@ -224,8 +224,8 @@ export default function App() {
         )}
       </main>
 
-      {/* Bottom nav — normal flow (ไม่ fixed) อยู่ใต้ main เสมอ */}
-      <nav className="md:hidden flex-shrink-0 bg-white border-t border-brand-blue/10 flex"
+      {/* Bottom nav — normal flow (ไม่ fixed) อยู่ใต้ main เสมอ; ซ่อนเมื่อมี modal เปิด (body.modal-open) */}
+      <nav data-bottom-nav className="md:hidden flex-shrink-0 bg-white border-t border-brand-blue/10 flex"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         {NAV_ITEMS.map(({ tab, label, Icon }) => {
           const isActive = activeTab === tab
