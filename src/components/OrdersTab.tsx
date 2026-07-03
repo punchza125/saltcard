@@ -553,6 +553,18 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
   return (
     <div className="px-4 md:px-6 py-4 max-w-2xl mx-auto">
 
+      {/* toast มุมขวาล่างตอนกำลังซิงค์ (ดึงข้อมูล) — ไม่บล็อกหน้าจอ */}
+      {syncing && !saving && (
+        <div className="fixed bottom-4 right-4 z-[60] animate-pop-in">
+          <div className="bg-white rounded-2xl shadow-xl border border-brand-blue/10 pl-3 pr-4 py-2.5 flex items-center gap-2.5">
+            <img src="/pic/mickyGif.gif" alt="syncing" className="w-9 h-9 object-contain flex-shrink-0" />
+            <p className="text-[12px] font-semibold text-brand-dark flex items-center gap-1.5">
+              <Loader2 size={12} className="animate-spin text-brand-blue" /> กำลังซิงค์ข้อมูล...
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* popup กลางจอระหว่างบันทึกการแก้ไขขึ้น Google Sheet */}
       {(saving || savedFlash) && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30">
