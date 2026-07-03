@@ -960,13 +960,13 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
     </div>
   ) : null
 
-  // popup กลางจอตอนกำลังโหลดสต๊อกล่าสุดจาก Sheet (แสดงตอนเข้าหน้านี้ครั้งแรกเท่านั้น)
+  // toast มุมขวาล่างตอนกำลังโหลดสต๊อกล่าสุดจาก Sheet — ไม่บล็อกหน้าจอ ใช้งานต่อได้เลย
   const loadOverlay = initialLoading ? (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30">
-      <div className="bg-white rounded-2xl shadow-2xl px-10 py-7 flex flex-col items-center gap-3 animate-pop-in">
-        <img src="/pic/mickyGif.gif" alt="loading" className="w-24 h-24 object-contain" />
-        <p className="text-[14px] font-semibold text-brand-dark flex items-center gap-1.5">
-          <Loader2 size={14} className="animate-spin text-brand-blue" /> กำลังโหลดข้อมูลล่าสุด...
+    <div className="fixed bottom-4 right-4 z-[60] animate-pop-in">
+      <div className="bg-white rounded-2xl shadow-xl border border-brand-blue/10 pl-3 pr-4 py-2.5 flex items-center gap-2.5">
+        <img src="/pic/mickyGif.gif" alt="loading" className="w-9 h-9 object-contain flex-shrink-0" />
+        <p className="text-[12px] font-semibold text-brand-dark flex items-center gap-1.5">
+          <Loader2 size={12} className="animate-spin text-brand-blue" /> กำลังโหลดข้อมูลล่าสุด...
         </p>
       </div>
     </div>
