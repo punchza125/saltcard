@@ -19,6 +19,24 @@
     align-items: stretch;
     background: #f0f4fb;
   }
+
+  /* มือถือ: ล็อกไม่ให้ body เลื่อน — เลื่อนได้เฉพาะใน <main> กัน bottom nav ลอยตอนนิ้วโดนขอบจอ */
+  @media (max-width: 767px) {
+    html, body {
+      overflow: hidden;
+      height: 100%;
+      overscroll-behavior: none;
+    }
+    #root {
+      height: 100dvh;
+      min-height: 0;
+      overflow: hidden;
+    }
+    main {
+      overscroll-behavior-y: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+  }
 }
 
 @layer utilities {
