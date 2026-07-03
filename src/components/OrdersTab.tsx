@@ -122,7 +122,12 @@ function CreateOrderModal({
           </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-5 pb-4 space-y-4">
+        <div className="overflow-y-auto flex-1 px-5 pb-4 space-y-4"
+          onFocusCapture={e => {
+            // เลื่อนช่องที่โฟกัสให้ขึ้นมาอยู่กลางพื้นที่ที่มองเห็น หลังคีย์บอร์ดเด้งขึ้น
+            const el = e.target as HTMLElement
+            setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 300)
+          }}>
 
           {/* ordered by */}
           <div>
