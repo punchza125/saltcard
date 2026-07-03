@@ -628,8 +628,11 @@ function ProductRow({
   const status      = getStatus(product)
   const style       = STATUS_STYLE[status]
   const ppb         = product.packsPerBox
-  const hasIncoming = product.qtyIncoming > 0
-  const total       = product.qty + product.qtyIncoming
+  // "รับมา" ยึดจากออเดอร์ที่ยังรอรับเป็นหลัก (self-healing) ถ้าไม่มีค่อย fallback ไปยอดที่เก็บไว้
+  const orderIncoming = (incomingDetail?.air ?? 0) + (incomingDetail?.domestic ?? 0)
+  const incomingPacks = orderIncoming > 0 ? orderIncoming : product.qtyIncoming
+  const hasIncoming = incomingPacks > 0
+  const total       = product.qty + incomingPacks
   const [open, setOpen] = useState(false)
   const [imgIdx, setImgIdx] = useState(0)
   const imgCandidates = useMemo(() => {
@@ -646,7 +649,7 @@ function ProductRow({
 
   const barMax = Math.max(total, product.yellowAt + (ppb > 0 ? ppb : 1))
   const qtyPct = Math.min((product.qty / barMax) * 100, 100)
-  const incPct = Math.min((product.qtyIncoming / barMax) * 100, 100 - qtyPct)
+  const incPct = Math.min((incomingPacks / barMax) * 100, 100 - qtyPct)
 
   return (
     <div className={`rounded-xl border overflow-hidden transition-colors flex flex-col ${style.card}`}>
@@ -707,7 +710,7 @@ function ProductRow({
                 </span>
               )}
               {/* ยอดค้างเก่าที่ไม่มี order รอรับผูกอยู่ — แสดงรวมแบบไม่ระบุช่องทาง */}
-              {(incomingDetail?.air ?? 0) === 0 && (incomingDetail?.domestic ?? 0) === 0 && (
+              {orderIncoming === 0 && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-md">
                   <Package2 size={10} /> +{formatQty(product.qtyIncoming, ppb)} มา
                 </span>
