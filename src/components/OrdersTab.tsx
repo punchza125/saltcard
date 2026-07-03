@@ -17,18 +17,22 @@ const STATUS_META: Record<OrderStatus, { label: string; color: string; bg: strin
   received:   { label: 'รับแล้ว',     color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200', icon: <CheckCircle2 size={10} /> },
 }
 
-// ความสูง viewport จริงตอนคีย์บอร์ดมือถือเปิด — ใช้หด modal ให้ปุ่มบันทึกไม่โดนบัง
-function useVisualViewportHeight(): number | null {
-  const [h, setH] = useState<number | null>(null)
+// ขนาด/ตำแหน่ง viewport จริงตอนคีย์บอร์ดมือถือเปิด — ใช้วาง modal ให้ปุ่มบันทึกไม่โดนบัง
+function useVisualViewport(): { height: number; top: number } | null {
+  const [vv, setVv] = useState<{ height: number; top: number } | null>(null)
   useEffect(() => {
-    const vv = window.visualViewport
-    if (!vv) return
-    const upd = () => setH(vv.height)
+    const v = window.visualViewport
+    if (!v) return
+    const upd = () => setVv({ height: v.height, top: v.offsetTop })
     upd()
-    vv.addEventListener('resize', upd)
-    return () => vv.removeEventListener('resize', upd)
+    v.addEventListener('resize', upd)
+    v.addEventListener('scroll', upd)
+    return () => {
+      v.removeEventListener('resize', upd)
+      v.removeEventListener('scroll', upd)
+    }
   }, [])
-  return h
+  return vv
 }
 
 // ── CreateOrderModal ──────────────────────────────────────────────────────────
@@ -90,13 +94,14 @@ function CreateOrderModal({
     onClose()
   }
 
-  const vvH = useVisualViewportHeight()
+  const vv = useVisualViewport()
 
   return (
-    <div className="fixed inset-x-0 top-0 z-50 flex items-end md:items-center justify-center bg-black/40"
-      style={{ height: vvH ?? '100%' }}>
+    <div className="fixed inset-0 z-50 bg-black/40">
+      <div className="absolute inset-x-0 flex items-end md:items-center justify-center"
+        style={vv ? { top: vv.top, height: vv.height } : { top: 0, height: '100%' }}>
       <div className="bg-white w-full md:max-w-lg rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[90vh] flex flex-col"
-        style={vvH ? { maxHeight: vvH * 0.96 } : undefined}>
+        style={vv ? { maxHeight: vv.height * 0.96 } : undefined}>
         {/* header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3 flex-shrink-0">
           <p className="text-[15px] font-bold text-brand-dark">
@@ -285,6 +290,7 @@ function CreateOrderModal({
           </button>
         </div>
       </div>
+      </div>
     </div>
   )
 }
@@ -298,13 +304,14 @@ function TrackingModal({ order, onClose, onSave }: {
 }) {
   const [carrier,  setCarrier]  = useState<CarrierId>(order.carrier ?? 'kerry')
   const [tracking, setTracking] = useState(order.trackingNumber ?? '')
-  const vvH = useVisualViewportHeight()
+  const vv = useVisualViewport()
 
   return (
-    <div className="fixed inset-x-0 top-0 z-50 flex items-end md:items-center justify-center bg-black/40"
-      style={{ height: vvH ?? '100%' }}>
+    <div className="fixed inset-0 z-50 bg-black/40">
+      <div className="absolute inset-x-0 flex items-end md:items-center justify-center"
+        style={vv ? { top: vv.top, height: vv.height } : { top: 0, height: '100%' }}>
       <div className="bg-white w-full md:max-w-sm rounded-t-3xl md:rounded-2xl shadow-2xl p-5 overflow-y-auto"
-        style={vvH ? { maxHeight: vvH * 0.96 } : undefined}>
+        style={vv ? { maxHeight: vv.height * 0.96 } : undefined}>
         <div className="flex items-center justify-between mb-4">
           <p className="text-[14px] font-bold text-brand-dark">ใส่เลข Tracking</p>
           <button onClick={onClose} className="w-8 h-8 rounded-full bg-brand-pale flex items-center justify-center">
@@ -344,6 +351,7 @@ function TrackingModal({ order, onClose, onSave }: {
         >
           บันทึก Tracking
         </button>
+      </div>
       </div>
     </div>
   )
