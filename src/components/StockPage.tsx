@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import {
   Plus, Pencil, Trash2, ArrowUp, ArrowDown,
   ChevronDown, ChevronUp, X, Check, RefreshCw, AlertTriangle, Upload, Cloud, CloudOff,
-  Package2, BarChart2, Truck, Loader2,
+  Package2, BarChart2, Truck, Loader2, Plane,
 } from 'lucide-react'
 import type { StockProduct, StockUnit, DayReport, PurchaseOrder } from '../types'
 import { useStockStore, type SyncPreviewItem, type InventorySnapshotItem } from '../hooks/useStockStore'
@@ -611,6 +611,7 @@ function ProductRow({
   pendingSyncCount,
   readOnly,
   taxRate,
+  incomingDetail,
 }: {
   product: StockProduct
   resolvedGoodsName: string | null
@@ -620,6 +621,8 @@ function ProductRow({
   pendingSyncCount: number
   readOnly?: boolean
   taxRate: number
+  // ยอดกำลังมาแยกตามช่องทาง (หน่วย pack) คำนวณจาก order ที่ยังไม่กดรับ
+  incomingDetail?: { air: number; domestic: number }
 }) {
   const { getStatus } = useStockStore()
   const status      = getStatus(product)
@@ -686,15 +689,30 @@ function ProductRow({
           )}
         </div>
 
-        {/* qty — fixed height area */}
-        <div className="mb-1.5 h-[2.5em]">
+        {/* qty */}
+        <div className="mb-1.5 min-h-[2.5em]">
           <p className={`text-[16px] font-bold leading-tight ${status === 'empty' ? 'text-gray-400' : 'text-brand-dark'}`}>
             {formatQty(product.qty, ppb)}
           </p>
           {hasIncoming && (
-            <p className="text-[10px] text-blue-500 font-medium mt-0.5">
-              +{formatQty(product.qtyIncoming, ppb)} มา
-            </p>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {(incomingDetail?.air ?? 0) > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-600 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded-md">
+                  <Plane size={10} /> +{formatQty(incomingDetail!.air, ppb)}
+                </span>
+              )}
+              {(incomingDetail?.domestic ?? 0) > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-md">
+                  <Truck size={10} /> +{formatQty(incomingDetail!.domestic, ppb)}
+                </span>
+              )}
+              {/* ยอดค้างเก่าที่ไม่มี order รอรับผูกอยู่ — แสดงรวมแบบไม่ระบุช่องทาง */}
+              {(incomingDetail?.air ?? 0) === 0 && (incomingDetail?.domestic ?? 0) === 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-md">
+                  <Package2 size={10} /> +{formatQty(product.qtyIncoming, ppb)} มา
+                </span>
+              )}
+            </div>
           )}
         </div>
 
@@ -879,6 +897,24 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
     previewInventorySnapshot, applyInventorySnapshot,
     getStatus, getEntries, setTaxRate, replaceAll: replaceStock,
   } = useStockStore()
+
+  // ยอดกำลังมาของแต่ละสินค้า แยกเครื่องบิน/ในประเทศ (หน่วย pack) จาก order ที่ยังไม่กดรับ
+  const incomingByProduct = useMemo(() => {
+    const map = new Map<string, { air: number; domestic: number }>()
+    orders.filter(o => o.status !== 'received').forEach(o => {
+      o.items.forEach(it => {
+        if (!it.productId) return
+        const p = stock.products.find(pp => pp.id === it.productId)
+        if (!p) return
+        const packs = it.unit === 'Box' && p.packsPerBox > 0 ? it.qty * p.packsPerBox : it.qty
+        const cur = map.get(it.productId) ?? { air: 0, domestic: 0 }
+        if (o.shipMethod === 'air') cur.air += packs
+        else cur.domestic += packs
+        map.set(it.productId, cur)
+      })
+    })
+    return map
+  }, [orders, stock.products])
 
   // ดึงสต๊อกล่าสุดจาก Sheet ทุกครั้งที่เข้าหน้านี้ กัน device อื่นแก้แล้วไม่เห็น
   const [initialLoading, setInitialLoading] = useState(!!onFetchStock)
@@ -1327,6 +1363,7 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
                 pendingSyncCount={pendingForProduct}
                 readOnly={readOnly}
                 taxRate={stock.taxRate}
+                incomingDetail={incomingByProduct.get(p.id)}
               />
             )
           })}
