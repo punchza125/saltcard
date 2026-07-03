@@ -17,6 +17,20 @@ const STATUS_META: Record<OrderStatus, { label: string; color: string; bg: strin
   received:   { label: 'รับแล้ว',     color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200', icon: <CheckCircle2 size={10} /> },
 }
 
+// ความสูง viewport จริงตอนคีย์บอร์ดมือถือเปิด — ใช้หด modal ให้ปุ่มบันทึกไม่โดนบัง
+function useVisualViewportHeight(): number | null {
+  const [h, setH] = useState<number | null>(null)
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const upd = () => setH(vv.height)
+    upd()
+    vv.addEventListener('resize', upd)
+    return () => vv.removeEventListener('resize', upd)
+  }, [])
+  return h
+}
+
 // ── CreateOrderModal ──────────────────────────────────────────────────────────
 
 function CreateOrderModal({
@@ -76,9 +90,13 @@ function CreateOrderModal({
     onClose()
   }
 
+  const vvH = useVisualViewportHeight()
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40">
-      <div className="bg-white w-full md:max-w-lg rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-x-0 top-0 z-50 flex items-end md:items-center justify-center bg-black/40"
+      style={{ height: vvH ?? '100%' }}>
+      <div className="bg-white w-full md:max-w-lg rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[90vh] flex flex-col"
+        style={vvH ? { maxHeight: vvH * 0.96 } : undefined}>
         {/* header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3 flex-shrink-0">
           <p className="text-[15px] font-bold text-brand-dark">
@@ -210,9 +228,14 @@ function CreateOrderModal({
                   <div className="flex items-center gap-2 px-3 py-2 border-t border-brand-blue/8 bg-brand-pale/20">
                     <span className="text-[11px] text-brand-dark/40 w-8">จำนวน</span>
                     <input
-                      type="number" min="1"
-                      value={item.qty}
-                      onChange={e => setItem(i, { qty: Math.max(1, +e.target.value) })}
+                      type="number" min="1" inputMode="numeric"
+                      value={item.qty === 0 ? '' : item.qty}
+                      onFocus={e => e.target.select()}
+                      onChange={e => {
+                        const v = e.target.value
+                        // ปล่อยให้ลบจนว่างได้ (เก็บเป็น 0 ชั่วคราว) — ไม่งั้นพิมพ์ 2 จะกลายเป็น 12
+                        setItem(i, { qty: v === '' ? 0 : Math.max(0, Math.floor(Number(v)) || 0) })
+                      }}
                       className="w-16 text-center border border-brand-blue/15 rounded-lg px-2 py-1 text-[13px] font-semibold outline-none focus:border-brand-blue"
                     />
                     <select
@@ -275,10 +298,13 @@ function TrackingModal({ order, onClose, onSave }: {
 }) {
   const [carrier,  setCarrier]  = useState<CarrierId>(order.carrier ?? 'kerry')
   const [tracking, setTracking] = useState(order.trackingNumber ?? '')
+  const vvH = useVisualViewportHeight()
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40">
-      <div className="bg-white w-full md:max-w-sm rounded-t-3xl md:rounded-2xl shadow-2xl p-5">
+    <div className="fixed inset-x-0 top-0 z-50 flex items-end md:items-center justify-center bg-black/40"
+      style={{ height: vvH ?? '100%' }}>
+      <div className="bg-white w-full md:max-w-sm rounded-t-3xl md:rounded-2xl shadow-2xl p-5 overflow-y-auto"
+        style={vvH ? { maxHeight: vvH * 0.96 } : undefined}>
         <div className="flex items-center justify-between mb-4">
           <p className="text-[14px] font-bold text-brand-dark">ใส่เลข Tracking</p>
           <button onClick={onClose} className="w-8 h-8 rounded-full bg-brand-pale flex items-center justify-center">
