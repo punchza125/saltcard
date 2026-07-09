@@ -82,19 +82,28 @@ export function useSheets(config: SheetsConfig | null) {
   }, [config])
 
   const pushStock = useCallback(async (stockData: object): Promise<boolean> => {
-    if (!config?.url) return false
+    if (!config?.url) return true  // ไม่ได้ตั้ง Sheet = โหมด local อย่างเดียว ถือว่าบันทึกในเครื่องสำเร็จ
     const s = stockData as any
-    const payload = { products: s.products ?? [], syncedDates: s.syncedDates ?? [], entries: [] }
+    const products = s.products ?? []
+    const payload = { products, syncedDates: s.syncedDates ?? [], entries: [] }
+    // ลายเซ็นของยอด (id→qty→incoming) ไว้ verify ว่าที่ลง Sheet ตรงกับที่ push จริง
+    const sig = (list: any[]) => list
+      .map(p => `${p.id}:${p.qty}:${p.qtyIncoming ?? 0}`)
+      .sort().join('|')
+    const wantSig = sig(products)
     try {
       await fetch(`${config.url}?action=saveStock`, {
         method: 'POST',
         body: JSON.stringify(payload),
       })
-    } catch {}
+    } catch { return false }
+    // verify: fetch กลับมาแล้วเทียบยอดทุกตัวว่าตรงกับที่ push
     try {
       const vRes = await fetch(`${config.url}?action=fetchStock`)
       const rv = await vRes.json()
-      return rv.ok === true && rv.data != null
+      if (rv.ok !== true || rv.data == null) return false
+      const saved = JSON.parse(rv.data)
+      return sig(saved.products ?? []) === wantSig
     } catch { return false }
   }, [config])
 

@@ -952,45 +952,68 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
   const [selectedSyncDates, setSelectedSyncDates] = useState<Set<string>>(new Set())
   const [pushing,          setPushing]          = useState(false)
   const [pushOk,           setPushOk]           = useState<boolean | null>(null)
+  const [pushError,        setPushError]        = useState(false)
 
   const [savedFlash, setSavedFlash] = useState(false)
   function flashSaved() {
     setSavedFlash(true)
-    setTimeout(() => setSavedFlash(false), 900)
-  }
-
-  async function handlePushStock() {
-    if (!onPushStock) return
-    setPushing(true)
-    const ok = await onPushStock(stock)  // ส่ง stock จาก instance นี้โดยตรง
-    setPushOk(ok)
-    setPushing(false)
-    if (ok) { flashSaved(); try { localStorage.removeItem(STOCK_DIRTY_KEY) } catch {} }
-    setTimeout(() => setPushOk(null), 3000)
+    setTimeout(() => setSavedFlash(false), 1200)
   }
 
   // push อัตโนมัติหลังแก้ไข — ใช้ ref เพื่ออ่าน stock ล่าสุดหลัง state settle
-  // (จำเป็นสำหรับเวอร์ชัน deploy ที่โหลดทับจาก Sheets ทุกครั้งที่เปิด)
   const stockRef = useRef(stock)
   useEffect(() => { stockRef.current = stock }, [stock])
+
+  // นับ generation ของการเปลี่ยนแปลง — ถ้ามีแก้ใหม่ระหว่าง push จะ push ซ้ำให้ครบ
+  const pushGenRef  = useRef(0)
+  const pushingRef  = useRef(false)
+
   function schedulePushStock() {
     if (!onPushStock) return
-    // ทำ dirty ทันที (ก่อน push) — ถ้าหน้า remount ระหว่างรอ push จะไม่ถูกดึงของเก่ามาทับ
+    pushGenRef.current += 1
+    // ทำ dirty ทันที — ถ้าหน้า remount ระหว่างรอ push จะไม่ถูกดึงของเก่ามาทับ
     try { localStorage.setItem(STOCK_DIRTY_KEY, String(Date.now())) } catch {}
-    setTimeout(async () => {
-      setPushing(true)
-      const ok = await onPushStock(stockRef.current)
-      setPushOk(ok)
-      setPushing(false)
-      if (ok) { flashSaved(); try { localStorage.removeItem(STOCK_DIRTY_KEY) } catch {} }
-      setTimeout(() => setPushOk(null), 3000)
-    }, 400)
+    runPush()
   }
 
-  // popup กลางจอระหว่างบันทึกขึ้น Google Sheet (แสดงทั้ง tab สต็อกและติดตามสินค้า)
-  const saveOverlay = (pushing || savedFlash) ? (
+  // push แบบเชื่อถือได้: รอ state settle → push พร้อม retry 3 ครั้ง → verify ผ่าน onPushStock
+  // (onPushStock จะ fetch กลับมาเช็คว่าข้อมูลลง Sheet จริง) → ถ้ามีแก้ใหม่ระหว่างทางจะ push ซ้ำ
+  async function runPush() {
+    if (!onPushStock || pushingRef.current) return
+    pushingRef.current = true
+    setPushing(true); setPushError(false)
+    await new Promise(r => setTimeout(r, 250)) // ให้ setState ของ logEntry commit ก่อน
+    let ok = false
+    // loop: push จนกว่าจะสำเร็จและไม่มีการเปลี่ยนแปลงใหม่ค้างอยู่
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const gen = pushGenRef.current
+      ok = false
+      for (let attempt = 0; attempt < 3 && !ok; attempt++) {
+        if (attempt > 0) await new Promise(r => setTimeout(r, 500 * attempt))
+        ok = await onPushStock(stockRef.current)
+      }
+      if (!ok) break                          // retry ครบแล้วยังพลาด → แจ้ง error
+      if (pushGenRef.current === gen) break    // ไม่มีการเปลี่ยนใหม่ → เสร็จ
+      // มีแก้ใหม่ระหว่าง push → วนบันทึกอีกรอบ
+    }
+    pushingRef.current = false
+    setPushing(false)
+    if (ok) {
+      setPushOk(true); flashSaved()
+      try { localStorage.removeItem(STOCK_DIRTY_KEY) } catch {}
+      setTimeout(() => setPushOk(null), 3000)
+    } else {
+      setPushError(true)   // ค้าง popup ให้กดลองใหม่ ไม่หายเงียบ
+    }
+  }
+
+  function handlePushStock() { schedulePushStock() }
+
+  // popup กลางจอระหว่าง/หลังบันทึกขึ้น Google Sheet (แสดงทั้ง tab สต็อกและติดตามสินค้า)
+  const saveOverlay = (pushing || savedFlash || pushError) ? (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30">
-      <div className="bg-white rounded-2xl shadow-2xl px-10 py-7 flex flex-col items-center gap-3 animate-pop-in">
+      <div className="bg-white rounded-2xl shadow-2xl px-10 py-7 flex flex-col items-center gap-3 animate-pop-in max-w-[300px] text-center">
         {pushing ? (
           <>
             <img src="/pic/doraemonGif.gif" alt="saving" className="w-24 h-24 object-contain" />
@@ -999,12 +1022,26 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
             </p>
             <p className="text-[11px] text-brand-dark/40">กรุณาอย่าเพิ่งปิดหน้านี้</p>
           </>
+        ) : pushError ? (
+          <>
+            <div className="w-11 h-11 rounded-full bg-red-100 flex items-center justify-center">
+              <CloudOff size={22} className="text-red-500" />
+            </div>
+            <p className="text-[14px] font-semibold text-red-600">บันทึกไม่สำเร็จ</p>
+            <p className="text-[11px] text-brand-dark/50 leading-relaxed">
+              การเปลี่ยนแปลงยังอยู่ในเครื่องแต่ยังไม่ขึ้น Google Sheet — เช็คอินเทอร์เน็ตแล้วกดลองใหม่
+            </p>
+            <button onClick={() => runPush()}
+              className="mt-1 px-5 py-2 rounded-xl bg-brand-blue text-white text-[13px] font-semibold active:scale-95 transition-all flex items-center gap-1.5">
+              <RefreshCw size={13} /> ลองบันทึกใหม่
+            </button>
+          </>
         ) : (
           <>
             <div className="w-11 h-11 rounded-full bg-emerald-100 flex items-center justify-center">
               <Check size={24} className="text-emerald-500" />
             </div>
-            <p className="text-[14px] font-semibold text-emerald-600">บันทึกแล้ว</p>
+            <p className="text-[14px] font-semibold text-emerald-600">บันทึกขึ้น Google Sheet แล้ว</p>
           </>
         )}
       </div>
