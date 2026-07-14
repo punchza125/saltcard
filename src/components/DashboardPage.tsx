@@ -16,6 +16,7 @@ interface DashboardPageProps {
   setActiveBranch: (s: string) => void
   syncStatus?: 'idle' | 'syncing' | 'success' | 'error'
   lastSynced?: string
+  categoryAliases?: Record<string, string>  // ย้าย/รวมหมวด → remap ยอดขายในกราฟ
 }
 
 function calcDayProfit(report: DayReport, products: StockProduct[], taxRate: number) {
@@ -69,7 +70,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   )
 }
 
-export default function DashboardPage({ reports, stockProducts = [], taxRate = 15, activeBranch, setActiveBranch, syncStatus, lastSynced }: DashboardPageProps) {
+export default function DashboardPage({ reports, stockProducts = [], taxRate = 15, activeBranch, setActiveBranch, syncStatus, lastSynced, categoryAliases = {} }: DashboardPageProps) {
   // Reports are already filtered by branch at App level — always use area totals here
   const selectedSite = 'ทั้งหมด'
   const [rangeMode, setRangeMode] = useState<RangeMode>('day')
@@ -252,17 +253,25 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
     return Array.from(map.values()).sort((a, b) => activeGoodsTab === 'amount' ? b.amount - a.amount : b.volume - a.volume)
   }, [filteredReports, activeGoodsTab])
 
+  // remap หมวดผ่าน alias (รองรับ chain เช่น A→B→C) กัน loop ด้วยลิมิตรอบ
+  const resolveType = (t: string) => {
+    let cur = t
+    for (let i = 0; i < 10 && categoryAliases[cur] && categoryAliases[cur] !== cur; i++) cur = categoryAliases[cur]
+    return cur
+  }
+
   const goodsTypeData = useMemo(() => {
     const map = new Map<string, { name: string; value: number }>()
     filteredReports.forEach(r => {
       r.goods.forEach(g => {
-        const ex = map.get(g.goodsType)
+        const type = resolveType(g.goodsType)
+        const ex = map.get(type)
         if (ex) ex.value += g.salesVolume
-        else map.set(g.goodsType, { name: g.goodsType, value: g.salesVolume })
+        else map.set(type, { name: type, value: g.salesVolume })
       })
     })
     return Array.from(map.values()).sort((a, b) => b.value - a.value)
-  }, [filteredReports])
+  }, [filteredReports, categoryAliases])
 
   const sitesData = useMemo(() => {
     const map = new Map<string, { name: string; amount: number; volume: number }>()

@@ -85,7 +85,12 @@ export function useSheets(config: SheetsConfig | null) {
     if (!config?.url) return true  // ไม่ได้ตั้ง Sheet = โหมด local อย่างเดียว ถือว่าบันทึกในเครื่องสำเร็จ
     const s = stockData as any
     const products = s.products ?? []
-    const payload = { products, syncedDates: s.syncedDates ?? [], entries: [] }
+    const payload = {
+      products, syncedDates: s.syncedDates ?? [], entries: [],
+      hiddenCategories: s.hiddenCategories ?? [],
+      categoryAliases: s.categoryAliases ?? {},
+      taxRate: s.taxRate,
+    }
     // ลายเซ็นของยอด (id→qty→incoming) ไว้ verify ว่าที่ลง Sheet ตรงกับที่ push จริง
     const sig = (list: any[]) => list
       .map(p => `${p.id}:${p.qty}:${p.qtyIncoming ?? 0}`)

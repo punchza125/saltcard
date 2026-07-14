@@ -316,14 +316,24 @@ export function useStockStore() {
   }
 
   // รวม/ย้ายหมวด: สินค้าในหมวด from → ไปหมวด to แล้วซ่อนชื่อ from
+  // บันทึก alias (from → to) ไว้ remap ยอดขายในกราฟด้วย และยุบ chain (ถ้าเคยมี x→from ให้กลายเป็น x→to)
   function mergeCategory(from: string, to: string) {
     if (from === to) return
-    setStock(s => ({
-      ...s,
-      products: s.products.map(p => p.category === from ? { ...p, category: to } : p),
-      // ปลายทางต้องไม่ถูกซ่อน, ต้นทางถูกซ่อน
-      hiddenCategories: Array.from(new Set([...(s.hiddenCategories ?? []).filter(c => c !== to), from])),
-    }))
+    setStock(s => {
+      const aliases: Record<string, string> = { ...(s.categoryAliases ?? {}) }
+      aliases[from] = to
+      for (const k of Object.keys(aliases)) {
+        if (aliases[k] === from) aliases[k] = to
+      }
+      // ป้องกัน to ชี้ไปหาตัวเอง/วน
+      if (aliases[to] === to) delete aliases[to]
+      return {
+        ...s,
+        products: s.products.map(p => p.category === from ? { ...p, category: to } : p),
+        hiddenCategories: Array.from(new Set([...(s.hiddenCategories ?? []).filter(c => c !== to), from])),
+        categoryAliases: aliases,
+      }
+    })
   }
 
   return {
