@@ -283,6 +283,7 @@ function ProductModal({
   onClose,
   hiddenCategories = [],
   onRemoveCategory,
+  onMergeCategory,
 }: {
   initial?: StockProduct
   onSave: (
@@ -293,6 +294,7 @@ function ProductModal({
   onClose: () => void
   hiddenCategories?: string[]
   onRemoveCategory?: (name: string) => void
+  onMergeCategory?: (from: string, to: string) => void
 }) {
   const [name,        setName]        = useState(initial?.name          ?? '')
   // หน่วยที่ซื้อเป็น Box เสมอ — ตัด dropdown ทิ้งแล้ว (สินค้าเก่ายังคงหน่วยเดิม)
@@ -312,6 +314,9 @@ function ProductModal({
   const [showNewCat,  setShowNewCat]  = useState(false)
   const [newCat,      setNewCat]      = useState('')
   const [delCatMode,  setDelCatMode]  = useState(false)
+  // โหมดรวมหมวด: เลือกหมวดต้นทางก่อน แล้วเลือกปลายทางเพื่อย้ายสินค้าทั้งหมด
+  const [mergeMode,   setMergeMode]   = useState(false)
+  const [mergeFrom,   setMergeFrom]   = useState<string | null>(null)
   // ล้างยอด 'กำลังมา' ที่ค้างจากข้อมูลเก่า (ปกติยอดนี้ซิงค์จากระบบติดตามสินค้า)
   const [clearIncoming, setClearIncoming] = useState(false)
 
@@ -338,6 +343,23 @@ function ProductModal({
     if (!confirm(`ลบหมวด "${c}"? สินค้าในหมวดนี้จะย้ายไป "อื่นๆ"`)) return
     onRemoveCategory(c)
     if (category === c) setCategory('')
+  }
+
+  // จำนวนสินค้าในแต่ละหมวด (ใช้แสดงตอนรวม)
+  function catCount(c: string) {
+    return allStock.products.filter(p => (p.category || 'อื่นๆ') === c).length
+  }
+
+  function handleMergeTap(c: string) {
+    if (!onMergeCategory) return
+    if (mergeFrom === null) { setMergeFrom(c); return }   // เลือกต้นทาง
+    if (c === mergeFrom) { setMergeFrom(null); return }    // แตะซ้ำ = ยกเลิก
+    // c = ปลายทาง
+    if (!confirm(`ย้ายสินค้า ${catCount(mergeFrom)} ชิ้นจาก "${mergeFrom}" ไปรวมกับ "${c}"?`)) return
+    onMergeCategory(mergeFrom, c)
+    if (category === mergeFrom) setCategory(c)
+    setMergeFrom(null)
+    setMergeMode(false)
   }
 
   const ppb = Number(packsPerBox)
@@ -418,26 +440,45 @@ function ProductModal({
             <label className="text-[11px] font-semibold text-brand-dark/40 uppercase tracking-wider">
               หมวดหมู่ <span className="font-normal normal-case text-brand-dark/30">(ไม่เลือก = อื่นๆ)</span>
             </label>
+            {mergeMode && (
+              <p className="text-[11px] text-brand-blue/70 bg-brand-pale/60 rounded-lg px-2.5 py-1.5 mt-1.5">
+                {mergeFrom === null
+                  ? '1) เลือกหมวดที่จะย้าย (ต้นทาง)'
+                  : `2) เลือกหมวดปลายทางที่จะเอา "${mergeFrom}" ไปรวม`}
+              </p>
+            )}
             <div className="flex flex-wrap gap-1.5 mt-1.5">
               {catChips.map(c => {
                 const deletable = delCatMode && c !== 'อื่นๆ'
+                const isMergeSource = mergeMode && mergeFrom === c
+                const isMergeTargetable = mergeMode && mergeFrom !== null && c !== mergeFrom
+                const onClick = () => {
+                  if (delCatMode) return deletable ? handleDeleteCat(c) : undefined
+                  if (mergeMode)  return handleMergeTap(c)
+                  setCategory(category === c ? '' : c)
+                }
                 return (
                   <button key={c} type="button"
-                    onClick={() => deletable ? handleDeleteCat(c) : setCategory(category === c ? '' : c)}
+                    onClick={onClick}
                     className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all flex items-center gap-1 ${
                       deletable
                         ? 'bg-red-50 text-red-500 border-red-200 hover:bg-red-100'
-                        : category === c
-                          ? 'bg-brand-blue text-white border-transparent'
-                          : 'bg-white text-brand-dark/60 border-brand-blue/20 hover:border-brand-blue/40'
+                        : isMergeSource
+                          ? 'bg-brand-blue text-white border-transparent ring-2 ring-brand-blue/30'
+                          : isMergeTargetable
+                            ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
+                            : category === c && !mergeMode
+                              ? 'bg-brand-blue text-white border-transparent'
+                              : 'bg-white text-brand-dark/60 border-brand-blue/20 hover:border-brand-blue/40'
                     }`}
                   >
                     {c}
+                    {mergeMode && c !== 'อื่นๆ' && <span className="opacity-50">·{catCount(c)}</span>}
                     {deletable && <X size={10} />}
                   </button>
                 )
               })}
-              {!delCatMode && (
+              {!delCatMode && !mergeMode && (
                 <button type="button"
                   onClick={() => setShowNewCat(v => !v)}
                   className={`px-2.5 py-1 rounded-full text-[11px] font-medium border border-dashed transition-all ${
@@ -447,7 +488,21 @@ function ProductModal({
                   }`}
                 >+ เพิ่มเอง</button>
               )}
-              {onRemoveCategory && (
+              {/* ปุ่มควบคุมโหมดจัดการหมวด */}
+              {onMergeCategory && !delCatMode && (
+                mergeMode ? (
+                  <button type="button"
+                    onClick={() => { setMergeMode(false); setMergeFrom(null) }}
+                    className="px-3 py-1 rounded-full text-[11px] font-semibold bg-brand-blue text-white flex items-center gap-1 active:scale-95 transition-all"
+                  ><Check size={11} /> เสร็จสิ้น</button>
+                ) : (
+                  <button type="button"
+                    onClick={() => { setMergeMode(true); setShowNewCat(false) }}
+                    className="px-2.5 py-1 rounded-full text-[11px] font-medium border border-dashed border-brand-blue/30 text-brand-blue/60 hover:border-brand-blue/60 hover:text-brand-blue transition-all"
+                  >⇄ รวมหมวด</button>
+                )
+              )}
+              {onRemoveCategory && !mergeMode && (
                 delCatMode ? (
                   <button type="button"
                     onClick={() => setDelCatMode(false)}
@@ -897,7 +952,7 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
   const { orders } = useOrderStore()
   const pendingOrderCount = orders.filter(o => o.status !== 'received').length
   const {
-    stock, addProduct, updateProduct, removeProduct, removeCategory, logEntry,
+    stock, addProduct, updateProduct, removeProduct, removeCategory, mergeCategory, logEntry,
     previewSync, applySync, previewSyncProduct, applySyncProduct,
     getPendingDates, resetSyncedDates,
     previewInventorySnapshot, applyInventorySnapshot,
@@ -1433,6 +1488,7 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
           onClose={() => setShowAdd(false)}
           hiddenCategories={stock.hiddenCategories ?? []}
           onRemoveCategory={c => { removeCategory(c); schedulePushStock() }}
+          onMergeCategory={(from, to) => { mergeCategory(from, to); schedulePushStock() }}
         />
       )}
       {editTarget && (
@@ -1445,6 +1501,7 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
           onClose={() => setEditTarget(null)}
           hiddenCategories={stock.hiddenCategories ?? []}
           onRemoveCategory={c => { removeCategory(c); schedulePushStock() }}
+          onMergeCategory={(from, to) => { mergeCategory(from, to); schedulePushStock() }}
         />
       )}
       {showSync && (

@@ -315,9 +315,20 @@ export function useStockStore() {
     }))
   }
 
+  // รวม/ย้ายหมวด: สินค้าในหมวด from → ไปหมวด to แล้วซ่อนชื่อ from
+  function mergeCategory(from: string, to: string) {
+    if (from === to) return
+    setStock(s => ({
+      ...s,
+      products: s.products.map(p => p.category === from ? { ...p, category: to } : p),
+      // ปลายทางต้องไม่ถูกซ่อน, ต้นทางถูกซ่อน
+      hiddenCategories: Array.from(new Set([...(s.hiddenCategories ?? []).filter(c => c !== to), from])),
+    }))
+  }
+
   return {
     stock,
-    addProduct, updateProduct, removeProduct, removeCategory, logEntry,
+    addProduct, updateProduct, removeProduct, removeCategory, mergeCategory, logEntry,
     previewSync, applySync, previewSyncProduct, applySyncProduct,
     getPendingDates, resetSyncedDates,
     previewInventorySnapshot, applyInventorySnapshot,
