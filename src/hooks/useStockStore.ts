@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useSyncExternalStore } from 'react'
 import type { StockStore, StockProduct, StockEntry, StockUnit, DayReport, EntryKind } from '../types'
 import type { InventoryRow } from '../utils/parser'
 
@@ -45,8 +45,22 @@ export interface InventorySnapshotItem {
   newQty: number
 }
 
+// ── Module-level shared store (ทุก component เห็นค่าเดียวกัน) ──────────
+let _stock: StockStore = load()
+const _listeners = new Set<() => void>()
+function notify() { _listeners.forEach(fn => fn()) }
+function setStock(next: StockStore | ((prev: StockStore) => StockStore)) {
+  _stock = typeof next === 'function' ? (next as (p: StockStore) => StockStore)(_stock) : next
+  save(_stock)
+  notify()
+}
+// ──────────────────────────────────────────────────────────────────────
+
 export function useStockStore() {
-  const [stock, setStock] = useState<StockStore>(load)
+  const stock = useSyncExternalStore(
+    (cb) => { _listeners.add(cb); return () => _listeners.delete(cb) },
+    () => _stock,
+  )
 
   function replaceAll(s: StockStore) {
     const migrated: StockStore = {
@@ -57,8 +71,6 @@ export function useStockStore() {
     }
     setStock(migrated)
   }
-
-  useEffect(() => { save(stock) }, [stock])
 
   function addProduct(
     name: string, unit: StockUnit, packsPerBox: number,

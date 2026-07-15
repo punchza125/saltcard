@@ -284,6 +284,7 @@ function ProductModal({
   hiddenCategories = [],
   onRemoveCategory,
   onMergeCategory,
+  extraCategories = [],
 }: {
   initial?: StockProduct
   onSave: (
@@ -295,6 +296,7 @@ function ProductModal({
   hiddenCategories?: string[]
   onRemoveCategory?: (name: string) => void
   onMergeCategory?: (from: string, to: string) => void
+  extraCategories?: string[]  // หมวดจากยอดขาย (goodsType) — ให้รวมหมวดได้แม้ไม่มีสินค้าในสต็อก
 }) {
   const [name,        setName]        = useState(initial?.name          ?? '')
   // หน่วยที่ซื้อเป็น Box เสมอ — ตัด dropdown ทิ้งแล้ว (สินค้าเก่ายังคงหน่วยเดิม)
@@ -326,9 +328,11 @@ function ProductModal({
     const hidden = new Set(hiddenCategories)
     const set = new Set<string>(CATEGORIES.filter(c => c !== 'อื่นๆ' && !hidden.has(c)))
     allStock.products.forEach(p => { if (p.category && p.category !== 'อื่นๆ' && !hidden.has(p.category)) set.add(p.category) })
+    // หมวดจากยอดขาย (goodsType) — ให้รวม/ย้ายได้แม้ไม่มีสินค้าในสต็อกแล้ว
+    extraCategories.forEach(c => { if (c && c !== 'อื่นๆ' && !hidden.has(c)) set.add(c) })
     if (category && category !== 'อื่นๆ') set.add(category)
     return [...set, 'อื่นๆ']
-  }, [allStock.products, category, hiddenCategories])
+  }, [allStock.products, category, hiddenCategories, extraCategories])
 
   function addNewCat() {
     const c = newCat.trim()
@@ -1136,6 +1140,13 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
     setShowSnapshot(true)
   }
 
+  // หมวดจากยอดขาย (goodsType) ที่ผ่าน alias แล้ว — ส่งให้ merge UI เห็นแม้ไม่มีสินค้าในสต็อก
+  const salesGoodsTypes = useMemo(() => {
+    const set = new Set<string>()
+    for (const r of reports) for (const g of r.goods) if (g.goodsType) set.add(g.goodsType)
+    return [...set]
+  }, [reports])
+
   // keyword → goodsName lookup from all reports' goods data
   const goodsNameMap = useMemo(() => {
     const map = new Map<string, string>()
@@ -1489,6 +1500,7 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
           hiddenCategories={stock.hiddenCategories ?? []}
           onRemoveCategory={c => { removeCategory(c); schedulePushStock() }}
           onMergeCategory={(from, to) => { mergeCategory(from, to); schedulePushStock() }}
+          extraCategories={salesGoodsTypes}
         />
       )}
       {editTarget && (
@@ -1502,6 +1514,7 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
           hiddenCategories={stock.hiddenCategories ?? []}
           onRemoveCategory={c => { removeCategory(c); schedulePushStock() }}
           onMergeCategory={(from, to) => { mergeCategory(from, to); schedulePushStock() }}
+          extraCategories={salesGoodsTypes}
         />
       )}
       {showSync && (
