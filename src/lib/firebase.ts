@@ -7,14 +7,16 @@ import {
   type Firestore,
 } from 'firebase/firestore'
 
-// Firebase web config ไม่ใช่ความลับ (ออกแบบมาให้อยู่ใน client) — ความปลอดภัยอยู่ที่ Firestore Rules
+// Firebase web config ไม่ใช่ความลับ — ออกแบบมาให้ฝังใน client ได้ (ความปลอดภัยอยู่ที่ Firestore Rules)
+// ฝังค่า default ไว้เลยเพื่อไม่ต้องตั้ง env ที่ Vercel; ยัง override ด้วย env ได้ถ้าอยากแยก project
+const env = import.meta.env
 const cfg = {
-  apiKey:            import.meta.env.VITE_FB_API_KEY as string | undefined,
-  authDomain:        import.meta.env.VITE_FB_AUTH_DOMAIN as string | undefined,
-  projectId:         import.meta.env.VITE_FB_PROJECT_ID as string | undefined,
-  storageBucket:     import.meta.env.VITE_FB_STORAGE_BUCKET as string | undefined,
-  messagingSenderId: import.meta.env.VITE_FB_SENDER_ID as string | undefined,
-  appId:             import.meta.env.VITE_FB_APP_ID as string | undefined,
+  apiKey:            (env.VITE_FB_API_KEY        as string) || 'AIzaSyAJxdm3JEWdwQ_JiwzDhW-TgqnB3xfHjDs',
+  authDomain:        (env.VITE_FB_AUTH_DOMAIN    as string) || 'saltcard-c69eb.firebaseapp.com',
+  projectId:         (env.VITE_FB_PROJECT_ID     as string) || 'saltcard-c69eb',
+  storageBucket:     (env.VITE_FB_STORAGE_BUCKET as string) || 'saltcard-c69eb.firebasestorage.app',
+  messagingSenderId: (env.VITE_FB_SENDER_ID      as string) || '878619829552',
+  appId:             (env.VITE_FB_APP_ID         as string) || '1:878619829552:web:337813fd2e8598b75d14f5',
 }
 
 /** ตั้งค่า Firebase ครบหรือยัง — ถ้ายัง แอปจะ fallback ไปใช้ Google Sheet เหมือนเดิม */

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import type { DayReport } from '../types'
 import { parseMultiReport, formatThaiDate } from '../utils/parser'
+import MigratePanel from './MigratePanel'
 
 interface UploadPageProps {
   centralReports: DayReport[]
@@ -136,6 +137,9 @@ export default function UploadPage({
   return (
     <div className="px-4 md:px-6 py-5 md:py-8 md:max-w-4xl md:mx-auto">
       <div className="space-y-5">
+
+        {/* ── ย้ายข้อมูลไป Firebase (ชั่วคราวระหว่างย้ายระบบ) ── */}
+        <MigratePanel />
 
         {/* ── Google Sheets ── */}
         <div className={`rounded-2xl p-4 border ${sheetsUrl ? 'bg-green-50 border-green-200' : 'bg-brand-pale border-brand-blue/15'}`}>
