@@ -502,82 +502,37 @@ function OrderCard({
 
 type FilterTab = 'all' | 'pending' | 'received'
 
-export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, ordersUrl, isOrdersEnv, onSaveOrdersUrl, onStockLog }: {
+export default function OrdersTab({ products }: {
   products: StockProduct[]
-  onPush?: (orders: PurchaseOrder[]) => Promise<boolean>
-  onFetch?: () => Promise<PurchaseOrder[] | null>
-  sheetsConnected?: boolean
-  ordersUrl?: string
-  isOrdersEnv?: boolean
-  onSaveOrdersUrl?: (url: string) => void
-  // ซิงค์สต็อกจากรายการสั่งซื้อ: incoming = สั่งใหม่, received = ยืนยันรับ, cancel = ลบรายการที่ยังไม่รับ
-  onStockLog?: (items: OrderItem[], kind: 'incoming' | 'received' | 'cancel') => void
 }) {
-  const { orders, addOrder, updateOrder, setTracking, markReceived, deleteOrder, replaceAll } = useOrderStore()
-  const [filter,      setFilter]      = useState<FilterTab>('all')
-  const [airOnly,     setAirOnly]     = useState(false)
-  const [showCreate,  setShowCreate]  = useState(false)
-  const [editOrder,   setEditOrder]   = useState<PurchaseOrder | null>(null)
-  const [trackOrder,  setTrackOrder]  = useState<PurchaseOrder | null>(null)
-  const [syncing,     setSyncing]     = useState(false)
-  const [lastSync,    setLastSync]    = useState<string | null>(null)
-  const [syncError,   setSyncError]   = useState(false)
-  const [urlTesting,  setUrlTesting]  = useState(false)
-  const [urlStatus,   setUrlStatus]   = useState<'ok' | 'fail' | null>(null)
-  const [showUrlEdit, setShowUrlEdit] = useState(false)
-  const [urlDraft,    setUrlDraft]    = useState('')
+  const {
+    orders, updateOrder, setTracking,
+    receiveOrder, createOrderWithStock, deleteOrderWithStock,
+  } = useOrderStore()
+  const [filter,     setFilter]     = useState<FilterTab>('all')
+  const [airOnly,    setAirOnly]    = useState(false)
+  const [showCreate, setShowCreate] = useState(false)
+  const [editOrder,  setEditOrder]  = useState<PurchaseOrder | null>(null)
+  const [trackOrder, setTrackOrder] = useState<PurchaseOrder | null>(null)
 
-  async function testUrl(u: string) {
-    if (!u) return
-    setUrlTesting(true); setUrlStatus(null)
-    try {
-      const res = await fetch(`${u}?action=dates`)
-      const json = await res.json()
-      setUrlStatus(json.ok === true ? 'ok' : 'fail')
-    } catch { setUrlStatus('fail') }
-    finally { setUrlTesting(false) }
-  }
-
-  function saveUrlEdit() {
-    const trimmed = urlDraft.trim()
-    if (trimmed && onSaveOrdersUrl) onSaveOrdersUrl(trimmed)
-    setShowUrlEdit(false)
-  }
-
-  useEffect(() => {
-    if (!onFetch) return
-    setSyncing(true)
-    onFetch().then(fetched => {
-      setSyncing(false)
-      if (fetched && (fetched.length > 0 || isOrdersEnv)) {
-        replaceAll(fetched)
-        setLastSync(new Date().toLocaleTimeString('th-TH'))
-        setSyncError(false)
-      } else {
-        setSyncError(true)
-      }
-    })
-  }, [])
-
-  // saving = กำลัง push การแก้ไขขึ้น Sheet (แยกจาก syncing ซึ่งรวมการดึงข้อมูลตอนเปิดหน้า)
+  // Firestore เขียนแล้วเห็นผลทันที (optimistic) + queue ให้เองตอนออฟไลน์
+  // popup นี้แค่บอกว่ากำลังยืนยันกับ server และแจ้งถ้าพลาด
   const [saving,     setSaving]     = useState(false)
   const [savedFlash, setSavedFlash] = useState(false)
+  const [opError,    setOpError]    = useState<string | null>(null)
 
-  async function pushOrders(latest: PurchaseOrder[]) {
-    if (!onPush) return
-    setSyncing(true); setSyncError(false); setSaving(true)
-    const ok = await onPush(latest)
-    setSyncing(false); setSaving(false)
-    if (ok) {
-      setLastSync(new Date().toLocaleTimeString('th-TH'))
+  /** ครอบ transaction: ขึ้น popup กำลังบันทึก → สำเร็จ/พลาด */
+  async function withSaving(fn: () => Promise<void>) {
+    setSaving(true); setOpError(null)
+    try {
+      await fn()
       setSavedFlash(true)
       setTimeout(() => setSavedFlash(false), 900)
-    } else setSyncError(true)
-  }
-
-  function withSync(mutation: () => PurchaseOrder[]) {
-    const latest = mutation()
-    setTimeout(() => pushOrders(latest), 50)
+    } catch (e) {
+      setOpError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setSaving(false)
+    }
   }
 
   const isPending = (o: PurchaseOrder) => o.status === 'ordered' || o.status === 'in_transit'
@@ -603,29 +558,28 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
   return (
     <div className="px-4 md:px-6 py-4 max-w-2xl mx-auto">
 
-      {/* toast มุมขวาล่างตอนกำลังซิงค์ (ดึงข้อมูล) — ไม่บล็อกหน้าจอ */}
-      {syncing && !saving && (
-        <div className="fixed right-4 z-[60] animate-pop-in bottom-[calc(env(safe-area-inset-bottom,0px)+5rem)] md:bottom-4">
-          <div className="bg-white rounded-2xl shadow-xl border border-brand-blue/10 pl-3 pr-4 py-2.5 flex items-center gap-2.5">
-            <img src="/pic/mickyGif.gif" alt="syncing" className="w-9 h-9 object-contain flex-shrink-0" />
-            <p className="text-[12px] font-semibold text-brand-dark flex items-center gap-1.5">
-              <Loader2 size={12} className="animate-spin text-brand-blue" /> กำลังซิงค์ข้อมูล...
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* popup กลางจอระหว่างบันทึกการแก้ไขขึ้น Google Sheet */}
-      {(saving || savedFlash) && (
+      {/* popup ระหว่าง/หลังบันทึกลง Firebase */}
+      {(saving || savedFlash || opError) && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-2xl shadow-2xl px-10 py-7 flex flex-col items-center gap-3 animate-pop-in">
+          <div className="bg-white rounded-2xl shadow-2xl px-10 py-7 flex flex-col items-center gap-3 animate-pop-in max-w-[300px] text-center">
             {saving ? (
               <>
                 <img src="/pic/doraemonGif.gif" alt="saving" className="w-24 h-24 object-contain" />
                 <p className="text-[14px] font-semibold text-brand-dark flex items-center gap-1.5">
                   <Loader2 size={14} className="animate-spin text-brand-blue" /> กำลังบันทึกข้อมูล...
                 </p>
-                <p className="text-[11px] text-brand-dark/40">กรุณาอย่าเพิ่งปิดหน้านี้</p>
+              </>
+            ) : opError ? (
+              <>
+                <div className="w-11 h-11 rounded-full bg-red-100 flex items-center justify-center">
+                  <CloudOff size={22} className="text-red-500" />
+                </div>
+                <p className="text-[14px] font-semibold text-red-600">บันทึกไม่สำเร็จ</p>
+                <p className="text-[11px] text-brand-dark/50 leading-relaxed">{opError}</p>
+                <button onClick={() => setOpError(null)}
+                  className="mt-1 px-5 py-2 rounded-xl bg-brand-blue text-white text-[13px] font-semibold active:scale-95 transition-all">
+                  ปิด
+                </button>
               </>
             ) : (
               <>
@@ -634,114 +588,6 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
                 </div>
                 <p className="text-[14px] font-semibold text-emerald-600">บันทึกแล้ว</p>
               </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Sync status banner */}
-      {sheetsConnected && (
-        <div className={`rounded-xl px-4 py-3 flex flex-col gap-2 mb-4 border ${
-          syncError ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'
-        }`}>
-          <div className="flex items-center gap-3">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${syncError ? 'bg-red-100' : 'bg-green-100'}`}>
-              {syncError ? <CloudOff size={14} className="text-red-500" /> : <Cloud size={14} className="text-green-600" />}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[12px] font-semibold text-brand-dark">
-                {syncError ? 'ซิงค์ไม่สำเร็จ' : 'เชื่อมต่อ Google Sheet แล้ว'}
-              </p>
-              <p className="text-[10px] text-brand-dark/40">
-                {syncing ? 'กำลังซิงค์...' : lastSync ? `ซิงค์ล่าสุด ${lastSync}` : 'พร้อมซิงค์'}
-              </p>
-            </div>
-            <button
-              onClick={() => onFetch && onFetch().then(f => {
-                if (f) { replaceAll(f); setLastSync(new Date().toLocaleTimeString('th-TH')); setSyncError(false) }
-                else setSyncError(true)
-              })}
-              disabled={syncing}
-              className="flex items-center gap-1 text-[11px] text-brand-blue border border-brand-blue/20 px-2.5 py-1.5 rounded-lg hover:bg-brand-pale disabled:opacity-40 transition-all"
-            >
-              {syncing ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
-              ดึงข้อมูล
-            </button>
-          </div>
-
-          {/* URL section */}
-          <div className="pl-11 flex flex-col gap-1.5">
-            {!showUrlEdit ? (
-              <div className="flex items-center gap-2">
-                <p className="text-[10px] text-brand-dark/50 break-all flex-1 font-mono leading-relaxed">
-                  {ordersUrl || 'ยังไม่ได้ตั้ง URL'}
-                </p>
-                <div className="flex gap-1.5 flex-shrink-0">
-                  <button
-                    onClick={() => testUrl(ordersUrl ?? '')}
-                    disabled={urlTesting || !ordersUrl}
-                    className={`text-[10px] px-2 py-1 rounded-lg border font-medium transition-all ${
-                      urlStatus === 'ok'   ? 'border-green-300 text-green-600 bg-green-50' :
-                      urlStatus === 'fail' ? 'border-red-300 text-red-500 bg-red-50' :
-                      'border-brand-blue/20 text-brand-blue hover:bg-brand-pale'
-                    } disabled:opacity-40`}
-                  >
-                    {urlTesting ? <Loader2 size={10} className="animate-spin inline" /> :
-                     urlStatus === 'ok' ? '✓ ใช้ได้' :
-                     urlStatus === 'fail' ? '✗ ผิด' : 'เช็ค'}
-                  </button>
-                  {!isOrdersEnv && (
-                    <button
-                      onClick={() => { setUrlDraft(ordersUrl ?? ''); setShowUrlEdit(true); setUrlStatus(null) }}
-                      className="text-[10px] px-2 py-1 rounded-lg border border-brand-blue/20 text-brand-blue hover:bg-brand-pale transition-all"
-                    >
-                      <Pencil size={10} className="inline mr-0.5" />แก้
-                    </button>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-1.5">
-                {isOrdersEnv && (
-                  <p className="text-[9px] text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">
-                    URL นี้มาจาก Vercel env var (VITE_ORDERS_URL) — ต้องแก้ใน Vercel แล้ว Redeploy
-                  </p>
-                )}
-                <textarea
-                  value={urlDraft}
-                  onChange={e => setUrlDraft(e.target.value)}
-                  disabled={isOrdersEnv}
-                  rows={3}
-                  className="text-[10px] font-mono w-full border border-brand-blue/30 rounded-lg px-2 py-1.5 resize-none bg-white disabled:bg-gray-50 disabled:text-gray-400 focus:outline-none focus:border-brand-blue"
-                  placeholder="https://script.google.com/macros/s/.../exec"
-                />
-                <div className="flex gap-2 justify-end">
-                  <button onClick={() => setShowUrlEdit(false)} className="text-[10px] px-2.5 py-1 rounded-lg border border-gray-200 text-brand-dark/50 hover:bg-gray-50">
-                    ยกเลิก
-                  </button>
-                  <button
-                    onClick={() => testUrl(urlDraft)}
-                    disabled={urlTesting || !urlDraft.trim()}
-                    className={`text-[10px] px-2.5 py-1 rounded-lg border font-medium transition-all ${
-                      urlStatus === 'ok' ? 'border-green-300 text-green-600 bg-green-50' :
-                      urlStatus === 'fail' ? 'border-red-300 text-red-500 bg-red-50' :
-                      'border-brand-blue/20 text-brand-blue hover:bg-brand-pale'
-                    } disabled:opacity-40`}
-                  >
-                    {urlTesting ? <Loader2 size={10} className="animate-spin inline mr-1" /> : null}
-                    {urlStatus === 'ok' ? '✓ ใช้ได้' : urlStatus === 'fail' ? '✗ ผิด' : 'ทดสอบ'}
-                  </button>
-                  {!isOrdersEnv && (
-                    <button
-                      onClick={saveUrlEdit}
-                      disabled={!urlDraft.trim()}
-                      className="text-[10px] px-2.5 py-1 rounded-lg bg-brand-blue text-white font-medium disabled:opacity-40 active:scale-95 transition-all"
-                    >
-                      บันทึก
-                    </button>
-                  )}
-                </div>
-              </div>
             )}
           </div>
         </div>
@@ -803,19 +649,10 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
               key={order.id}
               order={order}
               products={products}
-              onDelete={() => {
-                if (order.status !== 'received') onStockLog?.(order.items, 'cancel')
-                deleteOrder(order.id)
-                setTimeout(() => pushOrders(orders.filter(o => o.id !== order.id)), 100)
-              }}
+              onDelete={() => withSaving(() => deleteOrderWithStock(order, products))}
               onEdit={() => setEditOrder(order)}
               onSetTracking={() => setTrackOrder(order)}
-              onMarkReceived={() => {
-                const today = new Date().toISOString().slice(0, 10)
-                onStockLog?.(order.items, 'received')
-                markReceived(order.id)
-                setTimeout(() => pushOrders(orders.map(o => o.id === order.id ? { ...o, status: 'received' as const, receivedAt: today } : o)), 100)
-              }}
+              onMarkReceived={() => withSaving(() => receiveOrder(order, products))}
             />
           ))}
         </div>
@@ -826,11 +663,7 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
         <CreateOrderModal
           products={products}
           onClose={() => setShowCreate(false)}
-          onSave={data => {
-            const newOrder = addOrder(data)
-            onStockLog?.(data.items, 'incoming')
-            setTimeout(() => pushOrders([...orders, newOrder]), 100)
-          }}
+          onSave={data => withSaving(async () => { await createOrderWithStock(data, products) })}
         />
       )}
       {editOrder && (
@@ -838,20 +671,14 @@ export default function OrdersTab({ products, onPush, onFetch, sheetsConnected, 
           products={products}
           initial={editOrder}
           onClose={() => setEditOrder(null)}
-          onSave={data => {
-            updateOrder(editOrder.id, data)
-            setTimeout(() => pushOrders(orders.map(o => o.id === editOrder.id ? { ...o, ...data } : o)), 100)
-          }}
+          onSave={data => withSaving(async () => { updateOrder(editOrder.id, data) })}
         />
       )}
       {trackOrder && (
         <TrackingModal
           order={trackOrder}
           onClose={() => setTrackOrder(null)}
-          onSave={(carrier, tracking) => {
-            setTracking(trackOrder.id, carrier, tracking)
-            setTimeout(() => pushOrders(orders.map(o => o.id === trackOrder.id ? { ...o, carrier, trackingNumber: tracking, status: 'in_transit' as const } : o)), 100)
-          }}
+          onSave={(carrier, tracking) => withSaving(async () => { setTracking(trackOrder.id, carrier, tracking) })}
         />
       )}
     </div>

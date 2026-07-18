@@ -45,13 +45,11 @@ export async function fetchTracking(carrierId: string, trackingNumber: string): 
   const u    = getOrdersUrl()
   const slug = SLUGS[carrierId]
   if (!u || !slug) return null
-  try {
-    const res  = await fetch(`${u}?action=track&slug=${encodeURIComponent(slug)}&number=${encodeURIComponent(trackingNumber)}`)
-    const json = await res.json()
-    if (!json.ok) return null
-    return {
-      tag:         json.tracking?.tag ?? 'Unknown',
-      checkpoints: json.tracking?.checkpoints ?? [],
-    }
-  } catch { return null }
+  const res  = await fetch(`${u}?action=track&slug=${encodeURIComponent(slug)}&number=${encodeURIComponent(trackingNumber)}`)
+  const json = await res.json()
+  if (!json.ok) throw new Error(json.error ?? 'unknown error')
+  return {
+    tag:         json.tracking?.tag ?? 'Unknown',
+    checkpoints: json.tracking?.checkpoints ?? [],
+  }
 }

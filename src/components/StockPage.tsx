@@ -981,25 +981,9 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
     return map
   }, [orders, stock.products])
 
-  // ดึงสต๊อกล่าสุดจาก Sheet ทุกครั้งที่เข้าหน้านี้ กัน device อื่นแก้แล้วไม่เห็น
-  // ยกเว้น: ถ้ามีการแก้ในเครื่องที่ยัง push ไม่สำเร็จ (dirty) จะไม่ดึงมาทับ — กันของที่เพิ่งรับหาย
-  const [initialLoading, setInitialLoading] = useState(!!onFetchStock)
-  useEffect(() => {
-    if (!onFetchStock) return
-    if (localStorage.getItem(STOCK_DIRTY_KEY)) {
-      // มีการแก้ที่ยังไม่ได้บันทึกขึ้น Sheet → เก็บของในเครื่องไว้ แล้ว push ให้เสร็จแทน
-      setInitialLoading(false)
-      schedulePushStock()
-      return
-    }
-    let cancelled = false
-    onFetchStock().then(raw => {
-      if (cancelled) return
-      if (raw) { try { replaceStock(JSON.parse(raw)) } catch {} }
-      setInitialLoading(false)
-    })
-    return () => { cancelled = true }
-  }, [])
+  // Firestore real-time listener ดูแลให้เอง — ไม่ต้อง fetch เองอีกแล้ว
+  // แสดง loading เฉพาะตอนยังไม่มีข้อมูลชุดแรกเข้ามา
+  const initialLoading = stock.products.length === 0
 
   const [showAdd,          setShowAdd]          = useState(false)
   const [editTarget,       setEditTarget]       = useState<StockProduct | null>(null)
@@ -1009,65 +993,28 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
   const [syncProduct,      setSyncProduct]      = useState<StockProduct | null>(null)
   const [syncExpanded,     setSyncExpanded]     = useState(false)
   const [selectedSyncDates, setSelectedSyncDates] = useState<Set<string>>(new Set())
-  const [pushing,          setPushing]          = useState(false)
-  const [pushOk,           setPushOk]           = useState<boolean | null>(null)
-  const [pushError,        setPushError]        = useState(false)
-
+  // Firestore เขียนเองแบบ atomic + queue ตอนออฟไลน์ → ไม่ต้อง push/retry/dirty เองอีก
+  // เหลือแค่ popup บอกสถานะระหว่างเขียนและแจ้งถ้าพลาด
+  const [pushing,    setPushing]    = useState(false)
   const [savedFlash, setSavedFlash] = useState(false)
-  function flashSaved() {
-    setSavedFlash(true)
-    setTimeout(() => setSavedFlash(false), 1200)
-  }
+  const [pushError,  setPushError]  = useState<string | null>(null)
 
-  // push อัตโนมัติหลังแก้ไข — ใช้ ref เพื่ออ่าน stock ล่าสุดหลัง state settle
-  const stockRef = useRef(stock)
-  useEffect(() => { stockRef.current = stock }, [stock])
-
-  // นับ generation ของการเปลี่ยนแปลง — ถ้ามีแก้ใหม่ระหว่าง push จะ push ซ้ำให้ครบ
-  const pushGenRef  = useRef(0)
-  const pushingRef  = useRef(false)
-
-  function schedulePushStock() {
-    if (!onPushStock) return
-    pushGenRef.current += 1
-    // ทำ dirty ทันที — ถ้าหน้า remount ระหว่างรอ push จะไม่ถูกดึงของเก่ามาทับ
-    try { localStorage.setItem(STOCK_DIRTY_KEY, String(Date.now())) } catch {}
-    runPush()
-  }
-
-  // push แบบเชื่อถือได้: รอ state settle → push พร้อม retry 3 ครั้ง → verify ผ่าน onPushStock
-  // (onPushStock จะ fetch กลับมาเช็คว่าข้อมูลลง Sheet จริง) → ถ้ามีแก้ใหม่ระหว่างทางจะ push ซ้ำ
-  async function runPush() {
-    if (!onPushStock || pushingRef.current) return
-    pushingRef.current = true
-    setPushing(true); setPushError(false)
-    await new Promise(r => setTimeout(r, 250)) // ให้ setState ของ logEntry commit ก่อน
-    let ok = false
-    // loop: push จนกว่าจะสำเร็จและไม่มีการเปลี่ยนแปลงใหม่ค้างอยู่
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const gen = pushGenRef.current
-      ok = false
-      for (let attempt = 0; attempt < 3 && !ok; attempt++) {
-        if (attempt > 0) await new Promise(r => setTimeout(r, 500 * attempt))
-        ok = await onPushStock(stockRef.current)
-      }
-      if (!ok) break                          // retry ครบแล้วยังพลาด → แจ้ง error
-      if (pushGenRef.current === gen) break    // ไม่มีการเปลี่ยนใหม่ → เสร็จ
-      // มีแก้ใหม่ระหว่าง push → วนบันทึกอีกรอบ
-    }
-    pushingRef.current = false
-    setPushing(false)
-    if (ok) {
-      setPushOk(true); flashSaved()
-      try { localStorage.removeItem(STOCK_DIRTY_KEY) } catch {}
-      setTimeout(() => setPushOk(null), 3000)
-    } else {
-      setPushError(true)   // ค้าง popup ให้กดลองใหม่ ไม่หายเงียบ
+  /** ครอบการเขียนลง Firestore: กำลังบันทึก → สำเร็จ / พลาด */
+  async function withSaving(fn: () => void | Promise<void>) {
+    setPushing(true); setPushError(null)
+    try {
+      await fn()
+      setSavedFlash(true)
+      setTimeout(() => setSavedFlash(false), 1200)
+    } catch (e) {
+      setPushError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setPushing(false)
     }
   }
 
-  function handlePushStock() { schedulePushStock() }
+  // ชื่อเดิมที่ UI เรียกอยู่ — Firestore บันทึกให้แล้ว จึงไม่ต้องทำอะไร
+  function schedulePushStock() { /* no-op */ }
 
   // popup กลางจอระหว่าง/หลังบันทึกขึ้น Google Sheet (แสดงทั้ง tab สต็อกและติดตามสินค้า)
   const saveOverlay = (pushing || savedFlash || pushError) ? (
@@ -1087,12 +1034,10 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
               <CloudOff size={22} className="text-red-500" />
             </div>
             <p className="text-[14px] font-semibold text-red-600">บันทึกไม่สำเร็จ</p>
-            <p className="text-[11px] text-brand-dark/50 leading-relaxed">
-              การเปลี่ยนแปลงยังอยู่ในเครื่องแต่ยังไม่ขึ้น Google Sheet — เช็คอินเทอร์เน็ตแล้วกดลองใหม่
-            </p>
-            <button onClick={() => runPush()}
-              className="mt-1 px-5 py-2 rounded-xl bg-brand-blue text-white text-[13px] font-semibold active:scale-95 transition-all flex items-center gap-1.5">
-              <RefreshCw size={13} /> ลองบันทึกใหม่
+            <p className="text-[11px] text-brand-dark/50 leading-relaxed">{pushError}</p>
+            <button onClick={() => setPushError(null)}
+              className="mt-1 px-5 py-2 rounded-xl bg-brand-blue text-white text-[13px] font-semibold active:scale-95 transition-all">
+              ปิด
             </button>
           </>
         ) : (
@@ -1215,29 +1160,15 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
   })
 
   function handleConfirmSync() {
-    applySync(syncPreview, Array.from(selectedSyncDates))
-    schedulePushStock()
+    withSaving(() => applySync(syncPreview, Array.from(selectedSyncDates)))
   }
 
   if (stockTab === 'orders') {
+    // OrdersTab จัดการสต็อกเองผ่าน transaction แล้ว (สั่งซื้อ/รับของ/ยกเลิก)
     return (
       <>
         <SubTabBar active={stockTab} onChange={setStockTab} pendingCount={pendingOrderCount} />
-        <OrdersTab products={stock.products} onPush={onPushOrders} onFetch={onFetchOrders} sheetsConnected={!!(sheetsUrl || ordersUrl)} ordersUrl={ordersUrl} isOrdersEnv={isOrdersEnv} onSaveOrdersUrl={onSaveOrdersUrl}
-          onStockLog={(items, kind) => {
-            items.forEach(it => {
-              if (!it.productId) return
-              const p = stock.products.find(pp => pp.id === it.productId)
-              if (!p) return
-              const packs = it.unit === 'Box' && p.packsPerBox > 0 ? it.qty * p.packsPerBox : it.qty
-              if (kind === 'incoming')      logEntry(p.id, packs,  `สั่งซื้อ ${it.qty} ${it.unit}`, 'incoming')
-              else if (kind === 'cancel')   logEntry(p.id, -packs, 'ยกเลิกรายการสั่งซื้อ', 'incoming')
-              else                          logEntry(p.id, packs,  `รับสินค้า ${it.qty} ${it.unit}`, 'received', undefined, true)
-            })
-            schedulePushStock()
-          }} />
-        {saveOverlay}
-        {loadOverlay}
+        <OrdersTab products={stock.products} />
       </>
     )
   }
@@ -1401,21 +1332,7 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
 
       {/* status filter + add */}
       <div className="flex gap-1.5 items-center flex-wrap">
-        {sheetsUrl && onPushStock && (
-          <button
-            onClick={handlePushStock}
-            disabled={pushing}
-            className={`flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full border transition-all ${
-              pushing ? 'border-brand-blue/20 text-brand-blue animate-pulse'
-              : pushOk === true ? 'border-emerald-300 text-emerald-600 bg-emerald-50'
-              : pushOk === false ? 'border-red-200 text-red-500'
-              : 'border-brand-blue/15 text-brand-dark/50 hover:border-brand-blue/40 hover:text-brand-blue'
-            }`}
-          >
-            {pushOk === false ? <CloudOff size={12} /> : <Cloud size={12} />}
-            {pushing ? 'กำลังบันทึก...' : pushOk === true ? 'บันทึกแล้ว' : pushOk === false ? 'บันทึกไม่ได้' : 'บันทึกสต๊อก'}
-          </button>
-        )}
+        {/* ไม่มีปุ่ม "บันทึกสต๊อก" แล้ว — Firestore บันทึกให้อัตโนมัติทุกการแก้ไข */}
         {(['all', 'red', 'yellow', 'green'] as const).map(f => {
           const labels = { all: `ทั้งหมด`, red: `หมด/กำลังจะหมด`, yellow: `ใกล้หมด`, green: `ปกติ` }
           const badges = { all: counts.red + counts.yellow + counts.green, red: counts.red, yellow: counts.yellow, green: counts.green }
@@ -1476,7 +1393,7 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
                 product={p}
                 resolvedGoodsName={resolveGoodsName(p)}
                 onEdit={() => setEditTarget(p)}
-                onDelete={() => { removeProduct(p.id); schedulePushStock() }}
+                onDelete={() => withSaving(() => removeProduct(p.id))}
                 onSync={() => setSyncProduct(p)}
                 pendingSyncCount={pendingForProduct}
                 readOnly={readOnly}
@@ -1498,8 +1415,8 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
           }}
           onClose={() => setShowAdd(false)}
           hiddenCategories={stock.hiddenCategories ?? []}
-          onRemoveCategory={c => { removeCategory(c); schedulePushStock() }}
-          onMergeCategory={(from, to) => { mergeCategory(from, to); schedulePushStock() }}
+          onRemoveCategory={c => withSaving(() => removeCategory(c))}
+          onMergeCategory={(from, to) => withSaving(() => mergeCategory(from, to))}
           extraCategories={salesGoodsTypes}
         />
       )}
@@ -1512,8 +1429,8 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
           }}
           onClose={() => setEditTarget(null)}
           hiddenCategories={stock.hiddenCategories ?? []}
-          onRemoveCategory={c => { removeCategory(c); schedulePushStock() }}
-          onMergeCategory={(from, to) => { mergeCategory(from, to); schedulePushStock() }}
+          onRemoveCategory={c => withSaving(() => removeCategory(c))}
+          onMergeCategory={(from, to) => withSaving(() => mergeCategory(from, to))}
           extraCategories={salesGoodsTypes}
         />
       )}
@@ -1530,7 +1447,7 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
           items={snapshotItems}
           date={snapshotDate}
           unmatched={snapshotUnmatch}
-          onConfirm={() => { applyInventorySnapshot(snapshotItems, snapshotDate); schedulePushStock() }}
+          onConfirm={() => withSaving(() => applyInventorySnapshot(snapshotItems, snapshotDate))}
           onClose={() => setShowSnapshot(false)}
         />
       )}
@@ -1538,7 +1455,7 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
         <SyncModal
           preview={productSyncPreview}
           pendingDates={productSyncPreview.map(i => i.date).filter((d, i, a) => a.indexOf(d) === i)}
-          onConfirm={() => { applySyncProduct(productSyncPreview); schedulePushStock() }}
+          onConfirm={() => withSaving(() => applySyncProduct(productSyncPreview))}
           onClose={() => setSyncProduct(null)}
         />
       )}
