@@ -70,9 +70,18 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   )
 }
 
-export default function DashboardPage({ reports, stockProducts = [], taxRate = 15, activeBranch, setActiveBranch, syncStatus, lastSynced, categoryAliases = {} }: DashboardPageProps) {
+export default function DashboardPage({ reports: allReports, stockProducts = [], taxRate = 15, activeBranch, setActiveBranch, syncStatus, lastSynced, categoryAliases = {} }: DashboardPageProps) {
   // กรองตามสาขาที่เลือก — 'ทั้งหมด' รวมทุกสาขา (ใช้ area total), ไม่งั้นดึงเฉพาะ site ที่ตรงชื่อ
   const selectedSite = activeBranch || 'ทั้งหมด'
+
+  // เลือกสาขา → เหลือเฉพาะ "วันที่สาขานั้นมีข้อมูลจริง" (อยู่ใน Site Aspect ของวันนั้น)
+  // เช่น Passion เพิ่งเปิด 2 วัน → รายงานวันเก่าๆ ที่เป็นเซ็นทรัลล้วนถูกตัดทิ้งทั้งวัน
+  // ทำให้กราฟรายวัน/สินค้าขายดี/สินค้าตามประเภท เห็นเฉพาะช่วงที่สาขานี้เปิดจริง
+  const reports = useMemo(() => {
+    if (selectedSite === 'ทั้งหมด') return allReports
+    return allReports.filter(r => r.sites.some(s => s.name === selectedSite))
+  }, [allReports, selectedSite])
+
   const [rangeMode, setRangeMode] = useState<RangeMode>('day')
   const [selectedDateIdx, setSelectedDateIdx] = useState<number>(reports.length - 1)
   const [activeGoodsTab, setActiveGoodsTab] = useState<'amount' | 'volume'>('amount')
@@ -661,13 +670,14 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
           {goodsData.length > 0 && (
             <div className="px-4 md:px-0">
               <div className="bg-white border border-brand-blue/10 rounded-2xl p-4 card-hover">
+                {selectedSite !== 'ทั้งหมด' && (
+                  <div className="flex items-start gap-1.5 text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 mb-3">
+                    <span className="flex-shrink-0">⚠️</span>
+                    <span>นับเฉพาะวันที่สาขานี้มีข้อมูล แต่ยอดสินค้าในแต่ละวันเป็น<strong>ยอดรวมทุกสาขา</strong> — ตู้ไม่ได้แยกยอดสินค้าตามสาขาในไฟล์</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-brand-dark/60 text-[12px] font-medium">
-                    สินค้าขายดี
-                    {selectedSite !== 'ทั้งหมด' && (
-                      <span className="ml-1.5 text-[10px] font-normal text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">รวมทุกสาขา</span>
-                    )}
-                  </p>
+                  <p className="text-brand-dark/60 text-[12px] font-medium">สินค้าขายดี</p>
                   <div className="flex bg-brand-pale rounded-lg p-0.5 gap-0.5">
                     {([['amount','ยอด'],['volume','ชิ้น']] as ['amount'|'volume',string][]).map(([k, label]) => (
                       <button key={k} onClick={() => setActiveGoodsTab(k)}
