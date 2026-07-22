@@ -82,9 +82,12 @@ export default function UploadPage({
 
   // Auto-detect branch from parsed report, fall back to the zone it was dropped in
   function detectBranch(report: DayReport, fallback: string): 'central' | 'passion' {
+    // ไฟล์ Multi-Report แบบใหม่มีทุกสาขาใน Site Aspect → เก็บที่ store เดียว (central)
+    // แล้วให้ Dashboard กรองแยกสาขาเองจาก sites[]
+    if (report.sites.length > 1) return 'central'
     const siteName = report.sites[0]?.name ?? report.areas[0]?.name ?? ''
-    if (siteName.includes('พาชชั่น')) return 'passion'
-    if (siteName.includes('เซนทรัล')) return 'central'
+    if (siteName.includes('พาชชั่น') || siteName.includes('Passion')) return 'passion'
+    if (siteName.includes('เซนทรัล') || siteName.includes('เซ็นทรัล')) return 'central'
     return BRANCH_HANDLERS[fallback] ?? 'central'
   }
 

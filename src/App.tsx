@@ -52,21 +52,16 @@ export default function App() {
     () => mergeReports(store.reports, passionStore.reports),
     [store.reports, passionStore.reports]
   )
-  const activeReports = useMemo(() => {
-    if (selectedSite === 'ทั้งหมด') return allReports
-    if (selectedSite === 'พาชชั่น ระยอง') return passionStore.reports
-    return store.reports  // default = Central Rayong
-  }, [selectedSite, allReports, store.reports, passionStore.reports])
+  // ส่ง report ทั้งหมดเสมอ — DashboardPage กรองตามสาขาจาก sites[] ของแต่ละ report เอง
+  // (Multi-Report ไฟล์เดียวมีทุกสาขาใน Site Aspect อยู่แล้ว)
+  const activeReports = allReports
 
   const availableSites = useMemo(() => {
-    // Use actual site names from data; add Passion placeholder only when no data yet
+    // ชื่อสาขาจริงจากข้อมูล (Site Aspect ของทุก report)
     const sites = new Set<string>()
-    store.reports.forEach(r => r.sites.forEach(s => sites.add(s.name)))
-    passionStore.reports.forEach(r => r.sites.forEach(s => sites.add(s.name)))
-    // Passion placeholder when store is empty (shows as "เร็วๆ นี้" in Header)
-    if (passionStore.reports.length === 0) sites.add('พาชชั่น ระยอง')
+    allReports.forEach(r => r.sites.forEach(s => { if (s.name) sites.add(s.name) }))
     return Array.from(sites).sort()
-  }, [store.reports, passionStore.reports])
+  }, [allReports])
 
   const sheetsConfig = sheetsUrl ? { url: sheetsUrl } : null
   const { syncStatus, syncMessage, lastSynced, pushReport, fetchAll, pushStock, fetchStock, pushMachine, fetchMachine, pushOrders, fetchOrders } = useSheets(sheetsConfig)

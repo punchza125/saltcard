@@ -71,8 +71,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 }
 
 export default function DashboardPage({ reports, stockProducts = [], taxRate = 15, activeBranch, setActiveBranch, syncStatus, lastSynced, categoryAliases = {} }: DashboardPageProps) {
-  // Reports are already filtered by branch at App level — always use area totals here
-  const selectedSite = 'ทั้งหมด'
+  // กรองตามสาขาที่เลือก — 'ทั้งหมด' รวมทุกสาขา (ใช้ area total), ไม่งั้นดึงเฉพาะ site ที่ตรงชื่อ
+  const selectedSite = activeBranch || 'ทั้งหมด'
   const [rangeMode, setRangeMode] = useState<RangeMode>('day')
   const [selectedDateIdx, setSelectedDateIdx] = useState<number>(reports.length - 1)
   const [activeGoodsTab, setActiveGoodsTab] = useState<'amount' | 'volume'>('amount')
