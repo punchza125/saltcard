@@ -662,7 +662,12 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
             <div className="px-4 md:px-0">
               <div className="bg-white border border-brand-blue/10 rounded-2xl p-4 card-hover">
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-brand-dark/60 text-[12px] font-medium">สินค้าขายดี</p>
+                  <p className="text-brand-dark/60 text-[12px] font-medium">
+                    สินค้าขายดี
+                    {selectedSite !== 'ทั้งหมด' && (
+                      <span className="ml-1.5 text-[10px] font-normal text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">รวมทุกสาขา</span>
+                    )}
+                  </p>
                   <div className="flex bg-brand-pale rounded-lg p-0.5 gap-0.5">
                     {([['amount','ยอด'],['volume','ชิ้น']] as ['amount'|'volume',string][]).map(([k, label]) => (
                       <button key={k} onClick={() => setActiveGoodsTab(k)}
@@ -713,7 +718,12 @@ export default function DashboardPage({ reports, stockProducts = [], taxRate = 1
             return (
               <div className="px-4 md:px-0">
                 <div className="bg-white border border-brand-blue/10 rounded-2xl p-4 card-hover">
-                  <p className="text-brand-dark/60 text-[12px] font-medium mb-2">สินค้าตามประเภท</p>
+                  <p className="text-brand-dark/60 text-[12px] font-medium mb-2">
+                    สินค้าตามประเภท
+                    {selectedSite !== 'ทั้งหมด' && (
+                      <span className="ml-1.5 text-[10px] font-normal text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">รวมทุกสาขา</span>
+                    )}
+                  </p>
                   <ResponsiveContainer width="100%" height={200}>
                     <PieChart>
                       <Pie
