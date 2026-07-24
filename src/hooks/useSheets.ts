@@ -16,40 +16,30 @@ export function useSheets(config: SheetsConfig | null) {
     if (!config?.url) return false
     setSyncStatus('syncing')
     setSyncMessage('กำลังส่งข้อมูลไป Google Sheets...')
+    const base = config.url
+    // เป้าหมายไว้ verify: จำนวนสาขา + ยอดรวมของวันนั้น
+    const wantSites = report.sites.length
+    const wantAmt   = Math.round(report.sites.reduce((s, x) => s + (x.salesAmount || 0), 0))
     try {
-      const base = config.url
-      const date = encodeURIComponent(report.date)
-
-      // 1. ลบข้อมูลเดิมของวันนี้
-      await fetch(`${base}?action=clear&date=${date}`)
-
-      // 2. ส่ง sales rows (sequential เพื่อป้องกัน conflict)
-      for (const site of report.sites) {
-        await fetch(`${base}?action=saveRow&type=sales&date=${date}&row=${encodeURIComponent(JSON.stringify(site))}`)
+      // ส่งทั้งรายงานใน POST เดียว (GAS ทำ clear+เขียนทุกแถวในรอบเดียว)
+      // — แบบเก่าส่งทีละแถวแยก request แถวไหนล้มเงียบๆ ข้อมูลสาขานั้นหายทั้งวัน
+      let ok = false
+      for (let attempt = 0; attempt < 3 && !ok; attempt++) {
+        if (attempt > 0) await new Promise(r => setTimeout(r, 700 * attempt))
+        try {
+          await fetch(base, { method: 'POST', body: JSON.stringify({ report }) })
+        } catch { continue }
+        // verify: อ่านกลับมาเช็คว่าแถวครบทุกสาขาและยอดตรง
+        try {
+          const res = await fetch(`${base}?action=all`)
+          const json = await res.json()
+          const rows = (json.data?.sales ?? []).filter((r: any) => String(r.date).slice(0, 10) === report.date)
+          const gotAmt = Math.round(rows.reduce((s: number, r: any) => s + (Number(r.salesAmount) || 0), 0))
+          ok = rows.length === wantSites && gotAmt === wantAmt
+        } catch { ok = false }
       }
-
-      // 3. ส่ง goods rows (sequential)
-      for (const g of report.goods) {
-        await fetch(`${base}?action=saveRow&type=goods&date=${date}&row=${encodeURIComponent(JSON.stringify(g))}`)
-      }
-
-      // 4. ส่ง payments (รวมจาก areas)
-      const pay = report.areas.reduce((acc, a) => ({
-        promptAmount:  (acc.promptAmount  || 0) + (a.promptAmount  || 0),
-        cashAmount:    (acc.cashAmount    || 0) + (a.cashAmount    || 0),
-        mdbAmount:     (acc.mdbAmount     || 0) + (a.mdbAmount     || 0),
-        qr30Amount:    (acc.qr30Amount    || 0) + (a.qr30Amount    || 0),
-        alipayAmount:  (acc.alipayAmount  || 0) + (a.alipayAmount  || 0),
-        wechatAmount:  (acc.wechatAmount  || 0) + (a.wechatAmount  || 0),
-        vipAmount:     (acc.vipAmount     || 0) + (a.vipAmount     || 0),
-        mifareAmount:  (acc.mifareAmount  || 0) + (a.mifareAmount  || 0),
-        paytmAmount:   (acc.paytmAmount   || 0) + (a.paytmAmount   || 0),
-      }), {} as Record<string, number>)
-      await fetch(`${base}?action=saveRow&type=payments&date=${date}&row=${encodeURIComponent(JSON.stringify(pay))}`)
-
-      // 5. ส่ง meta
-      const meta = { fileName: report.fileName, rowsSales: report.sites.length, rowsGoods: report.goods.length }
-      await fetch(`${base}?action=saveRow&type=meta&date=${date}&row=${encodeURIComponent(JSON.stringify(meta))}`)
+      if (!ok) throw new Error('verify failed')
+      // goods / payments / meta ถูกเขียนใน POST เดียวกันโดย GAS แล้ว — ไม่ต้องส่งแยก
 
       setSyncStatus('success')
       setSyncMessage(`ส่งข้อมูลวันที่ ${report.date} สำเร็จ ✓`)
