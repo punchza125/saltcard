@@ -87,6 +87,17 @@ export async function parseMultiReport(file: File): Promise<DayReport> {
   return { date, fileName: file.name, areas, routes, sites, goods }
 }
 
+/**
+ * จับคู่ keyword ของสินค้ากับชื่อสินค้าในรายงานขาย
+ * เทียบแบบไม่สนตัวพิมพ์และ "ไม่สนช่องว่าง" — กันเคสพิมพ์ keyword เว้นวรรคไม่ตรง
+ * เช่น keyword "Set 13(1 Pack)" ต้อง match ชื่อ "Set 13 (1 Pack)" ได้
+ */
+export function matchesKeyword(goodsName: string, keyword: string): boolean {
+  if (!keyword) return false
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, '')
+  return norm(goodsName).includes(norm(keyword))
+}
+
 export function formatThaiDate(dateStr: string): string {
   const months = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']
   const d = new Date(dateStr)

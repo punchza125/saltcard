@@ -5,7 +5,7 @@ import {
 } from 'recharts'
 import { ChevronLeft, ChevronRight, TrendingUp, Package, MapPin } from 'lucide-react'
 import type { DayReport, StockProduct } from '../types'
-import { formatThaiDate, formatThaiDateFull, formatBaht } from '../utils/parser'
+import { formatThaiDate, formatThaiDateFull, formatBaht, matchesKeyword } from '../utils/parser'
 import StatCard from './StatCard'
 
 interface DashboardPageProps {
@@ -28,7 +28,7 @@ function calcDayProfit(report: DayReport, products: StockProduct[], taxRate: num
     const isBox = lowerName.includes('(box)') || lowerName.endsWith(' box')
     for (const product of products) {
       if (!product.goodsKeyword || !product.buyPricePerBox || product.packsPerBox <= 0) continue
-      if (!lowerName.includes(product.goodsKeyword.toLowerCase())) continue
+      if (!matchesKeyword(goods.goodsName, product.goodsKeyword)) continue
       const costPerPack = product.buyPricePerBox / product.packsPerBox
       const packsSold = isBox ? goods.salesVolume * product.packsPerBox : goods.salesVolume
       totalRevenue += goods.salesAmount

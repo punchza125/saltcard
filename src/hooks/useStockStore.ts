@@ -4,6 +4,7 @@ import {
   writeBatch, increment, runTransaction, query, where, getDocs,
 } from 'firebase/firestore'
 import type { StockStore, StockProduct, StockEntry, StockUnit, DayReport, EntryKind } from '../types'
+import { matchesKeyword } from '../utils/parser'
 import type { InventoryRow } from '../utils/parser'
 import { getDb, ensureAuth, COL, META_STOCK_DOC } from '../lib/firebase'
 
@@ -214,7 +215,7 @@ export function useStockStore() {
         for (const product of stock.products) {
           if (filterProductId && product.id !== filterProductId) continue
           if (!product.goodsKeyword) continue
-          if (!lowerName.includes(product.goodsKeyword.toLowerCase())) continue
+          if (!matchesKeyword(goods.goodsName, product.goodsKeyword)) continue
           if (alreadySynced.has(`${product.id}::${report.date}`)) continue
           const packDelta = isBox && product.packsPerBox > 0
             ? -(goods.salesVolume * product.packsPerBox)
@@ -246,7 +247,7 @@ export function useStockStore() {
         const isBox = lowerName.includes('(box)') || lowerName.endsWith(' box')
         const product = stock.products.find(p => p.id === productId)
         if (!product?.goodsKeyword) continue
-        if (!lowerName.includes(product.goodsKeyword.toLowerCase())) continue
+        if (!matchesKeyword(goods.goodsName, product.goodsKeyword)) continue
         const packDelta = isBox && product.packsPerBox > 0
           ? -(goods.salesVolume * product.packsPerBox)
           : -goods.salesVolume
@@ -299,7 +300,7 @@ export function useStockStore() {
       const lowerName = row.goodsName.toLowerCase()
       for (const product of stock.products) {
         if (!product.goodsKeyword) continue
-        if (!lowerName.includes(product.goodsKeyword.toLowerCase())) continue
+        if (!matchesKeyword(row.goodsName, product.goodsKeyword)) continue
         items.push({
           productId: product.id, productName: product.name,
           goodsName: row.goodsName, currentQty: product.qty, newQty: row.totalInventory,

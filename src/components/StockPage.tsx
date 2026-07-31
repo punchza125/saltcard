@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import type { StockProduct, StockUnit, DayReport, PurchaseOrder } from '../types'
 import { useStockStore, type SyncPreviewItem, type InventorySnapshotItem } from '../hooks/useStockStore'
-import { formatThaiDate, parseInventoryReport } from '../utils/parser'
+import { formatThaiDate, parseInventoryReport, matchesKeyword } from '../utils/parser'
 import OrdersTab from './OrdersTab'
 import { useOrderStore } from '../hooks/useOrderStore'
 
@@ -1108,9 +1108,9 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
     if (!product.goodsKeyword) return null
     const kw = product.goodsKeyword.toLowerCase()
     for (const [name, goodsName] of goodsNameMap) {
-      if (name.includes(kw) || kw.includes(name.split(' ').slice(-1)[0].toLowerCase())) {
-        return goodsName
-      }
+      // เทียบแบบไม่สนช่องว่าง — keyword ที่เว้นวรรคไม่ตรงต้องยังจับคู่ได้
+      if (matchesKeyword(goodsName, product.goodsKeyword)) return goodsName
+      if (kw.includes(name.split(' ').slice(-1)[0].toLowerCase())) return goodsName
     }
     return null
   }
