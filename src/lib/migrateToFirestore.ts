@@ -1,6 +1,6 @@
-import { collection, doc, getDocs, writeBatch } from 'firebase/firestore'
-import type { StockStore, StockProduct, PurchaseOrder } from '../types'
-import { getDb, ensureAuth, COL, META_STOCK_DOC } from './firebase'
+import { collection, doc, getDocs, setDoc, writeBatch } from 'firebase/firestore'
+import type { StockStore, StockProduct, PurchaseOrder, DayReport } from '../types'
+import { getDb, ensureAuth, COL, META_STOCK_DOC, META_MACHINE_DOC } from './firebase'
 
 export interface MigrateResult {
   products: number
@@ -79,5 +79,53 @@ export async function migrateToFirestore(stock: StockStore, orders: PurchaseOrde
     ok: verified.products >= products.length
       && verified.orders >= orders.length
       && verified.entries >= entries.length,
+  }
+}
+
+export interface ReportMigrateResult {
+  reports: number
+  verified: number
+  machine: boolean
+  ok: boolean
+}
+
+/**
+ * ย้ายรายงานยอดขาย (1 วัน = 1 document) + หน้าตู้ จาก Google Sheet → Firestore
+ * เขียนทับตามวันที่ → รันซ้ำได้ ไม่เกิดข้อมูลซ้ำ และไม่แตะข้อมูลใน Sheet
+ */
+export async function migrateReportsToFirestore(
+  reports: DayReport[],
+  machineRaw?: unknown,
+): Promise<ReportMigrateResult> {
+  await ensureAuth()
+  const db = getDb()
+  if (!db) throw new Error('Firebase ยังไม่ได้ตั้งค่า')
+
+  const clean = <T,>(v: T): T => JSON.parse(JSON.stringify(v ?? null))
+  const CHUNK = 400
+  for (let i = 0; i < reports.length; i += CHUNK) {
+    const b = writeBatch(db)
+    for (const r of reports.slice(i, i + CHUNK)) {
+      b.set(doc(db, COL.reports, r.date), clean({
+        date: r.date, fileName: r.fileName ?? '',
+        areas: r.areas ?? [], routes: r.routes ?? [],
+        sites: r.sites ?? [], goods: r.goods ?? [],
+      }))
+    }
+    await b.commit()
+  }
+
+  let machine = false
+  if (machineRaw != null) {
+    await setDoc(doc(db, COL.meta, META_MACHINE_DOC), clean({ data: machineRaw }))
+    machine = true
+  }
+
+  const snap = await getDocs(collection(db, COL.reports))
+  return {
+    reports: reports.length,
+    verified: snap.size,
+    machine,
+    ok: snap.size >= reports.length,
   }
 }

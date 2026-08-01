@@ -64,7 +64,9 @@ export const COL = {
   products: 'products',   // สินค้า 1 ตัว = 1 document
   orders:   'orders',     // ออเดอร์ 1 รายการ = 1 document
   entries:  'entries',    // log การเคลื่อนไหวสต็อก (audit trail)
-  meta:     'meta',       // meta/stock = taxRate, syncedDates, hiddenCategories, categoryAliases
+  reports:  'reports',    // รายงานยอดขาย 1 วัน = 1 document (id = วันที่ YYYY-MM-DD)
+  meta:     'meta',       // meta/stock = taxRate ฯลฯ, meta/machine = รายงานหน้าตู้
 } as const
 
-export const META_STOCK_DOC = 'stock'
+export const META_STOCK_DOC   = 'stock'
+export const META_MACHINE_DOC = 'machine'

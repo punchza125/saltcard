@@ -11,6 +11,7 @@ const SHEET_NAMES = {
   META:     'meta',
   STOCK:    'stock',    // JSON blob ของ stock store
   MACHINE:  'machine',  // JSON blob ของ machine report
+  ORDERS:   'orders',   // JSON blob ของ purchase orders
 }
 
 const HEADERS = {
@@ -45,6 +46,7 @@ const HEADERS = {
   ],
   STOCK:   ['updatedAt','data'],
   MACHINE: ['updatedAt','data'],
+  ORDERS:  ['updatedAt','data'],
 }
 
 // ── Utility ──────────────────────────────────────────────────
@@ -126,6 +128,12 @@ function doGet(e) {
       return jsonResponse({ data: blob })
     }
 
+    // ── Orders ──
+    if (action === 'fetchOrders') {
+      const blob = fetchBlob(SHEET_NAMES.ORDERS)
+      return jsonResponse({ data: blob })
+    }
+
     return errorResponse('unknown action')
   } catch (err) {
     return errorResponse(String(err))
@@ -166,7 +174,10 @@ function getAllData() {
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
     const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues()
     result[key.toLowerCase()] = rows.map(row =>
-      Object.fromEntries(headers.map((h, i) => [h, row[i]]))
+      Object.fromEntries(headers.map((h, i) => {
+        const v = row[i]
+        return [h, v instanceof Date ? cellToDateStr(v) : v]
+      }))
     )
   })
   return result
@@ -232,14 +243,16 @@ function doPost(e) {
   try {
     initSheets()
 
-    // ── blob actions (saveStock / saveMachine) — body is raw JSON ──
+    // ── blob actions (saveStock / saveMachine / saveOrders) — body is raw JSON ──
     const blobAction = e.parameter && e.parameter.action
-    if (blobAction === 'saveStock' || blobAction === 'saveMachine') {
+    if (blobAction === 'saveStock' || blobAction === 'saveMachine' || blobAction === 'saveOrders') {
       const data = e.postData && e.postData.contents ? e.postData.contents : null
       if (!data) return errorResponse('missing data')
-      const sheetName = blobAction === 'saveMachine' ? SHEET_NAMES.MACHINE : SHEET_NAMES.STOCK
+      const sheetName = blobAction === 'saveMachine' ? SHEET_NAMES.MACHINE
+                      : blobAction === 'saveOrders'  ? SHEET_NAMES.ORDERS
+                      : SHEET_NAMES.STOCK
       saveBlob(sheetName, data)
-      return jsonResponse({ saved: blobAction === 'saveMachine' ? 'machine' : 'stock' })
+      return jsonResponse({ saved: blobAction })
     }
 
     let raw

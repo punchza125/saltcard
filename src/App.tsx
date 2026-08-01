@@ -6,38 +6,20 @@ import UploadPage from './components/UploadPage'
 import StockPage from './components/StockPage'
 import MachinePage from './components/MachinePage'
 import SheetsConfigModal from './components/SheetsConfigModal'
-import { useStore } from './hooks/useStore'
-import { usePassionStore } from './hooks/usePassionStore'
 import { useSheets } from './hooks/useSheets'
 import { useOrdersSheets } from './hooks/useOrdersSheets'
 import { useStockStore } from './hooks/useStockStore'
+import { useReportStore, subscribeMachineReport, saveMachineReport } from './hooks/useReportStore'
+import { isFirebaseConfigured } from './lib/firebase'
 import type { DayReport, MachineReport } from './types'
-
-// Merge two stores' reports — same-date reports get their sites/goods merged
-function mergeReports(a: DayReport[], b: DayReport[]): DayReport[] {
-  const map = new Map<string, DayReport>()
-  for (const r of a) map.set(r.date, r)
-  for (const r of b) {
-    const existing = map.get(r.date)
-    if (!existing) { map.set(r.date, r); continue }
-    map.set(r.date, {
-      ...existing,
-      areas:  [...existing.areas,  ...r.areas],
-      routes: [...existing.routes, ...r.routes],
-      sites:  [...existing.sites,  ...r.sites],
-      goods:  [...existing.goods,  ...r.goods],
-    })
-  }
-  return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date))
-}
 
 const SHEETS_URL_KEY = 'saltcard_sheets_url'
 const ENV_SHEETS_URL = import.meta.env.VITE_SHEETS_URL as string | undefined
 
 export default function App() {
-  const { store, addReport, removeReport, clearAll } = useStore()
-  const { store: passionStore, addReport: addPassionReport, removeReport: removePassionReport, clearAll: clearPassion } = usePassionStore()
-  const { stock, replaceAll: replaceStock } = useStockStore()
+  // รายงานยอดขายอยู่บน Firestore แล้ว (1 วัน = 1 document) — real-time, ไม่ต้อง fetch เอง
+  const { reports: fbReports, loaded: reportsLoaded, saveReport, removeReport: removeReportDoc } = useReportStore()
+  const { stock } = useStockStore()
   const [activeTab, setActiveTab] = useState<'dashboard' | 'upload' | 'stock' | 'machine'>('dashboard')
   const [selectedSite, setSelectedSite] = useState<string>('ทั้งหมด')
   const [showSheetsConfig, setShowSheetsConfig] = useState(false)
@@ -47,11 +29,7 @@ export default function App() {
     () => ENV_SHEETS_URL ?? localStorage.getItem(SHEETS_URL_KEY) ?? ''
   )
 
-  // Determine which reports to show based on selected branch
-  const allReports = useMemo(
-    () => mergeReports(store.reports, passionStore.reports),
-    [store.reports, passionStore.reports]
-  )
+  const allReports = fbReports
   // ส่ง report ทั้งหมดเสมอ — DashboardPage กรองตามสาขาจาก sites[] ของแต่ละ report เอง
   // (Multi-Report ไฟล์เดียวมีทุกสาขาใน Site Aspect อยู่แล้ว)
   const activeReports = allReports
@@ -72,65 +50,26 @@ export default function App() {
   const effectivePushOrders = hasOrdersUrl ? ordersSheets.push : pushOrders
   const effectiveFetchOrders = hasOrdersUrl ? ordersSheets.fetch : fetchOrders
 
-  const FETCH_TTL_MS = 10 * 60 * 1000 // 10 นาที
-  const FETCH_TS_KEY = 'saltcard_last_fetch_ts'
-
-  function isCacheStale() {
-    const ts = localStorage.getItem(FETCH_TS_KEY)
-    if (!ts) return true
-    return Date.now() - Number(ts) > FETCH_TTL_MS
-  }
-
-  function markFetched() {
-    localStorage.setItem(FETCH_TS_KEY, String(Date.now()))
-  }
-
-  const didAutoFetch = useRef(false)
-  useEffect(() => {
-    if (didAutoFetch.current || !sheetsUrl) return
-    didAutoFetch.current = true
-    // สต๊อก/หน้าตู้ดึงสดเสมอทุกเครื่อง (ทั้ง deploy และ local) เพราะแก้ไขได้จากหลายที่
-    fetchStock().then(raw => {
-      if (!raw) return
-      try { replaceStock(JSON.parse(raw)) } catch {}
-    })
-    fetchMachine().then(raw => {
-      if (!raw) return
-      try { setSheetsMachine(JSON.parse(raw)) } catch {}
-    })
-    if (ENV_SHEETS_URL) {
-      // รายงานยอดขาย: ถ้า cache ยังไม่เก่าและมีข้อมูลอยู่แล้ว → ข้ามการดึง
-      if (isCacheStale() || store.reports.length === 0) {
-        fetchAll().then(fresh => {
-          if (fresh?.length) {
-            clearAll()
-            fresh.forEach(addReport)
-            markFetched()
-          }
-        })
-      }
-    } else if (store.reports.length === 0) {
-      fetchAll().then(reports => {
-        if (reports?.length) reports.forEach(addReport)
-      })
-    }
-  }, [sheetsUrl])
+  // หน้าตู้: subscribe จาก Firestore (real-time) — สต็อก/ออเดอร์/ยอดขาย มี listener ในตัวอยู่แล้ว
+  useEffect(() => subscribeMachineReport(data => {
+    setSheetsMachine((data as MachineReport | null) ?? null)
+  }), [])
 
   async function handlePushStock(currentStock: object): Promise<boolean> {
     return pushStock(currentStock)
   }
 
   async function handlePushMachine(r: MachineReport): Promise<boolean> {
-    return pushMachine(r)
+    try { await saveMachineReport(r); return true } catch { return false }
   }
 
-  const prevCount = useRef(store.reports.length)
+  const prevCount = useRef(allReports.length)
   useEffect(() => {
-    if (store.reports.length > prevCount.current && store.reports.length === 1) {
+    if (allReports.length > prevCount.current && allReports.length === 1) {
       setActiveTab('dashboard')
     }
-    prevCount.current = store.reports.length
-  }, [store.reports.length])
+    prevCount.current = allReports.length
+  }, [allReports.length])
 
   function handleSaveSheetsUrl(url: string) {
     setSheetsUrl(url)
@@ -147,7 +86,7 @@ export default function App() {
     }
   }
 
-  if (syncStatus === 'syncing' && store.reports.length === 0) {
+  if (isFirebaseConfigured && !reportsLoaded) {
     return (
       <div className="fixed inset-0 flex flex-col items-center justify-center bg-white z-50">
         <img src="/pic/luffygif.gif" alt="loading" className="w-48 h-48 object-contain" />
@@ -168,7 +107,7 @@ export default function App() {
     <div className="w-full flex flex-col bg-white md:bg-[#f0f4fb] md:min-h-screen"
       style={{ height: '100dvh' }}>
       <Header
-        reportCount={store.reports.length}
+        reportCount={allReports.length}
         onUploadClick={() => setActiveTab('upload')}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -182,7 +121,7 @@ export default function App() {
         {activeTab === 'dashboard' && <DashboardPage reports={activeReports} stockProducts={stock.products} taxRate={stock.taxRate} activeBranch={selectedSite} setActiveBranch={setSelectedSite} syncStatus={syncStatus} lastSynced={lastSynced ?? undefined} categoryAliases={stock.categoryAliases} />}
         {activeTab === 'stock' && (
           <StockPage
-            reports={store.reports}
+            reports={allReports}
             sheetsUrl={sheetsUrl}
             ordersUrl={ordersSheets.url}
             isOrdersEnv={ordersSheets.isEnvConfigured}
@@ -202,18 +141,19 @@ export default function App() {
         )}
         {activeTab === 'upload' && (
           <UploadPage
-            centralReports={store.reports}
-            passionReports={passionStore.reports}
-            onAddCentral={addReport}
-            onAddPassion={addPassionReport}
-            onRemoveCentral={removeReport}
-            onRemovePassion={removePassionReport}
-            onClearCentral={clearAll}
-            onClearPassion={clearPassion}
-            sheetsUrl={sheetsUrl}
+            centralReports={allReports}
+            passionReports={[]}
+            onAddCentral={saveReport}
+            onAddPassion={saveReport}
+            onRemoveCentral={removeReportDoc}
+            onRemovePassion={removeReportDoc}
+            onClearCentral={() => {}}
+            onClearPassion={() => {}}
+            sheetsUrl={isFirebaseConfigured ? '' : sheetsUrl}
             lastSynced={lastSynced}
             onPushReport={pushReport}
             onFetchAll={fetchAll}
+            onFetchMachine={fetchMachine}
             onOpenSheetsConfig={() => setShowSheetsConfig(true)}
           />
         )}

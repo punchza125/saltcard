@@ -21,6 +21,7 @@ interface UploadPageProps {
   lastSynced: string | null
   onPushReport: (r: DayReport) => Promise<boolean>
   onFetchAll: () => Promise<DayReport[] | null>
+  onFetchMachine?: () => Promise<string | null>
   onOpenSheetsConfig: () => void
 }
 
@@ -63,7 +64,7 @@ export default function UploadPage({
   onRemoveCentral, onRemovePassion,
   onClearCentral, onClearPassion,
   sheetsUrl, lastSynced,
-  onPushReport, onFetchAll, onOpenSheetsConfig,
+  onPushReport, onFetchAll, onFetchMachine, onOpenSheetsConfig,
 }: UploadPageProps) {
   const [fileStatuses, setFileStatuses] = useState<FileStatus[]>([])
   const [fetching,    setFetching]    = useState(false)
@@ -142,7 +143,7 @@ export default function UploadPage({
       <div className="space-y-5">
 
         {/* ── ย้ายข้อมูลไป Firebase (ชั่วคราวระหว่างย้ายระบบ) ── */}
-        <MigratePanel />
+        <MigratePanel onFetchAllFromSheets={onFetchAll} onFetchMachineFromSheets={onFetchMachine} />
 
         {/* ── Google Sheets ── */}
         <div className={`rounded-2xl p-4 border ${sheetsUrl ? 'bg-green-50 border-green-200' : 'bg-brand-pale border-brand-blue/15'}`}>
