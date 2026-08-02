@@ -272,10 +272,16 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
   }, [filteredReports, activeGoodsTab, categoryAliases])
 
   // ค้นหา + กรองหมวด สำหรับรายการสินค้าขายดี (สินค้าเยอะแล้วเลื่อนหายาก)
-  const goodsTypes = useMemo(
-    () => Array.from(new Set(goodsData.map(g => g.type).filter(Boolean))).sort(),
-    [goodsData],
-  )
+  const goodsTypes = useMemo(() => {
+    // หมวดหลักขึ้นก่อนตามลำดับนี้ ที่เหลือเรียง ก-ฮ/A-Z ต่อท้าย
+    const PINNED = ['One Piece', 'Pokemon', 'Lorcana', 'Naruto']
+    const rank = (t: string) => {
+      const i = PINNED.findIndex(p => p.toLowerCase() === t.toLowerCase())
+      return i === -1 ? PINNED.length : i
+    }
+    return Array.from(new Set(goodsData.map(g => g.type).filter(Boolean)))
+      .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, 'th'))
+  }, [goodsData])
   const visibleGoods = useMemo(() => {
     const q = goodsSearch.trim().toLowerCase()
     return goodsData.filter(g => {
