@@ -3,7 +3,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Sector, ReferenceLine
 } from 'recharts'
-import { ChevronLeft, ChevronRight, TrendingUp, Package, MapPin } from 'lucide-react'
+import { ChevronLeft, ChevronRight, TrendingUp, Package, MapPin, Search, X } from 'lucide-react'
 import type { DayReport, StockProduct } from '../types'
 import { formatThaiDate, formatThaiDateFull, formatBaht, matchesKeyword } from '../utils/parser'
 import StatCard from './StatCard'
@@ -85,6 +85,8 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
   const [rangeMode, setRangeMode] = useState<RangeMode>('day')
   const [selectedDateIdx, setSelectedDateIdx] = useState<number>(reports.length - 1)
   const [activeGoodsTab, setActiveGoodsTab] = useState<'amount' | 'volume'>('amount')
+  const [goodsSearch, setGoodsSearch] = useState('')
+  const [goodsCat,    setGoodsCat]    = useState('ทั้งหมด')
   const [showCalendar, setShowCalendar] = useState(false)
   const [activePieIndex, setActivePieIndex] = useState<number | undefined>(undefined)
   const [calendarMonth, setCalendarMonth] = useState(() =>
@@ -250,24 +252,39 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
     return { support: p25, resistance: p75 }
   }, [trendData])
 
-  const goodsData = useMemo(() => {
-    const map = new Map<string, { name: string; volume: number; amount: number }>()
-    filteredReports.forEach(r => {
-      r.goods.forEach(g => {
-        const ex = map.get(g.goodsName)
-        if (ex) { ex.volume += g.salesVolume; ex.amount += g.salesAmount }
-        else map.set(g.goodsName, { name: g.goodsName, volume: g.salesVolume, amount: g.salesAmount })
-      })
-    })
-    return Array.from(map.values()).sort((a, b) => activeGoodsTab === 'amount' ? b.amount - a.amount : b.volume - a.volume)
-  }, [filteredReports, activeGoodsTab])
-
   // remap หมวดผ่าน alias (รองรับ chain เช่น A→B→C) กัน loop ด้วยลิมิตรอบ
   const resolveType = (t: string) => {
     let cur = t
     for (let i = 0; i < 10 && categoryAliases[cur] && categoryAliases[cur] !== cur; i++) cur = categoryAliases[cur]
     return cur
   }
+
+  const goodsData = useMemo(() => {
+    const map = new Map<string, { name: string; type: string; volume: number; amount: number }>()
+    filteredReports.forEach(r => {
+      r.goods.forEach(g => {
+        const ex = map.get(g.goodsName)
+        if (ex) { ex.volume += g.salesVolume; ex.amount += g.salesAmount }
+        else map.set(g.goodsName, { name: g.goodsName, type: resolveType(g.goodsType), volume: g.salesVolume, amount: g.salesAmount })
+      })
+    })
+    return Array.from(map.values()).sort((a, b) => activeGoodsTab === 'amount' ? b.amount - a.amount : b.volume - a.volume)
+  }, [filteredReports, activeGoodsTab, categoryAliases])
+
+  // ค้นหา + กรองหมวด สำหรับรายการสินค้าขายดี (สินค้าเยอะแล้วเลื่อนหายาก)
+  const goodsTypes = useMemo(
+    () => Array.from(new Set(goodsData.map(g => g.type).filter(Boolean))).sort(),
+    [goodsData],
+  )
+  const visibleGoods = useMemo(() => {
+    const q = goodsSearch.trim().toLowerCase()
+    return goodsData.filter(g => {
+      if (goodsCat !== 'ทั้งหมด' && g.type !== goodsCat) return false
+      if (!q) return true
+      // ค้นแบบแยกคำ — พิมพ์ "op 15" เจอ "One Piece OP-15" ได้
+      return q.split(/\s+/).every(w => g.name.toLowerCase().includes(w))
+    })
+  }, [goodsData, goodsSearch, goodsCat])
 
   const goodsTypeData = useMemo(() => {
     const map = new Map<string, { name: string; value: number }>()
@@ -677,7 +694,12 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
                   </div>
                 )}
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-brand-dark/60 text-[12px] font-medium">สินค้าขายดี</p>
+                  <p className="text-brand-dark/60 text-[12px] font-medium">
+                    สินค้าขายดี
+                    {visibleGoods.length !== goodsData.length && (
+                      <span className="ml-1.5 text-[11px] text-brand-dark/35">{visibleGoods.length}/{goodsData.length}</span>
+                    )}
+                  </p>
                   <div className="flex bg-brand-pale rounded-lg p-0.5 gap-0.5">
                     {([['amount','ยอด'],['volume','ชิ้น']] as ['amount'|'volume',string][]).map(([k, label]) => (
                       <button key={k} onClick={() => setActiveGoodsTab(k)}
@@ -687,9 +709,45 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
                     ))}
                   </div>
                 </div>
+
+                {/* ค้นหา + กรองหมวด — สินค้าเยอะแล้วเลื่อนหายาก */}
+                <div className="relative mb-2">
+                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-dark/30 pointer-events-none" />
+                  <input
+                    value={goodsSearch}
+                    onChange={e => setGoodsSearch(e.target.value)}
+                    placeholder="ค้นหาสินค้า..."
+                    className="w-full border border-brand-blue/15 rounded-xl pl-8 pr-8 py-2 text-[12px] outline-none focus:border-brand-blue"
+                  />
+                  {goodsSearch && (
+                    <button onClick={() => setGoodsSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-brand-pale flex items-center justify-center text-brand-dark/40 hover:text-brand-dark">
+                      <X size={11} />
+                    </button>
+                  )}
+                </div>
+                {goodsTypes.length > 1 && (
+                  <div className="flex flex-wrap gap-1 mb-3">
+                    {['ทั้งหมด', ...goodsTypes].map(c => (
+                      <button key={c} onClick={() => setGoodsCat(c)}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
+                          goodsCat === c
+                            ? 'bg-brand-dark text-white border-transparent'
+                            : 'bg-white text-brand-dark/50 border-brand-blue/15 hover:border-brand-blue/40'
+                        }`}
+                      >{c}</button>
+                    ))}
+                  </div>
+                )}
+
+                {visibleGoods.length === 0 && (
+                  <p className="text-[12px] text-brand-dark/35 text-center py-6">ไม่พบสินค้าที่ค้นหา</p>
+                )}
+
                 <div className="space-y-3 md:max-h-96 md:overflow-y-auto md:pr-1">
-                  {goodsData.map((g, i) => {
-                    const pct = goodsData[0] ? (activeGoodsTab === 'amount' ? g.amount / goodsData[0].amount : g.volume / goodsData[0].volume) * 100 : 0
+                  {visibleGoods.map((g, i) => {
+                    const top = visibleGoods[0]
+                    const pct = top ? (activeGoodsTab === 'amount' ? g.amount / top.amount : g.volume / top.volume) * 100 : 0
                     return (
                       <div key={g.name} className="flex items-center gap-3 row-hover px-2 py-1 -mx-2">
                         <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold flex-shrink-0"
