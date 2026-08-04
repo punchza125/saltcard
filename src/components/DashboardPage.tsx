@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, TrendingUp, Package, MapPin, Search, X } fro
 import type { DayReport, StockProduct } from '../types'
 import { formatThaiDate, formatThaiDateFull, formatBaht, matchesKeyword } from '../utils/parser'
 import StatCard from './StatCard'
+import { IMG_FILES } from '../generated/imgManifest'
 
 interface DashboardPageProps {
   reports: DayReport[]
@@ -60,6 +61,18 @@ const RANK_STYLES = [
  * ลำดับรูปที่จะลองโหลดสำหรับสินค้าในรายงานขาย
  * สินค้า [Promotion] ใช้รูปปกติของสินค้านั้น (ตัดคำว่า promotion ออกก่อนค้น)
  */
+// ชื่อไฟล์รูปจริง (จาก manifest) → คีย์ที่ตัดช่องว่าง/ตัวพิมพ์ออก
+// กันเคสไฟล์ตั้งชื่อไม่ตรงเป๊ะ เช่น "Attack Of The Vine - Set 13(1 Pack).jpg"
+// ขณะที่รายงานเขียนว่า "Attack of the Vine - Set 13 (1 Pack)"
+const IMG_BY_KEY: Record<string, string> = (() => {
+  const map: Record<string, string> = {}
+  for (const f of IMG_FILES) {
+    const key = f.replace(/\.(jpe?g|png|webp)$/i, '').toLowerCase().replace(/\s+/g, '')
+    if (!(key in map)) map[key] = f
+  }
+  return map
+})()
+
 function goodsImageCandidates(name: string): string[] {
   const base = name
     .replace(/^\[Promotion\]\s*/i, '')
@@ -67,13 +80,18 @@ function goodsImageCandidates(name: string): string[] {
     .replace(/\s*\(Promotion\)\s*$/i, '')
     .trim()
   // สินค้า promotion ใช้ "รูปปกติ" ของสินค้านั้นก่อน แล้วค่อย fallback เป็นชื่อเต็ม
-  const out: string[] = base !== name ? [base, name] : [name]
-  for (const b of [...out]) {
-    if (!/\((1 Pack|Box)\)\s*$/i.test(b)) out.push(`${b} (1 Pack)`)
+  const names: string[] = base !== name ? [base, name] : [name]
+  for (const b of [...names]) {
+    if (!/\((1 Pack|Box)\)\s*$/i.test(b)) names.push(`${b} (1 Pack)`)
     const noBox = b.replace(/\s*\(Box\)\s*$/i, '')
-    if (noBox !== b) out.push(`${noBox} (1 Pack)`)
+    if (noBox !== b) names.push(`${noBox} (1 Pack)`)
   }
-  return [...new Set(out)].map(n => `/Img/${n}.jpg`)
+  const out: string[] = []
+  for (const n of names) {
+    const hit = IMG_BY_KEY[n.toLowerCase().replace(/\s+/g, '')]
+    if (hit) out.push(`/Img/${hit}`)
+  }
+  return [...new Set(out)]
 }
 
 /** รูปสินค้าเล็กในรายการขายดี — ลองหลายชื่อ ถ้าไม่เจอเลยแสดงกล่องเปล่า */
@@ -82,7 +100,7 @@ function GoodsThumb({ name }: { name: string }) {
   const [idx, setIdx] = useState(0)
   if (idx >= srcs.length) {
     return (
-      <div className="w-10 h-10 rounded-lg bg-brand-pale flex items-center justify-center flex-shrink-0">
+      <div className="w-11 h-11 rounded-lg bg-brand-pale flex items-center justify-center flex-shrink-0">
         <Package size={14} className="text-brand-blue/25" />
       </div>
     )
@@ -94,7 +112,7 @@ function GoodsThumb({ name }: { name: string }) {
       alt={name}
       loading="lazy"
       onError={() => setIdx(i => i + 1)}
-      className="w-10 h-10 rounded-lg object-cover bg-brand-pale flex-shrink-0"
+      className="w-11 h-11 rounded-lg object-contain bg-white ring-1 ring-brand-blue/10 flex-shrink-0"
     />
   )
 }
@@ -793,27 +811,27 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
                   <p className="text-[12px] text-brand-dark/35 text-center py-6">ไม่พบสินค้าที่ค้นหา</p>
                 )}
 
-                <div className="space-y-3 md:max-h-96 md:overflow-y-auto md:pr-1">
+                <div className="space-y-0.5 md:max-h-[26rem] md:overflow-y-auto md:pr-1">
                   {visibleGoods.map((g, i) => {
                     const top = visibleGoods[0]
                     const pct = top ? (activeGoodsTab === 'amount' ? g.amount / top.amount : g.volume / top.volume) * 100 : 0
                     return (
-                      <div key={g.name} className="flex items-center gap-2.5 row-hover px-2 py-1 -mx-2">
-                        <span className="w-5 text-center text-[12px] font-bold flex-shrink-0"
-                          style={{ color: RANK_STYLES[i]?.bg ?? 'rgba(13,27,62,0.35)' }}>
+                      <div key={g.name} className="flex items-center gap-2 rounded-xl px-2 py-1.5 -mx-2 hover:bg-brand-pale/50 transition-colors">
+                        <span className="w-4 text-right text-[12px] font-bold tabular-nums flex-shrink-0"
+                          style={{ color: RANK_STYLES[i]?.bg ?? 'rgba(13,27,62,0.3)' }}>
                           {i + 1}
                         </span>
                         <GoodsThumb name={g.name} />
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1">
-                            <p className="text-brand-dark text-[12px] font-medium truncate pr-2">{g.name}</p>
-                            <p className="text-brand-dark/70 text-[12px] font-medium flex-shrink-0">
+                          <div className="flex items-baseline justify-between gap-2 mb-1.5">
+                            <p className="text-brand-dark text-[12px] font-medium truncate leading-snug">{g.name}</p>
+                            <p className="text-brand-dark text-[12px] font-semibold tabular-nums flex-shrink-0">
                               {activeGoodsTab === 'amount' ? `฿${formatBaht(g.amount)}` : `${g.volume} ชิ้น`}
                             </p>
                           </div>
-                          <div className="h-1.5 bg-brand-pale rounded-full overflow-hidden">
+                          <div className="h-1 bg-brand-pale rounded-full overflow-hidden">
                             <div className="h-full rounded-full transition-all duration-500"
-                              style={{ width: `${pct}%`, backgroundColor: RANK_STYLES[i]?.bg ?? '#1a52b3', opacity: i >= 3 ? 0.5 : 1 }} />
+                              style={{ width: `${pct}%`, backgroundColor: RANK_STYLES[i]?.bg ?? '#1a52b3', opacity: i >= 3 ? 0.45 : 1 }} />
                           </div>
                         </div>
                       </div>

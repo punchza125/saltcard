@@ -23,6 +23,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "predev": "node scripts/gen-img-manifest.mjs",
+    "prebuild": "node scripts/gen-img-manifest.mjs"
   }
 }
