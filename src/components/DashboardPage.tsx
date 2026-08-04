@@ -96,12 +96,13 @@ function goodsImageCandidates(name: string): string[] {
 }
 
 /** รูปสินค้าเล็กในรายการขายดี — ลองหลายชื่อ ถ้าไม่เจอเลยแสดงกล่องเปล่า */
-function GoodsThumb({ name }: { name: string }) {
+function GoodsThumb({ name, delay = 0 }: { name: string; delay?: number }) {
   const srcs = useMemo(() => goodsImageCandidates(name), [name])
   const [idx, setIdx] = useState(0)
   if (idx >= srcs.length) {
     return (
-      <div className="w-11 h-11 rounded-lg bg-brand-pale flex items-center justify-center flex-shrink-0">
+      <div className="w-11 h-11 rounded-lg bg-brand-pale flex items-center justify-center flex-shrink-0 animate-pop-in"
+        style={{ animationDelay: `${delay}ms` }}>
         <Package size={14} className="text-brand-blue/25" />
       </div>
     )
@@ -113,7 +114,8 @@ function GoodsThumb({ name }: { name: string }) {
       alt={name}
       loading="lazy"
       onError={() => setIdx(i => i + 1)}
-      className="w-11 h-11 rounded-lg object-contain bg-white ring-1 ring-brand-blue/10 flex-shrink-0"
+      style={{ animationDelay: `${delay}ms` }}
+      className="w-11 h-11 rounded-lg object-contain bg-white ring-1 ring-brand-blue/10 flex-shrink-0 animate-pop-in transition-transform duration-200 hover:scale-110"
     />
   )
 }
@@ -796,12 +798,13 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
                 </div>
                 {goodsTypes.length > 1 && (
                   <div className="flex flex-wrap gap-1 mb-3">
-                    {['ทั้งหมด', ...goodsTypes].map(c => {
+                    {['ทั้งหมด', ...goodsTypes].map((c, idx) => {
                       const logo = categoryLogo(c)
                       const active = goodsCat === c
                       return (
                         <button key={c} onClick={() => setGoodsCat(c)} title={c}
-                          className={`h-7 px-2.5 rounded-full text-[11px] font-medium border transition-all flex items-center ${
+                          style={{ animationDelay: `${Math.min(idx, 10) * 40}ms` }}
+                          className={`h-7 px-2.5 rounded-full text-[11px] font-medium border flex items-center animate-pop-in transition-all duration-200 active:scale-90 hover:-translate-y-0.5 ${
                             active
                               ? 'bg-brand-pale border-brand-blue ring-1 ring-brand-blue/40 text-brand-dark'
                               : 'bg-white text-brand-dark/50 border-brand-blue/15 hover:border-brand-blue/40'
@@ -836,7 +839,7 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
                             {i + 1}
                           </span>
                         )}
-                        <GoodsThumb name={g.name} />
+                        <GoodsThumb name={g.name} delay={Math.min(i, 12) * 35} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-baseline justify-between gap-2 mb-1.5">
                             <p className="text-brand-dark text-[12px] font-medium truncate leading-snug">{g.name}</p>

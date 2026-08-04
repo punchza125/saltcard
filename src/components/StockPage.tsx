@@ -1313,13 +1313,14 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
           const set = new Set<string>(CATEGORIES.filter(c => c !== 'อื่นๆ' && !hidden.has(c)))
           stock.products.forEach(p => { if (p.category && p.category !== 'อื่นๆ' && !hidden.has(p.category)) set.add(p.category) })
           return ['ทั้งหมด', ...set, 'อื่นๆ']
-        })().map(c => {
+        })().map((c, ci) => {
           const count = c === 'ทั้งหมด'
             ? stock.products.length
             : stock.products.filter(p => c === 'อื่นๆ' ? (!p.category || p.category === 'อื่นๆ') : p.category === c).length
           return (
             <button key={c} onClick={() => setCatFilter(c)} title={c}
-              className={`flex-shrink-0 h-8 px-3 rounded-full text-[12px] font-medium transition-all border flex items-center gap-1.5 ${
+              style={{ animationDelay: `${Math.min(ci, 10) * 40}ms` }}
+              className={`flex-shrink-0 h-8 px-3 rounded-full text-[12px] font-medium border flex items-center gap-1.5 animate-pop-in transition-all duration-200 active:scale-90 hover:-translate-y-0.5 ${
                 catFilter === c
                   ? 'bg-brand-pale text-brand-dark border-brand-blue ring-1 ring-brand-blue/40'
                   : 'bg-white text-brand-dark/60 border-brand-blue/15 hover:border-brand-blue/30'
