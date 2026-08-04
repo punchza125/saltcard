@@ -56,6 +56,49 @@ const RANK_STYLES = [
   { bg: '#8b5cf6', text: '#fff' },
 ]
 
+/**
+ * ลำดับรูปที่จะลองโหลดสำหรับสินค้าในรายงานขาย
+ * สินค้า [Promotion] ใช้รูปปกติของสินค้านั้น (ตัดคำว่า promotion ออกก่อนค้น)
+ */
+function goodsImageCandidates(name: string): string[] {
+  const base = name
+    .replace(/^\[Promotion\]\s*/i, '')
+    .replace(/^Promotion\s*-\s*/i, '')
+    .replace(/\s*\(Promotion\)\s*$/i, '')
+    .trim()
+  // สินค้า promotion ใช้ "รูปปกติ" ของสินค้านั้นก่อน แล้วค่อย fallback เป็นชื่อเต็ม
+  const out: string[] = base !== name ? [base, name] : [name]
+  for (const b of [...out]) {
+    if (!/\((1 Pack|Box)\)\s*$/i.test(b)) out.push(`${b} (1 Pack)`)
+    const noBox = b.replace(/\s*\(Box\)\s*$/i, '')
+    if (noBox !== b) out.push(`${noBox} (1 Pack)`)
+  }
+  return [...new Set(out)].map(n => `/Img/${n}.jpg`)
+}
+
+/** รูปสินค้าเล็กในรายการขายดี — ลองหลายชื่อ ถ้าไม่เจอเลยแสดงกล่องเปล่า */
+function GoodsThumb({ name }: { name: string }) {
+  const srcs = useMemo(() => goodsImageCandidates(name), [name])
+  const [idx, setIdx] = useState(0)
+  if (idx >= srcs.length) {
+    return (
+      <div className="w-10 h-10 rounded-lg bg-brand-pale flex items-center justify-center flex-shrink-0">
+        <Package size={14} className="text-brand-blue/25" />
+      </div>
+    )
+  }
+  return (
+    <img
+      key={srcs[idx]}
+      src={srcs[idx]}
+      alt={name}
+      loading="lazy"
+      onError={() => setIdx(i => i + 1)}
+      className="w-10 h-10 rounded-lg object-cover bg-brand-pale flex-shrink-0"
+    />
+  )
+}
+
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null
   return (
@@ -755,13 +798,12 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
                     const top = visibleGoods[0]
                     const pct = top ? (activeGoodsTab === 'amount' ? g.amount / top.amount : g.volume / top.volume) * 100 : 0
                     return (
-                      <div key={g.name} className="flex items-center gap-3 row-hover px-2 py-1 -mx-2">
-                        <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold flex-shrink-0"
-                          style={RANK_STYLES[i]
-                            ? { backgroundColor: RANK_STYLES[i].bg, color: RANK_STYLES[i].text }
-                            : { backgroundColor: '#e8f0fc', color: 'rgba(13,27,62,0.5)' }}>
+                      <div key={g.name} className="flex items-center gap-2.5 row-hover px-2 py-1 -mx-2">
+                        <span className="w-5 text-center text-[12px] font-bold flex-shrink-0"
+                          style={{ color: RANK_STYLES[i]?.bg ?? 'rgba(13,27,62,0.35)' }}>
                           {i + 1}
-                        </div>
+                        </span>
+                        <GoodsThumb name={g.name} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-1">
                             <p className="text-brand-dark text-[12px] font-medium truncate pr-2">{g.name}</p>
