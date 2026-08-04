@@ -8,6 +8,7 @@ import type { DayReport, StockProduct } from '../types'
 import { formatThaiDate, formatThaiDateFull, formatBaht, matchesKeyword } from '../utils/parser'
 import StatCard from './StatCard'
 import { IMG_FILES } from '../generated/imgManifest'
+import { categoryLogo } from '../lib/categoryLogos'
 
 interface DashboardPageProps {
   reports: DayReport[]
@@ -795,15 +796,23 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
                 </div>
                 {goodsTypes.length > 1 && (
                   <div className="flex flex-wrap gap-1 mb-3">
-                    {['ทั้งหมด', ...goodsTypes].map(c => (
-                      <button key={c} onClick={() => setGoodsCat(c)}
-                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
-                          goodsCat === c
-                            ? 'bg-brand-dark text-white border-transparent'
-                            : 'bg-white text-brand-dark/50 border-brand-blue/15 hover:border-brand-blue/40'
-                        }`}
-                      >{c}</button>
-                    ))}
+                    {['ทั้งหมด', ...goodsTypes].map(c => {
+                      const logo = categoryLogo(c)
+                      const active = goodsCat === c
+                      return (
+                        <button key={c} onClick={() => setGoodsCat(c)} title={c}
+                          className={`h-7 px-2.5 rounded-full text-[11px] font-medium border transition-all flex items-center ${
+                            active
+                              ? 'bg-brand-pale border-brand-blue ring-1 ring-brand-blue/40 text-brand-dark'
+                              : 'bg-white text-brand-dark/50 border-brand-blue/15 hover:border-brand-blue/40'
+                          }`}
+                        >
+                          {logo
+                            ? <img src={logo} alt={c} className={`h-4 w-auto max-w-[54px] object-contain transition-opacity ${active ? '' : 'opacity-55'}`} />
+                            : c}
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
 
@@ -817,10 +826,16 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
                     const pct = top ? (activeGoodsTab === 'amount' ? g.amount / top.amount : g.volume / top.volume) * 100 : 0
                     return (
                       <div key={g.name} className="flex items-center gap-2 rounded-xl px-2 py-1.5 -mx-2 hover:bg-brand-pale/50 transition-colors">
-                        <span className="w-4 text-right text-[12px] font-bold tabular-nums flex-shrink-0"
-                          style={{ color: RANK_STYLES[i]?.bg ?? 'rgba(13,27,62,0.3)' }}>
-                          {i + 1}
-                        </span>
+                        {RANK_STYLES[i] ? (
+                          <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold tabular-nums flex-shrink-0 text-white"
+                            style={{ backgroundColor: RANK_STYLES[i].bg }}>
+                            {i + 1}
+                          </span>
+                        ) : (
+                          <span className="w-5 text-center text-[11px] font-semibold tabular-nums flex-shrink-0 text-brand-dark/30">
+                            {i + 1}
+                          </span>
+                        )}
                         <GoodsThumb name={g.name} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-baseline justify-between gap-2 mb-1.5">

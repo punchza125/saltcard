@@ -9,6 +9,7 @@ import { useStockStore, type SyncPreviewItem, type InventorySnapshotItem } from 
 import { formatThaiDate, parseInventoryReport, matchesKeyword } from '../utils/parser'
 import OrdersTab from './OrdersTab'
 import { useOrderStore } from '../hooks/useOrderStore'
+import { categoryLogo } from '../lib/categoryLogos'
 
 
 const CATEGORIES = ['One Piece', 'Dragon Ball', 'Naruto', 'Pokémon', 'อื่นๆ'] as const
@@ -1317,14 +1318,18 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
             ? stock.products.length
             : stock.products.filter(p => c === 'อื่นๆ' ? (!p.category || p.category === 'อื่นๆ') : p.category === c).length
           return (
-            <button key={c} onClick={() => setCatFilter(c)}
-              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-[12px] font-medium transition-all border ${
+            <button key={c} onClick={() => setCatFilter(c)} title={c}
+              className={`flex-shrink-0 h-8 px-3 rounded-full text-[12px] font-medium transition-all border flex items-center gap-1.5 ${
                 catFilter === c
-                  ? 'bg-brand-dark text-white border-transparent'
+                  ? 'bg-brand-pale text-brand-dark border-brand-blue ring-1 ring-brand-blue/40'
                   : 'bg-white text-brand-dark/60 border-brand-blue/15 hover:border-brand-blue/30'
               }`}
             >
-              {c} {count > 0 && <span className={`text-[10px] ${catFilter === c ? 'text-white/70' : 'text-brand-dark/40'}`}>{count}</span>}
+              {categoryLogo(c)
+                ? <img src={categoryLogo(c)!} alt={c}
+                    className={`h-4 w-auto max-w-[58px] object-contain transition-opacity ${catFilter === c ? '' : 'opacity-55'}`} />
+                : c}
+              {count > 0 && <span className={`text-[10px] ${catFilter === c ? 'text-brand-blue' : 'text-brand-dark/40'}`}>{count}</span>}
             </button>
           )
         })}
