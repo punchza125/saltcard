@@ -65,3 +65,10 @@ export const IMG_FILES: string[] = [
   "[Promotion] One Piece OP-16 (1 Pack).jpg",
   "[Promotion] PANINI - FIFA World Cup 2026 - Black (1 Pack).jpg"
 ]
+
+export const LOGO_FILES: string[] = [
+  "Kayou.png",
+  "Lorcana.png",
+  "One Piece.png",
+  "Pokemon.png"
+]
