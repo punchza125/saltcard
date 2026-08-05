@@ -67,8 +67,11 @@ export const IMG_FILES: string[] = [
 ]
 
 export const LOGO_FILES: string[] = [
+  "Doraemon.webp",
+  "Dragon Ball.png",
   "Kayou.png",
   "Lorcana.png",
+  "Naruto.svg",
   "One Piece.png",
   "Pokemon.png"
 ]
