@@ -271,6 +271,25 @@ function CreateOrderModal({
                       </button>
                     )}
                   </div>
+
+                  {/* ราคาซื้อต่อกล่อง — ใช้เป็นต้นทุนคิดกำไรตั้งแต่วันที่รับของ */}
+                  <div className="flex items-center gap-2 px-3 py-2 border-t border-brand-blue/8 bg-emerald-50/40">
+                    <span className="text-[11px] text-emerald-700/70 w-8 flex-shrink-0">ราคา</span>
+                    <div className="flex items-center gap-1 flex-1">
+                      <span className="text-[13px] text-brand-dark/40">฿</span>
+                      <input
+                        type="number" min="0" inputMode="decimal" placeholder="ราคาต่อกล่อง"
+                        value={item.pricePerBox ?? ''}
+                        onFocus={e => e.target.select()}
+                        onChange={e => {
+                          const v = e.target.value
+                          setItem(i, { pricePerBox: v === '' ? undefined : Math.max(0, Number(v) || 0) })
+                        }}
+                        className="w-full border border-emerald-200 rounded-lg px-2 py-1 text-[13px] font-semibold outline-none focus:border-emerald-400 bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                    </div>
+                    <span className="text-[10px] text-brand-dark/30 flex-shrink-0">/ กล่อง</span>
+                  </div>
                 </div>
               ))}
 
@@ -446,7 +465,12 @@ function OrderCard({
             <div key={i} className="flex items-center gap-1.5 text-[11px]">
               <span className="w-1 h-1 rounded-full bg-brand-dark/20 flex-shrink-0" />
               <span className="text-brand-dark/70 flex-1 truncate">{item.name}</span>
-              <span className="font-semibold text-brand-dark flex-shrink-0">{item.qty} {item.unit}</span>
+              <span className="font-semibold text-brand-dark flex-shrink-0">
+                {item.qty} {item.unit}
+                {item.pricePerBox != null && (
+                  <span className="ml-1.5 font-normal text-emerald-600/80">฿{item.pricePerBox.toLocaleString()}/กล่อง</span>
+                )}
+              </span>
               {product && <span className="text-[10px] text-brand-dark/25 flex-shrink-0">{product.category}</span>}
             </div>
           )

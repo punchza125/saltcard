@@ -6,7 +6,8 @@ import {
 import { ChevronLeft, ChevronRight, TrendingUp, Package, MapPin, Search, X } from 'lucide-react'
 import type { DayReport, StockProduct } from '../types'
 import { formatThaiDate, formatThaiDateFull, formatBaht, matchesKeyword } from '../utils/parser'
-import { rateOn } from '../lib/profitRates'
+import { calcProfit } from '../lib/profit'
+import { useOrderStore } from '../hooks/useOrderStore'
 import StatCard from './StatCard'
 import { IMG_FILES } from '../generated/imgManifest'
 import { categoryLogo } from '../lib/categoryLogos'
@@ -22,41 +23,6 @@ interface DashboardPageProps {
   categoryAliases?: Record<string, string>  // ย้าย/รวมหมวด → remap ยอดขายในกราฟ
 }
 
-/**
- * กำไรของช่วงที่เลือก — คิดจาก "กำไรต่อซอง / ต่อกล่อง" ที่กรอกไว้ในหน้าสต็อก
- * คูณกับจำนวนที่ขายได้จริงในรายงาน (ขายเป็นกล่องใช้กำไรต่อกล่อง, เป็นซองใช้ต่อซอง)
- * อัตราที่ใช้คืออัตราที่มีผล ณ วันนั้นๆ — แก้ราคาวันนี้ไม่กระทบกำไรของวันก่อนหน้า
- */
-function calcProfit(reports: DayReport[], products: StockProduct[]) {
-  let packQty = 0, packProfit = 0
-  let boxQty  = 0, boxProfit  = 0
-  let matched = 0
-  const unpriced = new Set<string>()
-
-  for (const report of reports) {
-    for (const goods of report.goods) {
-      const lower = goods.goodsName.toLowerCase()
-      const isBox = lower.includes('(box)') || lower.endsWith(' box')
-      const product = products.find(p => p.goodsKeyword && matchesKeyword(goods.goodsName, p.goodsKeyword))
-      // ใช้อัตราที่มีผล ณ วันของรายงาน ไม่ใช่อัตราล่าสุด
-      const r = product ? rateOn(product, report.date) : undefined
-      const rate = isBox ? r?.perBox : r?.perPack
-      if (!product || rate == null) { unpriced.add(goods.goodsName); continue }
-      if (isBox) { boxQty += goods.salesVolume;  boxProfit  += goods.salesVolume * rate }
-      else       { packQty += goods.salesVolume; packProfit += goods.salesVolume * rate }
-      matched++
-    }
-  }
-
-  if (matched === 0) return null
-  return {
-    total: packProfit + boxProfit,
-    packQty, packProfit, avgPerPack: packQty > 0 ? packProfit / packQty : 0,
-    boxQty,  boxProfit,  avgPerBox:  boxQty  > 0 ? boxProfit  / boxQty  : 0,
-    matched,
-    unpricedCount: unpriced.size,
-  }
-}
 
 type RangeMode = 'day' | 'week' | 'month' | 'all'
 
@@ -147,6 +113,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 }
 
 export default function DashboardPage({ reports: allReports, stockProducts = [], taxRate = 15, activeBranch, setActiveBranch, syncStatus, lastSynced, categoryAliases = {} }: DashboardPageProps) {
+  const { orders } = useOrderStore()
   // กรองตามสาขาที่เลือก — 'ทั้งหมด' รวมทุกสาขา (ใช้ area total), ไม่งั้นดึงเฉพาะ site ที่ตรงชื่อ
   const selectedSite = activeBranch || 'ทั้งหมด'
 
@@ -294,11 +261,11 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
     return { best, streak, winsTotal, total: dailyAmts.length - 1 }
   }, [reports, rangeMode])
 
-  // กำไรของช่วงที่เลือก — ใช้ได้ทุกวัน/ทุกช่วง เพราะกำไรต่อหน่วยกรอกไว้แล้ว
+  // กำไรของช่วงที่เลือก — ต้นทุนอ้างอิงราคากล่องล่าสุดที่รับของแล้ว ณ วันนั้น
   const profit = useMemo(() => {
     if (!filteredReports.length || stockProducts.length === 0) return null
-    return calcProfit(filteredReports, stockProducts)
-  }, [filteredReports, stockProducts])
+    return calcProfit(filteredReports, stockProducts, orders, taxRate)
+  }, [filteredReports, stockProducts, orders, taxRate])
 
   const availableDates = useMemo(() => new Set(reports.map(r => r.date)), [reports])
 
@@ -716,15 +683,22 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
                 )}
               </div>
             </div>
-            {profit.unpricedCount > 0 && (
+            <div className="flex gap-4 flex-wrap text-[10px] text-brand-dark/40 pt-0.5 border-t border-emerald-200/60">
+              <span>ยอดขาย ฿{formatBaht(Math.round(profit.revenue))}</span>
+              <span>ต้นทุน ฿{formatBaht(Math.round(profit.cost))}</span>
+              <span>ภาษี {taxRate}% ฿{formatBaht(Math.round(profit.tax))}</span>
+              <span className="font-semibold text-emerald-600">กำไร {profit.marginPct.toFixed(1)}%</span>
+            </div>
+            {profit.uncosted.length > 0 && (
               <p className="text-[10px] text-amber-600">
-                ⚠️ ยังไม่ได้ตั้งกำไรให้สินค้า {profit.unpricedCount} รายการ — ยอดส่วนนี้ยังไม่ถูกนับ
+                ⚠️ ยังไม่รู้ต้นทุนสินค้า {profit.uncosted.length} รายการ — ยอดส่วนนี้ยังไม่ถูกนับ
+                (กรอกราคาตอนสั่งสินค้า หรือใส่ราคาตั้งต้นที่หน้าสต็อก)
               </p>
             )}
           </div>
         ) : (
           <div className="rounded-2xl border border-brand-blue/10 bg-brand-pale/30 px-4 py-3 text-center">
-            <p className="text-[12px] text-brand-dark/30">ยังไม่ได้ตั้งกำไรต่อซอง/ต่อกล่อง — ตั้งได้ที่หน้าสต็อก → แก้ไขสินค้า</p>
+            <p className="text-[12px] text-brand-dark/30">ยังคิดกำไรไม่ได้ — ต้องรู้ต้นทุนก่อน กรอกราคาต่อกล่องตอนสั่งสินค้า</p>
           </div>
         )}
       </div>

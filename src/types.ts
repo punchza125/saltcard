@@ -43,13 +43,6 @@ export interface DashboardStore {
   reports: DayReport[]
 }
 
-/** อัตรากำไรต่อหน่วยที่มีผลตั้งแต่วันที่ `from` เป็นต้นไป (จนกว่าจะมีช่วงถัดไป) */
-export interface ProfitRate {
-  from: string      // YYYY-MM-DD
-  perPack?: number  // กำไรต่อซอง (฿)
-  perBox?: number   // กำไรต่อกล่อง (฿)
-}
-
 export type StockUnit = 'Box' | 'Pack' | 'Carton' | 'ชิ้น'
 
 export interface StockProduct {
@@ -63,15 +56,12 @@ export interface StockProduct {
   redAt: number          // critical threshold (pack)
   goodsKeyword: string   // keyword จับคู่ชื่อใน Goods Aspect เช่น "PRB-02"
   category: string       // หมวดหมู่ เช่น "One Piece"
-  buyPricePerBox?: number   // ราคาซื้อต่อกล่อง (฿)
-  sellPricePerPack?: number // ราคาขายต่อซอง (฿)
-  sellPricePerBox?: number  // ราคาขายต่อกล่อง (฿) — optional
-  // กำไรที่กรอกเองต่อหน่วย (฿) — ระบบเอาไปคูณกับยอดขายในรายงานให้อัตโนมัติ
-  // อัตราตั้งต้น: ใช้กับวันที่เก่ากว่าช่วงแรกใน profitRates
-  profitPerPack?: number    // กำไรต่อซอง
-  profitPerBox?: number     // กำไรต่อกล่อง
-  // ประวัติอัตรากำไรตามช่วงเวลา — เรียงตาม from จากเก่าไปใหม่
-  profitRates?: ProfitRate[]
+  /**
+   * ราคาซื้อต่อกล่อง (฿) — ต้นทุนตั้งต้น
+   * ใช้กับวันที่เก่ากว่าออร์เดอร์แรกที่กรอกราคาไว้
+   * ออร์เดอร์ที่รับของแล้วและมีราคา จะเข้ามาแทนตั้งแต่วันที่รับเป็นต้นไป
+   */
+  buyPricePerBox?: number
 }
 
 export type EntryKind = 'in' | 'received' | 'incoming' | 'out' | 'auto' | 'adjust'
@@ -131,6 +121,7 @@ export interface OrderItem {
   name: string         // ชื่อสินค้า (สำเนาจาก product หรือพิมพ์เอง)
   qty: number          // จำนวนที่สั่ง
   unit: string         // หน่วย (Box/Pack/etc)
+  pricePerBox?: number // ราคาซื้อต่อกล่อง (฿) — ใช้เป็นต้นทุนตั้งแต่วันที่รับของ
 }
 
 export type OrderStatus = 'ordered' | 'in_transit' | 'received'

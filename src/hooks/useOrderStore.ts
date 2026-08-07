@@ -36,9 +36,20 @@ const orderRef   = (id: string) => doc(db(), COL.orders, id)
 const productRef = (id: string) => doc(db(), COL.products, id)
 const entryRef   = (id: string) => doc(db(), COL.entries, id)
 
-/** Firestore ไม่รับ undefined → ตัดทิ้งก่อนเขียน */
+/** Firestore ไม่รับ undefined → ตัดทิ้งก่อนเขียน (รวมถึงที่ซ้อนอยู่ใน items ด้วย) */
+function strip(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(strip)
+  if (v && typeof v === 'object') {
+    return Object.fromEntries(
+      Object.entries(v as Record<string, unknown>)
+        .filter(([, x]) => x !== undefined)
+        .map(([k, x]) => [k, strip(x)])
+    )
+  }
+  return v
+}
 function clean<T extends object>(o: T): T {
-  return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T
+  return strip(o) as T
 }
 
 /** แปลงจำนวนที่สั่ง (Box/Pack) → จำนวน pack ตาม packsPerBox ของสินค้า */
