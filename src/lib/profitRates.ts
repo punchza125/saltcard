@@ -58,7 +58,11 @@ export function upsertRate(
   const effective = rateOn({ ...product, profitRates: next }, from)
   if (effective.perPack === perPack && effective.perBox === perBox) return next  // ไม่เปลี่ยน
 
-  return sortRates([...next, { from, perPack, perBox }])
+  // ห้ามใส่ key ที่เป็น undefined — Firestore ไม่รับค่า undefined ที่อยู่ในอาร์เรย์
+  const rate: ProfitRate = { from }
+  if (perPack != null) rate.perPack = perPack
+  if (perBox  != null) rate.perBox  = perBox
+  return sortRates([...next, rate])
 }
 
 export function removeRate(product: StockProduct, from: string): ProfitRate[] {

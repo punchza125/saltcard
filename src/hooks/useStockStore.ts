@@ -102,8 +102,20 @@ export function useStockStore() {
 
   function updateProduct(id: string, patchData: Partial<Omit<StockProduct, 'id'>>) {
     // ส่ง key มาพร้อมค่า undefined = ตั้งใจลบค่านั้นทิ้ง (เช่น ล้างกำไรต่อซอง)
+    // ส่วนค่า undefined ที่ซ้อนอยู่ข้างในต้องตัดออก — Firestore ไม่รับ
+    const stripUndefined = (v: unknown): unknown => {
+      if (Array.isArray(v)) return v.map(stripUndefined)
+      if (v && typeof v === 'object') {
+        return Object.fromEntries(
+          Object.entries(v as Record<string, unknown>)
+            .filter(([, x]) => x !== undefined)
+            .map(([k, x]) => [k, stripUndefined(x)])
+        )
+      }
+      return v
+    }
     const payload = Object.fromEntries(
-      Object.entries(patchData).map(([k, v]) => [k, v === undefined ? deleteField() : v])
+      Object.entries(patchData).map(([k, v]) => [k, v === undefined ? deleteField() : stripUndefined(v)])
     )
     updateDoc(productRef(id), payload)
     if (patchData.category) unhideCategory(patchData.category)
