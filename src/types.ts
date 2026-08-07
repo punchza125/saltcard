@@ -43,6 +43,13 @@ export interface DashboardStore {
   reports: DayReport[]
 }
 
+/** อัตรากำไรต่อหน่วยที่มีผลตั้งแต่วันที่ `from` เป็นต้นไป (จนกว่าจะมีช่วงถัดไป) */
+export interface ProfitRate {
+  from: string      // YYYY-MM-DD
+  perPack?: number  // กำไรต่อซอง (฿)
+  perBox?: number   // กำไรต่อกล่อง (฿)
+}
+
 export type StockUnit = 'Box' | 'Pack' | 'Carton' | 'ชิ้น'
 
 export interface StockProduct {
@@ -59,6 +66,12 @@ export interface StockProduct {
   buyPricePerBox?: number   // ราคาซื้อต่อกล่อง (฿)
   sellPricePerPack?: number // ราคาขายต่อซอง (฿)
   sellPricePerBox?: number  // ราคาขายต่อกล่อง (฿) — optional
+  // กำไรที่กรอกเองต่อหน่วย (฿) — ระบบเอาไปคูณกับยอดขายในรายงานให้อัตโนมัติ
+  // อัตราตั้งต้น: ใช้กับวันที่เก่ากว่าช่วงแรกใน profitRates
+  profitPerPack?: number    // กำไรต่อซอง
+  profitPerBox?: number     // กำไรต่อกล่อง
+  // ประวัติอัตรากำไรตามช่วงเวลา — เรียงตาม from จากเก่าไปใหม่
+  profitRates?: ProfitRate[]
 }
 
 export type EntryKind = 'in' | 'received' | 'incoming' | 'out' | 'auto' | 'adjust'

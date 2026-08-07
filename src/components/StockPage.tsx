@@ -4,12 +4,13 @@ import {
   ChevronDown, ChevronUp, X, Check, RefreshCw, AlertTriangle, Upload, Cloud, CloudOff,
   Package2, BarChart2, Truck, Loader2, Plane,
 } from 'lucide-react'
-import type { StockProduct, StockUnit, DayReport, PurchaseOrder } from '../types'
+import type { StockProduct, StockUnit, DayReport, PurchaseOrder, ProfitRate } from '../types'
 import { useStockStore, type SyncPreviewItem, type InventorySnapshotItem } from '../hooks/useStockStore'
 import { formatThaiDate, parseInventoryReport, matchesKeyword } from '../utils/parser'
 import OrdersTab from './OrdersTab'
 import { useOrderStore } from '../hooks/useOrderStore'
 import { categoryLogo } from '../lib/categoryLogos'
+import { rateOn, upsertRate, removeRate, sortRates } from '../lib/profitRates'
 
 
 const CATEGORIES = ['One Piece', 'Dragon Ball', 'Naruto', 'Pokémon', 'อื่นๆ'] as const
@@ -291,7 +292,8 @@ function ProductModal({
   onSave: (
     name: string, unit: StockUnit, packsPerBox: number,
     qty: number, qtyIncoming: number, yellowAt: number, redAt: number, goodsKeyword: string, category: string,
-    buyPricePerBox?: number, sellPricePerPack?: number, sellPricePerBox?: number
+    buyPricePerBox?: number, sellPricePerPack?: number, sellPricePerBox?: number,
+    profitPerPack?: number, profitPerBox?: number, profitRates?: ProfitRate[]
   ) => void
   onClose: () => void
   hiddenCategories?: string[]
@@ -312,6 +314,32 @@ function ProductModal({
   const [yellowAt,    setYellowAt]    = useState(String(initial?.yellowAt    ?? 120))
   const [redAt,       setRedAt]       = useState(String(initial?.redAt       ?? 48))
   const [keyword,     setKeyword]     = useState(initial?.goodsKeyword       ?? '')
+  // ── กำไรต่อหน่วยแบบมีช่วงเวลา ─────────────────────────────────────────────
+  const TODAY = new Date().toISOString().slice(0, 10)
+  const [rates, setRates] = useState<ProfitRate[]>(initial?.profitRates ?? [])
+  const [profitFrom, setProfitFrom] = useState(TODAY)
+  const rateAt = (date: string, rs: ProfitRate[]) =>
+    rateOn({ ...(initial ?? ({} as StockProduct)), profitRates: rs }, date)
+  const initialRate = rateAt(TODAY, initial?.profitRates ?? [])
+  const [profitPack, setProfitPack] = useState(initialRate.perPack != null ? String(initialRate.perPack) : '')
+  const [profitBox,  setProfitBox]  = useState(initialRate.perBox  != null ? String(initialRate.perBox)  : '')
+
+  /** เปลี่ยนวันที่มีผล → ดึงอัตราที่ใช้อยู่ ณ วันนั้นมาโชว์ */
+  function changeProfitFrom(date: string) {
+    setProfitFrom(date)
+    if (!date) return
+    const r = rateAt(date, rates)
+    setProfitPack(r.perPack != null ? String(r.perPack) : '')
+    setProfitBox(r.perBox  != null ? String(r.perBox)  : '')
+  }
+
+  function deleteRate(from: string) {
+    const next = removeRate({ ...(initial ?? ({} as StockProduct)), profitRates: rates }, from)
+    setRates(next)
+    const r = rateAt(profitFrom || TODAY, next)
+    setProfitPack(r.perPack != null ? String(r.perPack) : '')
+    setProfitBox(r.perBox  != null ? String(r.perBox)  : '')
+  }
   const [category,    setCategory]    = useState(initial?.category           ?? '')
   const [error,       setError]       = useState('')
   const [showNewCat,  setShowNewCat]  = useState(false)
@@ -409,6 +437,15 @@ function ProductModal({
       initial?.buyPricePerBox,
       initial?.sellPricePerPack,
       initial?.sellPricePerBox,
+      // ค่าตั้งต้นเดิมไม่แตะ — มันคืออัตราของวันก่อนช่วงแรกในประวัติ
+      initial?.profitPerPack,
+      initial?.profitPerBox,
+      upsertRate(
+        { ...(initial ?? ({} as StockProduct)), profitRates: rates },
+        profitFrom || TODAY,
+        profitPack.trim() === '' ? undefined : Number(profitPack),
+        profitBox.trim()  === '' ? undefined : Number(profitBox),
+      ),
     )
     onClose()
   }
@@ -580,6 +617,77 @@ function ProductModal({
             )}
           </div>
 
+          {/* กำไรต่อหน่วย — ใส่ไว้แล้วระบบคูณกับยอดขายในรายงานให้เอง */}
+          <div>
+            <label className="text-[11px] font-semibold text-brand-dark/40 uppercase tracking-wider">
+              กำไรต่อหน่วย <span className="font-normal normal-case text-brand-dark/30">(฿ — ไม่ใส่ก็ได้)</span>
+            </label>
+            <div className="grid grid-cols-2 gap-2 mt-1.5">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
+                <p className="text-[11px] text-emerald-600 font-medium mb-1">กำไร / ซอง</p>
+                <input
+                  type="number" inputMode="decimal" placeholder="—"
+                  className="w-full bg-transparent text-[16px] font-bold text-brand-dark outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  value={profitPack} onChange={e => setProfitPack(e.target.value)}
+                />
+              </div>
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
+                <p className="text-[11px] text-emerald-600 font-medium mb-1">กำไร / กล่อง</p>
+                <input
+                  type="number" inputMode="decimal" placeholder="—"
+                  className="w-full bg-transparent text-[16px] font-bold text-brand-dark outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  value={profitBox} onChange={e => setProfitBox(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="mt-2 flex items-center gap-2 rounded-xl bg-brand-dark/[0.03] px-3 py-2">
+              <span className="text-[11px] font-medium text-brand-dark/50 shrink-0">มีผลตั้งแต่</span>
+              <input
+                type="date"
+                className="flex-1 bg-transparent text-[13px] font-semibold text-brand-dark outline-none"
+                value={profitFrom}
+                onChange={e => changeProfitFrom(e.target.value)}
+              />
+            </div>
+            <p className="text-[10px] text-brand-dark/30 mt-1 leading-relaxed">
+              ยอดขายแต่ละวันจะใช้อัตราที่มีผล ณ วันนั้น — แก้ราคาวันนี้ <b>ไม่กระทบ</b> กำไรของวันก่อนหน้า
+              {' '}ถ้าจะแก้ย้อนหลัง ให้เลื่อนวันที่กลับไป
+            </p>
+
+            {rates.length > 0 && (
+              <div className="mt-2.5 space-y-1">
+                <p className="text-[10px] font-semibold text-brand-dark/35 uppercase tracking-wider">ประวัติอัตรากำไร</p>
+                {[...rates].reverse().map(r => (
+                  <div key={r.from} className="flex items-center gap-2 rounded-lg bg-white border border-brand-dark/8 px-2.5 py-1.5">
+                    <span className="text-[11px] font-semibold text-brand-dark/60 tabular-nums shrink-0">
+                      {formatThaiDate(r.from)}
+                    </span>
+                    <span className="text-[11px] text-brand-dark/45 flex-1 truncate">
+                      {r.perPack != null && <>ซอง ฿{r.perPack}</>}
+                      {r.perPack != null && r.perBox != null && ' · '}
+                      {r.perBox != null && <>กล่อง ฿{r.perBox}</>}
+                    </span>
+                    <button
+                      type="button" onClick={() => deleteRate(r.from)}
+                      className="text-brand-dark/25 hover:text-red-500 transition-colors shrink-0 w-5 h-5 flex items-center justify-center"
+                      aria-label={`ลบอัตราของ ${r.from}`}
+                    >✕</button>
+                  </div>
+                ))}
+                {(initial?.profitPerPack != null || initial?.profitPerBox != null) && (
+                  <div className="flex items-center gap-2 px-2.5 py-1 text-[10px] text-brand-dark/30">
+                    <span className="shrink-0">ก่อนหน้านั้น</span>
+                    <span className="truncate">
+                      {initial?.profitPerPack != null && <>ซอง ฿{initial.profitPerPack}</>}
+                      {initial?.profitPerPack != null && initial?.profitPerBox != null && ' · '}
+                      {initial?.profitPerBox != null && <>กล่อง ฿{initial.profitPerBox}</>}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* thresholds */}
           <div>
             <label className="text-[11px] font-semibold text-brand-dark/40 uppercase tracking-wider">ขีดเตือนสต๊อก (Pack)</label>
@@ -673,7 +781,6 @@ function ProductRow({
   onSync,
   pendingSyncCount,
   readOnly,
-  taxRate,
   incomingDetail,
 }: {
   product: StockProduct
@@ -683,7 +790,6 @@ function ProductRow({
   onSync: () => void
   pendingSyncCount: number
   readOnly?: boolean
-  taxRate: number
   // ยอดกำลังมาแยกตามช่องทาง (หน่วย pack) คำนวณจาก order ที่ยังไม่กดรับ
   incomingDetail?: { air: number; domestic: number }
 }) {
@@ -830,33 +936,58 @@ function ProductRow({
             {ppb > 0 && ` · 1 ${product.unit} = ${ppb} Pack`}
           </p>
 
-          {/* Profit section */}
+          {/* กำไรต่อหน่วยที่ตั้งไว้ — แก้ได้ที่ปุ่มแก้ไขสินค้า */}
           {(() => {
-            const p = calcProfit(product, taxRate)
-            if (!p) return null
+            const now  = rateOn(product, new Date().toISOString().slice(0, 10))
+            const hist = product.profitRates?.length ? sortRates(product.profitRates) : []
+            const isSet = now.perPack != null || now.perBox != null
             return (
               <div className="bg-emerald-50 rounded-xl p-2.5 mb-2 border border-emerald-100">
-                <p className="text-[10px] font-semibold text-emerald-700 mb-1.5">กำไร (ภาษี {taxRate}%)</p>
-                <div className="grid grid-cols-3 text-[9px] text-brand-dark/40 font-medium px-1 mb-1">
-                  <span></span><span className="text-center">Pack</span><span className="text-center">Box</span>
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-[10px] font-semibold text-emerald-700">กำไรต่อหน่วย (ใช้อยู่ตอนนี้)</p>
+                  {!readOnly && (
+                    <button onClick={onEdit}
+                      className="flex items-center gap-1 text-[10px] font-semibold text-emerald-700/70 hover:text-emerald-800"
+                    ><Pencil size={9} /> แก้</button>
+                  )}
                 </div>
-                {[
-                  { label: 'ต้นทุน', packVal: p.costPerPack, boxVal: product.buyPricePerBox, color: 'text-brand-dark/60' },
-                  { label: 'ราคาขาย', packVal: product.sellPricePerPack, boxVal: product.sellPricePerBox, color: 'text-brand-dark/60' },
-                  { label: 'กำไรดิบ', packVal: p.pack ? p.pack.rawProfit : undefined, boxVal: p.box ? p.box.rawProfit : undefined, color: 'text-amber-600' },
-                  { label: 'กำไรสุทธิ', packVal: p.pack ? p.pack.netProfit : undefined, boxVal: p.box ? p.box.netProfit : undefined, color: 'text-emerald-600', bold: true },
-                  { label: 'กำไร %', packVal: p.pack ? p.pack.profitPct : undefined, boxVal: p.box ? p.box.profitPct : undefined, color: 'text-blue-600', isPct: true },
-                ].map(({ label, packVal, boxVal, color, bold, isPct }) => (
-                  <div key={label} className="grid grid-cols-3 text-[11px] py-0.5 border-t border-emerald-100/60">
-                    <span className="text-brand-dark/50 text-[10px]">{label}</span>
-                    <span className={`text-center font-${bold ? 'bold' : 'medium'} ${color}`}>
-                      {packVal != null ? (isPct ? `${packVal.toFixed(1)}%` : `฿${packVal.toFixed(2)}`) : '—'}
-                    </span>
-                    <span className={`text-center font-${bold ? 'bold' : 'medium'} ${color}`}>
-                      {boxVal != null ? (isPct ? `${boxVal.toFixed(1)}%` : `฿${boxVal.toFixed(0)}`) : '—'}
-                    </span>
+
+                {isSet ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-white/70 rounded-lg px-2 py-1.5">
+                      <p className="text-[9px] text-brand-dark/40">ต่อซอง</p>
+                      <p className="text-[15px] font-bold text-emerald-600 leading-tight">
+                        {now.perPack != null ? `฿${now.perPack}` : '—'}
+                      </p>
+                    </div>
+                    <div className="bg-white/70 rounded-lg px-2 py-1.5">
+                      <p className="text-[9px] text-brand-dark/40">ต่อกล่อง</p>
+                      <p className="text-[15px] font-bold text-emerald-600 leading-tight">
+                        {now.perBox != null ? `฿${now.perBox}` : '—'}
+                      </p>
+                    </div>
                   </div>
-                ))}
+                ) : (
+                  <p className="text-[11px] text-brand-dark/35">
+                    ยังไม่ได้ตั้งกำไร — กด <b>แก้</b> เพื่อใส่กำไรต่อซอง/ต่อกล่อง
+                  </p>
+                )}
+
+                {hist.length > 0 && (
+                  <div className="mt-2 pt-1.5 border-t border-emerald-100">
+                    <p className="text-[9px] text-brand-dark/35 mb-0.5">ประวัติอัตรา</p>
+                    {[...hist].reverse().map(r => (
+                      <div key={r.from} className="flex items-center gap-1.5 text-[10px] text-brand-dark/45 py-0.5">
+                        <span className="tabular-nums shrink-0">{formatThaiDate(r.from)}</span>
+                        <span className="truncate">
+                          {r.perPack != null && `ซอง ฿${r.perPack}`}
+                          {r.perPack != null && r.perBox != null && ' · '}
+                          {r.perBox != null && `กล่อง ฿${r.perBox}`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )
           })()}
@@ -883,32 +1014,6 @@ interface StockPageProps {
   onPushOrders?: (orders: PurchaseOrder[]) => Promise<boolean>
   onFetchOrders?: () => Promise<PurchaseOrder[] | null>
   readOnly?: boolean
-}
-
-// ── Profit Calculator ─────────────────────────────────────────────────────────
-function calcProfit(product: StockProduct, taxRate: number) {
-  const ppb = product.packsPerBox
-  if (!product.buyPricePerBox || ppb <= 0) return null
-  const costPerPack = product.buyPricePerBox / ppb
-  const result: {
-    costPerPack: number
-    pack?: { rawProfit: number; netProfit: number; profitPct: number }
-    box?: { rawProfit: number; netProfit: number; profitPct: number }
-  } = { costPerPack }
-  if (product.sellPricePerPack) {
-    const rawProfit = product.sellPricePerPack - costPerPack
-    const netProfit = product.sellPricePerPack * (1 - taxRate / 100) - costPerPack
-    const profitPct = costPerPack > 0 ? (netProfit / costPerPack) * 100 : 0
-    result.pack = { rawProfit, netProfit, profitPct }
-  }
-  if (product.sellPricePerBox) {
-    const costPerBox = product.buyPricePerBox
-    const rawProfit = product.sellPricePerBox - costPerBox
-    const netProfit = product.sellPricePerBox * (1 - taxRate / 100) - costPerBox
-    const profitPct = costPerBox > 0 ? (netProfit / costPerBox) * 100 : 0
-    result.box = { rawProfit, netProfit, profitPct }
-  }
-  return result
 }
 
 function SubTabBar({ active, onChange, pendingCount }: {
@@ -1403,7 +1508,6 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
                 onSync={() => setSyncProduct(p)}
                 pendingSyncCount={pendingForProduct}
                 readOnly={readOnly}
-                taxRate={stock.taxRate}
                 incomingDetail={incomingByProduct.get(p.id)}
               />
             )
@@ -1414,9 +1518,9 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
       {/* modals */}
       {showAdd && (
         <ProductModal
-          onSave={(name, unit, ppb, qty, inc, yellowAt, redAt, kw, cat, buyPricePerBox, sellPricePerPack, sellPricePerBox) => {
+          onSave={(name, unit, ppb, qty, inc, yellowAt, redAt, kw, cat, buyPricePerBox, sellPricePerPack, sellPricePerBox, profitPerPack, profitPerBox, profitRates) => {
             const id = addProduct(name, unit, ppb, qty, yellowAt, redAt, kw, cat)
-            updateProduct(id, { buyPricePerBox, sellPricePerPack, sellPricePerBox })
+            updateProduct(id, { buyPricePerBox, sellPricePerPack, sellPricePerBox, profitPerPack, profitPerBox, profitRates })
             schedulePushStock()
           }}
           onClose={() => setShowAdd(false)}
@@ -1429,8 +1533,8 @@ export default function StockPage({ reports, sheetsUrl, ordersUrl, isOrdersEnv, 
       {editTarget && (
         <ProductModal
           initial={editTarget}
-          onSave={(name, unit, ppb, qty, inc, yellowAt, redAt, kw, cat, buyPricePerBox, sellPricePerPack, sellPricePerBox) => {
-            updateProduct(editTarget.id, { name, unit, packsPerBox: ppb, qty, qtyIncoming: inc, yellowAt, redAt, goodsKeyword: kw, category: cat, buyPricePerBox, sellPricePerPack, sellPricePerBox })
+          onSave={(name, unit, ppb, qty, inc, yellowAt, redAt, kw, cat, buyPricePerBox, sellPricePerPack, sellPricePerBox, profitPerPack, profitPerBox, profitRates) => {
+            updateProduct(editTarget.id, { name, unit, packsPerBox: ppb, qty, qtyIncoming: inc, yellowAt, redAt, goodsKeyword: kw, category: cat, buyPricePerBox, sellPricePerPack, sellPricePerBox, profitPerPack, profitPerBox, profitRates })
             schedulePushStock()
           }}
           onClose={() => setEditTarget(null)}

@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import {
-  collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc,
+  collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc, deleteField,
   writeBatch, increment, runTransaction, query, where, getDocs,
 } from 'firebase/firestore'
 import type { StockStore, StockProduct, StockEntry, StockUnit, DayReport, EntryKind } from '../types'
@@ -101,7 +101,11 @@ export function useStockStore() {
   }
 
   function updateProduct(id: string, patchData: Partial<Omit<StockProduct, 'id'>>) {
-    updateDoc(productRef(id), clean(patchData) as Record<string, unknown>)
+    // ส่ง key มาพร้อมค่า undefined = ตั้งใจลบค่านั้นทิ้ง (เช่น ล้างกำไรต่อซอง)
+    const payload = Object.fromEntries(
+      Object.entries(patchData).map(([k, v]) => [k, v === undefined ? deleteField() : v])
+    )
+    updateDoc(productRef(id), payload)
     if (patchData.category) unhideCategory(patchData.category)
   }
 
