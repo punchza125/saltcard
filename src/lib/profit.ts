@@ -19,7 +19,13 @@ export function isBoxGoods(goodsName: string): boolean {
 }
 
 export type CostSource = 'manual' | 'order' | 'default'
-export interface CostPoint { from: string; perBox: number; source: 'manual' | 'order' }
+export interface CostPoint {
+  from: string
+  perBox: number
+  source: 'manual' | 'order'
+  /** วันที่สร้างออร์เดอร์ — ใช้ตัดสินเมื่อรับหลายออร์เดอร์วันเดียวกัน */
+  at?: string
+}
 
 export function sortCostRates(rates: CostRate[]): CostRate[] {
   return [...rates].sort((a, b) => a.from.localeCompare(b.from))
@@ -37,16 +43,21 @@ export function costTimeline(product: StockProduct, orders: PurchaseOrder[]): Co
     if (o.status !== 'received' || !o.receivedAt) continue
     for (const it of o.items) {
       if (it.productId !== product.id || it.pricePerBox == null || it.pricePerBox <= 0) continue
-      points.push({ from: o.receivedAt, perBox: it.pricePerBox, source: 'order' })
+      points.push({ from: o.receivedAt, perBox: it.pricePerBox, source: 'order', at: o.createdAt })
     }
   }
   for (const r of product.costRates ?? []) {
     if (r.perBox > 0) points.push({ from: r.from, perBox: r.perBox, source: 'manual' })
   }
+  // เรียงให้ "ตัวที่ควรชนะ" อยู่ท้ายสุดเสมอ และต้องได้ผลเดิมทุกครั้ง
+  //   1. วันที่มีผล
+  //   2. ออร์เดอร์ก่อน แล้วค่อยค่าที่กรอกเอง (กรอกเองชนะ เพราะตั้งใจแก้ทีหลัง)
+  //   3. รับหลายออร์เดอร์วันเดียวกัน → ออร์เดอร์ที่สร้างทีหลังชนะ
+  const rank = (p: CostPoint) => (p.source === 'manual' ? 1 : 0)
   return points.sort((a, b) =>
-    a.from === b.from
-      ? (a.source === 'manual' ? 1 : -1)   // วันเดียวกัน: manual อยู่ท้าย = ชนะ
-      : a.from.localeCompare(b.from))
+    a.from.localeCompare(b.from)
+    || rank(a) - rank(b)
+    || (a.at ?? '').localeCompare(b.at ?? ''))
 }
 
 /**

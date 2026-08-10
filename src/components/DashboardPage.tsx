@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Sector, ReferenceLine
@@ -98,6 +99,173 @@ function GoodsThumb({ name, delay = 0 }: { name: string; delay?: number }) {
   )
 }
 
+
+const THAI_DAY_FULL = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัส', 'ศุกร์', 'เสาร์']
+
+/** ประวัติการขายของสินค้าตัวเดียว — กดจากรายการสินค้าขายดี */
+function GoodsDetailModal({ name, reports, onClose }: {
+  name: string
+  reports: DayReport[]
+  onClose: () => void
+}) {
+  const [range, setRange] = useState<7 | 30 | 'all'>(30)
+
+  const data = useMemo(() => {
+    // ทุกวันที่สินค้านี้มียอด
+    const all = reports
+      .map(r => {
+        const g = r.goods.find(x => x.goodsName === name)
+        return g ? { date: r.date, volume: g.salesVolume, amount: g.salesAmount } : null
+      })
+      .filter((x): x is { date: string; volume: number; amount: number } => !!x)
+    if (!all.length) return null
+
+    const cutoff = range === 'all' ? '' : (() => {
+      const last = new Date(reports[reports.length - 1].date)
+      last.setDate(last.getDate() - (range - 1))
+      return last.toISOString().slice(0, 10)
+    })()
+    const rows = range === 'all' ? all : all.filter(d => d.date >= cutoff)
+    if (!rows.length) return null
+
+    const totalVol = rows.reduce((s, d) => s + d.volume, 0)
+    const totalAmt = rows.reduce((s, d) => s + d.amount, 0)
+    const best = rows.reduce((a, b) => (b.amount > a.amount ? b : a))
+    const first = all[0].date
+
+    // ขายดีวันไหนของสัปดาห์ — เฉลี่ยต่อวันที่มีข้อมูลจริง
+    const dow = Array.from({ length: 7 }, () => ({ vol: 0, days: 0 }))
+    rows.forEach(d => {
+      const i = new Date(d.date).getDay()
+      dow[i].vol += d.volume
+      dow[i].days++
+    })
+    const dowAvg = dow.map((x, i) => ({
+      label: THAI_DAY_FULL[i],
+      avg: x.days ? x.vol / x.days : 0,
+      days: x.days,
+    }))
+    const dowMax = Math.max(...dowAvg.map(x => x.avg), 0)
+
+    return {
+      rows: rows.map(d => ({ ...d, label: formatThaiDate(d.date) })),
+      totalVol, totalAmt, best, first,
+      avgPerDay: totalVol / rows.length,
+      dowAvg, dowMax,
+      activeDays: rows.length,
+    }
+  }, [reports, name, range])
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-black/40 p-0 md:p-4"
+      onClick={onClose}>
+      <div className="bg-white w-full md:max-w-2xl rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col"
+        onClick={e => e.stopPropagation()}>
+
+        {/* header */}
+        <div className="flex items-start gap-3 px-4 md:px-5 pt-4 pb-3 border-b border-brand-blue/8">
+          <GoodsThumb name={name} />
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-semibold text-brand-dark leading-snug">{name}</p>
+            {data && (
+              <p className="text-[10px] text-brand-dark/35 mt-0.5">
+                ขายครั้งแรก {formatThaiDate(data.first)} · มียอด {data.activeDays} วัน
+              </p>
+            )}
+          </div>
+          <button onClick={onClose}
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-brand-dark/30 hover:bg-brand-pale hover:text-brand-dark transition-colors flex-shrink-0">
+            <X size={15} />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto px-4 md:px-5 py-3 space-y-4">
+          {/* ช่วงเวลา */}
+          <div className="flex gap-1.5">
+            {([[7, '7 วัน'], [30, '30 วัน'], ['all', 'ทั้งหมด']] as [7 | 30 | 'all', string][]).map(([k, label]) => (
+              <button key={String(k)} onClick={() => setRange(k)}
+                className={`text-[11px] px-3 py-1.5 rounded-lg font-medium transition-all ${
+                  range === k ? 'bg-brand-blue text-white' : 'bg-brand-pale text-brand-dark/50 hover:text-brand-dark'
+                }`}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {!data ? (
+            <p className="text-[12px] text-brand-dark/35 text-center py-10">ไม่มียอดขายในช่วงนี้</p>
+          ) : (
+            <>
+              {/* สรุป */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {[
+                  { l: 'ขายได้', v: `${data.totalVol} ชิ้น` },
+                  { l: 'ยอดขาย', v: `฿${formatBaht(data.totalAmt)}` },
+                  { l: 'เฉลี่ยวันที่ขายได้', v: `${data.avgPerDay.toFixed(1)} ชิ้น` },
+                  { l: 'วันที่ดีที่สุด', v: `฿${formatBaht(data.best.amount)}`, sub: formatThaiDate(data.best.date) },
+                ].map(x => (
+                  <div key={x.l} className="rounded-xl bg-brand-pale/50 px-3 py-2">
+                    <p className="text-[9px] text-brand-dark/40 mb-0.5">{x.l}</p>
+                    <p className="text-[14px] font-bold text-brand-dark leading-tight">{x.v}</p>
+                    {x.sub && <p className="text-[9px] text-brand-dark/35 mt-0.5">{x.sub}</p>}
+                  </div>
+                ))}
+              </div>
+
+              {/* กราฟยอดขายรายวัน */}
+              <div>
+                <p className="text-[11px] font-medium text-brand-dark/50 mb-1.5">ยอดขายรายวัน</p>
+                <ResponsiveContainer width="100%" height={180}>
+                  <AreaChart data={data.rows} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="gDetail" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#1a52b3" stopOpacity={0.35} />
+                        <stop offset="100%" stopColor="#1a52b3" stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e4eaf6" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#0d1b3e66' }} tickLine={false} axisLine={false} minTickGap={20} />
+                    <YAxis tick={{ fontSize: 9, fill: '#0d1b3e66' }} tickLine={false} axisLine={false} width={45}
+                      tickFormatter={(v: number) => v >= 1000 ? `${Math.round(v / 1000)}K` : String(v)} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Area type="monotone" dataKey="amount" name="ยอดขาย" stroke="#1a52b3" strokeWidth={2} fill="url(#gDetail)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* ขายดีวันไหนของสัปดาห์ */}
+              <div>
+                <p className="text-[11px] font-medium text-brand-dark/50 mb-1.5">
+                  ขายดีวันไหน <span className="text-brand-dark/30 font-normal">(เฉลี่ยชิ้นต่อวัน)</span>
+                </p>
+                <div className="space-y-1">
+                  {data.dowAvg.map(d => (
+                    <div key={d.label} className="flex items-center gap-2">
+                      <span className="w-12 text-[10px] text-brand-dark/45 flex-shrink-0">{d.label}</span>
+                      <div className="flex-1 h-3.5 bg-brand-pale rounded-full overflow-hidden relative">
+                        <div className="h-full rounded-full bg-brand-blue transition-all duration-500"
+                          style={{ width: data.dowMax > 0 ? `${(d.avg / data.dowMax) * 100}%` : '0%',
+                                   opacity: d.avg === data.dowMax && d.avg > 0 ? 1 : 0.4 }} />
+                      </div>
+                      <span className="w-16 text-right text-[10px] tabular-nums text-brand-dark/45 flex-shrink-0">
+                        {d.days ? `${d.avg.toFixed(1)} ชิ้น` : '—'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[9px] text-brand-dark/30 mt-1.5">
+                  นับเฉพาะวันที่สินค้านี้ขายได้ — วันที่ไม่มียอดไม่ถูกนำมาเฉลี่ย
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null
   return (
@@ -115,6 +283,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export default function DashboardPage({ reports: allReports, stockProducts = [], taxRate = 15, activeBranch, setActiveBranch, syncStatus, lastSynced, categoryAliases = {} }: DashboardPageProps) {
   const { orders } = useOrderStore()
   const [goodsMetric, setGoodsMetric] = useState<'amount' | 'profit'>('amount')
+  const [goodsDetail, setGoodsDetail] = useState<string | null>(null)
   // กรองตามสาขาที่เลือก — 'ทั้งหมด' รวมทุกสาขา (ใช้ area total), ไม่งั้นดึงเฉพาะ site ที่ตรงชื่อ
   const selectedSite = activeBranch || 'ทั้งหมด'
 
@@ -791,7 +960,8 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
                       : profitByGoods.get(visibleGoods[0]?.name ?? '')?.profit
                     const pct = topVal && val != null && val > 0 ? (val / topVal) * 100 : 0
                     return (
-                      <div key={g.name} className="flex items-center gap-2 rounded-xl px-2 py-1.5 -mx-2 hover:bg-brand-pale/50 transition-colors">
+                      <button key={g.name} type="button" onClick={() => setGoodsDetail(g.name)}
+                        className="w-full text-left flex items-center gap-2 rounded-xl px-2 py-1.5 -mx-2 hover:bg-brand-pale/50 active:scale-[0.995] transition-all">
                         {RANK_STYLES[i] ? (
                           <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold tabular-nums flex-shrink-0 text-white"
                             style={{ backgroundColor: RANK_STYLES[i].bg }}>
@@ -829,7 +999,7 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
                             </span>
                           </div>
                         </div>
-                      </div>
+                      </button>
                     )
                   })}
                 </div>
@@ -950,6 +1120,14 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
           )}
         </div>
       </div>
+
+      {goodsDetail && (
+        <GoodsDetailModal
+          name={goodsDetail}
+          reports={reports}
+          onClose={() => setGoodsDetail(null)}
+        />
+      )}
     </div>
   )
 }
