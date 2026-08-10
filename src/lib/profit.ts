@@ -97,6 +97,16 @@ export function removeCostRate(product: StockProduct, from: string): CostRate[] 
 }
 
 
+/** กำไรรายสินค้า รวมทุกวันในช่วงที่เลือก */
+export interface ProfitItem {
+  name: string      // ชื่อสินค้าตามที่อยู่ในรายงาน
+  isBox: boolean    // ขายยกกล่องหรือขายเป็นซอง
+  qty: number       // จำนวนที่ขายได้
+  revenue: number   // ยอดขาย (฿)
+  cost: number      // ต้นทุน (฿)
+  profit: number    // กำไรสุทธิ (฿)
+}
+
 export interface ProfitBreakdown {
   total: number         // กำไรสุทธิรวม (฿)
   revenue: number       // ยอดขายที่คิดกำไรได้ (฿)
@@ -107,6 +117,7 @@ export interface ProfitBreakdown {
   packQty: number; packProfit: number; avgPerPack: number
   boxQty: number;  boxProfit: number;  avgPerBox: number
   matched: number
+  items: ProfitItem[]   // แยกรายสินค้า เรียงกำไรมากไปน้อย
   uncosted: string[]    // สินค้าที่ยังไม่รู้ต้นทุน — ไม่ถูกนับ
 }
 
@@ -121,6 +132,7 @@ export function calcProfit(
   let boxQty  = 0, boxProfit  = 0
   let matched = 0
   const uncosted = new Set<string>()
+  const byGoods = new Map<string, ProfitItem>()
 
   for (const report of reports) {
     for (const goods of report.goods) {
@@ -143,6 +155,14 @@ export function calcProfit(
       if (box) { boxQty  += goods.salesVolume; boxProfit  += unitNet * goods.salesVolume }
       else     { packQty += goods.salesVolume; packProfit += unitNet * goods.salesVolume }
       matched++
+
+      const row = byGoods.get(goods.goodsName)
+        ?? { name: goods.goodsName, isBox: box, qty: 0, revenue: 0, cost: 0, profit: 0 }
+      row.qty     += goods.salesVolume
+      row.revenue += goods.salesAmount
+      row.cost    += unitCost * goods.salesVolume
+      row.profit  += unitNet * goods.salesVolume
+      byGoods.set(goods.goodsName, row)
     }
   }
 
@@ -156,6 +176,7 @@ export function calcProfit(
     packQty, packProfit, avgPerPack: packQty > 0 ? packProfit / packQty : 0,
     boxQty,  boxProfit,  avgPerBox:  boxQty  > 0 ? boxProfit  / boxQty  : 0,
     matched,
+    items: [...byGoods.values()].sort((a, b) => b.profit - a.profit),
     uncosted: [...uncosted],
   }
 }

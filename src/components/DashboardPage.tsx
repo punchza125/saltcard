@@ -709,11 +709,43 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
                   <span>ต้นทุน ฿{formatBaht(Math.round(profit.cost))}</span>
                   <span>ภาษี {taxRate}% ฿{formatBaht(Math.round(profit.tax))}</span>
                 </div>
+
+                {/* กำไรรายสินค้า */}
+                <div className="rounded-xl bg-white/60 border border-emerald-200/70 overflow-hidden">
+                  <div className="flex items-center gap-2 px-2.5 py-1.5 text-[9px] font-semibold text-brand-dark/35 uppercase tracking-wider border-b border-emerald-200/50">
+                    <span className="flex-1">สินค้า</span>
+                    <span className="w-14 text-right">จำนวน</span>
+                    <span className="w-16 text-right">ยอดขาย</span>
+                    <span className="w-16 text-right">กำไร</span>
+                  </div>
+                  <div className="max-h-52 overflow-y-auto">
+                    {profit.items.map(it => (
+                      <div key={it.name}
+                        className="flex items-center gap-2 px-2.5 py-1.5 text-[11px] border-b border-emerald-100/50 last:border-0">
+                        <span className="flex-1 truncate text-brand-dark/70" title={it.name}>{it.name}</span>
+                        <span className="w-14 text-right text-brand-dark/45 tabular-nums whitespace-nowrap">
+                          {it.qty} {it.isBox ? 'กล่อง' : 'ซอง'}
+                        </span>
+                        <span className="w-16 text-right text-brand-dark/45 tabular-nums">
+                          ฿{formatBaht(Math.round(it.revenue))}
+                        </span>
+                        <span className={`w-16 text-right font-semibold tabular-nums ${it.profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                          ฿{formatBaht(Math.round(it.profit))}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
                 {profit.uncosted.length > 0 && (
-                  <p className="text-[10px] text-amber-600">
-                    ⚠️ ยังไม่รู้ต้นทุนสินค้า {profit.uncosted.length} รายการ — ยอดส่วนนี้ยังไม่ถูกนับ
-                    (กรอกราคาตอนสั่งสินค้า หรือใส่ราคาตั้งต้นที่หน้าสต็อก)
-                  </p>
+                  <div className="text-[10px] text-amber-600">
+                    <p>
+                      ⚠️ ยังไม่รู้ต้นทุนสินค้า {profit.uncosted.length} รายการ — ยอดส่วนนี้ยังไม่ถูกนับ
+                      (กรอกราคาตอนสั่งสินค้า หรือใส่ราคาตั้งต้นที่หน้าสต็อก)
+                    </p>
+                    <ul className="mt-0.5 space-y-0.5 text-amber-600/70">
+                      {profit.uncosted.map(n => <li key={n} className="truncate">· {n}</li>)}
+                    </ul>
+                  </div>
                 )}
               </div>
             )}
