@@ -135,20 +135,21 @@ function MonthlyGoalBar({ earned, goal, monthLabel, daysLeft, onEditGoal }: {
   return (
     <>
       {/* แถบกดได้ สูงจริง 28px (พื้นที่กดกว้างเต็มการ์ด) แต่เห็นเป็นหลอด 12px */}
-      {/* พื้นที่กดกว้างเต็มการ์ด สูง 32px แต่มองเห็นเป็นแถบน้ำบาง 6px ที่ขอบล่าง */}
+      {/* หลอดแนวตั้งที่ขอบขวา — absolute ทั้งหมด ไม่กินความกว้าง/ความสูงของการ์ด
+          พื้นที่กดกว้าง 36px สูงเต็มการ์ด แต่มองเห็นเป็นหลอดบาง 6px */}
       <button
         onClick={() => { setDraft(String(goal)); setOpen(o => !o) }}
-        className="absolute inset-x-0 bottom-0 h-8 flex items-end px-4 pb-1.5 group"
+        className="absolute inset-y-0 right-0 w-9 flex items-center justify-center group"
         title={`เป้ากำไร${monthLabel} ฿${formatBaht(Math.round(earned))} / ฿${formatBaht(goal)} (${pct.toFixed(0)}%)`}
       >
-        <span className="relative flex-1 h-1.5 rounded-full bg-white/20 overflow-hidden group-hover:bg-white/30 transition-colors">
+        <span className="relative w-1.5 h-[calc(100%-1.75rem)] rounded-full bg-white/20 overflow-hidden group-hover:bg-white/35 transition-colors">
           <span
-            className="absolute inset-y-0 left-0 block overflow-hidden transition-[width] duration-1000 ease-out"
-            style={{ width: `${Math.max(pct, 4)}%` }}
+            className="absolute inset-x-0 bottom-0 block overflow-hidden transition-[height] duration-1000 ease-out"
+            style={{ height: `${Math.max(pct, 4)}%` }}
           >
             <span className={`wave-body absolute inset-0 block ${done
-              ? 'bg-gradient-to-r from-emerald-400 to-emerald-300'
-              : 'bg-gradient-to-r from-sky-300 to-sky-200'}`} />
+              ? 'bg-gradient-to-t from-emerald-400 to-emerald-200'
+              : 'bg-gradient-to-t from-sky-400 to-sky-200'}`} />
             <span className="wave-layer wave-a block" style={{ backgroundImage: waveBg('#ffffff') }} />
             <span className="wave-layer wave-b block" style={{ backgroundImage: waveBg('#ffffff') }} />
           </span>
