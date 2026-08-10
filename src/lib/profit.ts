@@ -1,5 +1,5 @@
 import type { CostRate, DayReport, PurchaseOrder, StockProduct } from '../types'
-import { matchesKeyword } from '../utils/parser'
+import { baseGoodsName, matchesKeyword } from '../utils/parser'
 
 /**
  * การคิดกำไร — ตามสูตรในสเปรดชีตเดิม
@@ -167,13 +167,15 @@ export function calcProfit(
       else     { packQty += goods.salesVolume; packProfit += unitNet * goods.salesVolume }
       matched++
 
-      const row = byGoods.get(goods.goodsName)
-        ?? { name: goods.goodsName, isBox: box, qty: 0, revenue: 0, cost: 0, profit: 0 }
+      // รวม [Promotion] เข้ากับตัวปกติ — เป็นสินค้าตัวเดียวกัน
+      const key = baseGoodsName(goods.goodsName)
+      const row = byGoods.get(key)
+        ?? { name: key, isBox: box, qty: 0, revenue: 0, cost: 0, profit: 0 }
       row.qty     += goods.salesVolume
       row.revenue += goods.salesAmount
       row.cost    += unitCost * goods.salesVolume
       row.profit  += unitNet * goods.salesVolume
-      byGoods.set(goods.goodsName, row)
+      byGoods.set(key, row)
     }
   }
 

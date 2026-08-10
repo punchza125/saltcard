@@ -98,6 +98,20 @@ export function matchesKeyword(goodsName: string, keyword: string): boolean {
   return norm(goodsName).includes(norm(keyword))
 }
 
+/**
+ * ตัดคำว่า promotion ออกจากชื่อสินค้า
+ * "[Promotion] One Piece OP-16 (1 Pack)" → "One Piece OP-16 (1 Pack)"
+ * ใช้รวมยอดสินค้าตัวเดียวกันที่ขายทั้งราคาปกติและราคาโปรฯ เข้าด้วยกัน
+ * (คงส่วน (Box) / (1 Pack) ไว้ เพราะต้นทุนคนละแบบ)
+ */
+export function baseGoodsName(name: string): string {
+  return name
+    .replace(/^\[Promotion\]\s*/i, '')
+    .replace(/^Promotion\s*-\s*/i, '')
+    .replace(/\s*\(Promotion\)\s*$/i, '')
+    .trim()
+}
+
 export function formatThaiDate(dateStr: string): string {
   const months = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']
   const d = new Date(dateStr)

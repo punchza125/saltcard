@@ -6,7 +6,7 @@ import {
 } from 'recharts'
 import { ChevronLeft, ChevronRight, TrendingUp, Package, MapPin, Search, X } from 'lucide-react'
 import type { DayReport, StockProduct } from '../types'
-import { formatThaiDate, formatThaiDateFull, formatBaht, matchesKeyword } from '../utils/parser'
+import { formatThaiDate, formatThaiDateFull, formatBaht, matchesKeyword, baseGoodsName } from '../utils/parser'
 import { calcProfit } from '../lib/profit'
 import { useOrderStore } from '../hooks/useOrderStore'
 import StatCard from './StatCard'
@@ -114,8 +114,14 @@ function GoodsDetailModal({ name, reports, onClose }: {
     // ทุกวันที่สินค้านี้มียอด
     const all = reports
       .map(r => {
-        const g = r.goods.find(x => x.goodsName === name)
-        return g ? { date: r.date, volume: g.salesVolume, amount: g.salesAmount } : null
+        // รวมทุกแถวที่เป็นสินค้าตัวเดียวกัน (ทั้งราคาปกติและ [Promotion])
+        const rows = r.goods.filter(x => baseGoodsName(x.goodsName) === name)
+        if (!rows.length) return null
+        return {
+          date: r.date,
+          volume: rows.reduce((s, x) => s + x.salesVolume, 0),
+          amount: rows.reduce((s, x) => s + x.salesAmount, 0),
+        }
       })
       .filter((x): x is { date: string; volume: number; amount: number } => !!x)
     if (!all.length) return null
@@ -473,9 +479,11 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
     const map = new Map<string, { name: string; type: string; volume: number; amount: number }>()
     filteredReports.forEach(r => {
       r.goods.forEach(g => {
-        const ex = map.get(g.goodsName)
+        // [Promotion] X กับ X เป็นสินค้าตัวเดียวกัน → รวมยอดเข้าด้วยกัน
+        const key = baseGoodsName(g.goodsName)
+        const ex = map.get(key)
         if (ex) { ex.volume += g.salesVolume; ex.amount += g.salesAmount }
-        else map.set(g.goodsName, { name: g.goodsName, type: resolveType(g.goodsType), volume: g.salesVolume, amount: g.salesAmount })
+        else map.set(key, { name: key, type: resolveType(g.goodsType), volume: g.salesVolume, amount: g.salesAmount })
       })
     })
     return Array.from(map.values()).sort((a, b) => b.amount - a.amount)
