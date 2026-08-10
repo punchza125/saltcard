@@ -826,7 +826,15 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
           valueSuffix={profit && (
             <>กำไร <b className="font-semibold text-white/90">฿{formatBaht(Math.round(profit.total))}</b> · {profit.marginPct.toFixed(1)}%</>
           )}
- />
+          overlay={monthGoal && (
+            <MonthlyGoalBar
+              earned={monthGoal.earned}
+              goal={monthlyProfitGoal}
+              monthLabel={monthGoal.monthLabel}
+              daysLeft={monthGoal.daysLeft}
+              onEditGoal={onSetMonthlyGoal}
+            />
+          )} />
         <StatCard label="จำนวนชิ้น" value={`${stats.totalVolume.toLocaleString()}`} sub={`เฉลี่ย ฿${formatBaht(stats.avgPerPiece)}/ชิ้น`} icon={<Package size={12} />} delay={50} animKey={currentIdx} />
 
         {/* Luffy — 7-day comparison card */}
