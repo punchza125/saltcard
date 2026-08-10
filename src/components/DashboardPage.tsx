@@ -686,10 +686,10 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
                 <div className="flex gap-5 flex-wrap pt-1.5">
                   {profit.packQty > 0 && (
                     <div>
-                      <p className="text-[10px] text-brand-dark/40 mb-0.5">ซอง · {profit.packQty} ซอง</p>
+                      <p className="text-[10px] text-brand-dark/40 mb-0.5">แยกชิ้น · {profit.packQty} ชิ้น</p>
                       <p className="text-[13px] font-semibold text-brand-dark/70">
                         ฿{formatBaht(Math.round(profit.packProfit))}
-                        <span className="text-[10px] text-brand-dark/35 font-normal"> (เฉลี่ย ฿{profit.avgPerPack.toFixed(0)}/ซอง)</span>
+                        <span className="text-[10px] text-brand-dark/35 font-normal"> (เฉลี่ย ฿{profit.avgPerPack.toFixed(0)}/ชิ้น)</span>
                       </p>
                     </div>
                   )}
@@ -723,7 +723,7 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
                         className="flex items-center gap-2 px-2.5 py-1.5 text-[11px] border-b border-emerald-100/50 last:border-0">
                         <span className="flex-1 truncate text-brand-dark/70" title={it.name}>{it.name}</span>
                         <span className="w-14 text-right text-brand-dark/45 tabular-nums whitespace-nowrap">
-                          {it.qty} {it.isBox ? 'กล่อง' : 'ซอง'}
+                          {it.qty} {it.isBox ? 'กล่อง' : 'ชิ้น'}
                         </span>
                         <span className="w-16 text-right text-brand-dark/45 tabular-nums">
                           ฿{formatBaht(Math.round(it.revenue))}
