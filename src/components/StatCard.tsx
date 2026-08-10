@@ -11,8 +11,6 @@ interface StatCardProps {
   animKey?: string | number;
   /** ข้อความเล็กต่อท้ายตัวเลขใหญ่ในบรรทัดเดียวกัน — ไม่กินความสูงเพิ่ม */
   valueSuffix?: React.ReactNode;
-  /** วางทับในการ์ด (absolute) ไม่กินพื้นที่ layout — เช่น หลอดเป้ากำไรที่ขอบล่าง */
-  overlay?: React.ReactNode;
 }
 
 export default function StatCard({
@@ -25,11 +23,10 @@ export default function StatCard({
   delay = 0,
   animKey,
   valueSuffix,
-  overlay,
 }: StatCardProps) {
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl p-4 animate-pop-in card-hover ${
+      className={`rounded-2xl p-4 animate-pop-in card-hover ${
         accent
           ? "border border-brand-blue"
           : "bg-white border border-brand-blue/10"
@@ -82,7 +79,6 @@ export default function StatCard({
           {sub2}
         </div>
       )}
-      {overlay}
     </div>
   );
 }
