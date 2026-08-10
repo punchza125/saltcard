@@ -104,6 +104,7 @@ export interface StockStore {
   entries: StockEntry[]
   syncedDates: string[]  // วันที่ที่ sync จากรายงานแล้ว
   taxRate: number        // ภาษี % เช่น 15
+  monthlyProfitGoal?: number  // เป้ากำไรต่อเดือน (฿)
   hiddenCategories?: string[]  // หมวดหมู่ที่ผู้ใช้ลบทิ้ง (ซ่อนจาก chips ทุกที่)
   categoryAliases?: Record<string, string>  // ย้าย/รวมหมวด: ชื่อเดิม → ชื่อใหม่ (ใช้ remap ยอดขายด้วย)
 }

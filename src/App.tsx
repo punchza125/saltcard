@@ -19,7 +19,7 @@ const ENV_SHEETS_URL = import.meta.env.VITE_SHEETS_URL as string | undefined
 export default function App() {
   // รายงานยอดขายอยู่บน Firestore แล้ว (1 วัน = 1 document) — real-time, ไม่ต้อง fetch เอง
   const { reports: fbReports, loaded: reportsLoaded, saveReport, removeReport: removeReportDoc } = useReportStore()
-  const { stock } = useStockStore()
+  const { stock, setMonthlyProfitGoal } = useStockStore()
   const [activeTab, setActiveTab] = useState<'dashboard' | 'upload' | 'stock' | 'machine'>('dashboard')
   const [selectedSite, setSelectedSite] = useState<string>('ทั้งหมด')
   const [showSheetsConfig, setShowSheetsConfig] = useState(false)
@@ -118,7 +118,7 @@ export default function App() {
 
       {/* main scrolls inside — ไม่ใช้ body scroll เพื่อให้ nav ไม่ลอย */}
       <main className="flex-1 overflow-y-auto md:overflow-visible">
-        {activeTab === 'dashboard' && <DashboardPage reports={activeReports} stockProducts={stock.products} taxRate={stock.taxRate} activeBranch={selectedSite} setActiveBranch={setSelectedSite} syncStatus={syncStatus} lastSynced={lastSynced ?? undefined} categoryAliases={stock.categoryAliases} />}
+        {activeTab === 'dashboard' && <DashboardPage reports={activeReports} stockProducts={stock.products} taxRate={stock.taxRate} monthlyProfitGoal={stock.monthlyProfitGoal} onSetMonthlyGoal={setMonthlyProfitGoal} activeBranch={selectedSite} setActiveBranch={setSelectedSite} syncStatus={syncStatus} lastSynced={lastSynced ?? undefined} categoryAliases={stock.categoryAliases} />}
         {activeTab === 'stock' && (
           <StockPage
             reports={allReports}

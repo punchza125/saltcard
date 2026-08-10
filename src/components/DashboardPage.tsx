@@ -17,6 +17,8 @@ interface DashboardPageProps {
   reports: DayReport[]
   stockProducts?: StockProduct[]
   taxRate?: number
+  monthlyProfitGoal?: number
+  onSetMonthlyGoal?: (v: number) => void
   activeBranch: string       // which branch is selected (for display only — reports are pre-filtered)
   setActiveBranch: (s: string) => void
   syncStatus?: 'idle' | 'syncing' | 'success' | 'error'
@@ -99,6 +101,107 @@ function GoodsThumb({ name, delay = 0 }: { name: string; delay?: number }) {
   )
 }
 
+
+
+/** คลื่นน้ำ SVG แบบ data URI — ใช้เป็น background ที่วิ่งวนได้ */
+function waveBg(color: string) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 28" preserveAspectRatio="none"><path d="M0 10 C 15 2, 25 2, 40 10 S 65 18, 80 10 S 105 2, 120 10 L120 28 L0 28 Z" fill="${color}"/></svg>`
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
+}
+
+/** หลอดเป้ากำไรรายเดือน — มีลูกเล่นน้ำไหลในหลอด */
+function MonthlyGoalBar({ earned, goal, monthLabel, daysLeft, onEditGoal }: {
+  earned: number
+  goal: number
+  monthLabel: string
+  daysLeft: number
+  onEditGoal?: (v: number) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(String(goal))
+  const pct = goal > 0 ? Math.min((earned / goal) * 100, 100) : 0
+  const done = earned >= goal
+  const remain = Math.max(0, goal - earned)
+  const perDay = daysLeft > 0 ? remain / daysLeft : 0
+
+  function save() {
+    const n = Number(draft)
+    if (onEditGoal && n > 0) onEditGoal(Math.round(n))
+    setEditing(false)
+  }
+
+  return (
+    <div className="bg-white border border-brand-blue/10 rounded-2xl px-4 py-3 card-hover"
+      style={{ animation: 'fadeUp 0.4s ease both', animationDelay: '120ms' }}>
+      <div className="flex items-baseline justify-between gap-2 mb-2 flex-wrap">
+        <p className="text-[12px] font-medium text-brand-dark/60">
+          เป้ากำไร{monthLabel}
+        </p>
+        <div className="flex items-baseline gap-1.5 text-[11px]">
+          <span className={`font-bold text-[14px] ${done ? 'text-emerald-600' : 'text-brand-dark'}`}>
+            ฿{formatBaht(Math.round(earned))}
+          </span>
+          <span className="text-brand-dark/30">/</span>
+          {editing ? (
+            <input
+              autoFocus type="number" inputMode="numeric"
+              className="w-20 border border-brand-blue rounded-md px-1.5 py-0.5 text-[12px] text-right outline-none"
+              value={draft}
+              onChange={e => setDraft(e.target.value)}
+              onBlur={save}
+              onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }}
+            />
+          ) : (
+            <button
+              onClick={() => { setDraft(String(goal)); setEditing(true) }}
+              className="text-brand-dark/45 hover:text-brand-blue transition-colors underline decoration-dotted underline-offset-2"
+              title="แก้เป้า"
+            >
+              ฿{formatBaht(goal)}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* หลอดน้ำ */}
+      <div className="relative h-8 rounded-full bg-brand-pale overflow-hidden">
+        <div
+          className="absolute inset-y-0 left-0 transition-[width] duration-1000 ease-out overflow-hidden"
+          style={{ width: `${Math.max(pct, 1.5)}%` }}
+        >
+          {/* ตัวน้ำ */}
+          <div className={`wave-body absolute inset-0 ${done
+            ? 'bg-gradient-to-r from-emerald-400 to-teal-400'
+            : 'bg-gradient-to-r from-sky-400 to-brand-blue'}`} />
+          {/* ผิวน้ำ 2 ชั้น วิ่งคนละทาง */}
+          <div className="wave-layer wave-a" style={{ backgroundImage: waveBg('#ffffff') }} />
+          <div className="wave-layer wave-b" style={{ backgroundImage: waveBg('#ffffff') }} />
+          {/* ฟองอากาศ */}
+          {pct > 12 && [18, 45, 72].map((left, i) => (
+            <span key={left}
+              className="bubble absolute bottom-1 w-1 h-1 rounded-full bg-white/70"
+              style={{ left: `${left}%`, animationDelay: `${i * 0.9}s` }} />
+          ))}
+        </div>
+
+        {/* ตัวเลข % */}
+        <span className={`absolute inset-0 flex items-center px-3 text-[11px] font-bold tabular-nums pointer-events-none ${
+          pct > 55 ? 'text-white justify-start' : 'text-brand-dark/50 justify-end'
+        }`}>
+          {pct.toFixed(0)}%
+        </span>
+      </div>
+
+      <p className="text-[10px] text-brand-dark/35 mt-1.5">
+        {done
+          ? `ถึงเป้าแล้ว เกินมา ฿${formatBaht(Math.round(earned - goal))} 🎉`
+          : daysLeft > 0
+            ? `เหลืออีก ฿${formatBaht(Math.round(remain))} · ${daysLeft} วัน · เฉลี่ยวันละ ฿${formatBaht(Math.round(perDay))}`
+            : `เหลืออีก ฿${formatBaht(Math.round(remain))}`}
+      </p>
+    </div>
+  )
+}
 
 const THAI_DAY_FULL = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัส', 'ศุกร์', 'เสาร์']
 
@@ -286,7 +389,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   )
 }
 
-export default function DashboardPage({ reports: allReports, stockProducts = [], taxRate = 15, activeBranch, setActiveBranch, syncStatus, lastSynced, categoryAliases = {} }: DashboardPageProps) {
+export default function DashboardPage({ reports: allReports, stockProducts = [], taxRate = 15, monthlyProfitGoal = 40000, onSetMonthlyGoal, activeBranch, setActiveBranch, syncStatus, lastSynced, categoryAliases = {} }: DashboardPageProps) {
   const { orders } = useOrderStore()
   const [goodsMetric, setGoodsMetric] = useState<'amount' | 'profit'>('amount')
   const [goodsDetail, setGoodsDetail] = useState<string | null>(null)
@@ -441,6 +544,22 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
     if (!filteredReports.length || stockProducts.length === 0) return null
     return calcProfit(filteredReports, stockProducts, orders, taxRate)
   }, [filteredReports, stockProducts, orders, taxRate])
+
+  // เป้ากำไรรายเดือน — นับทั้งเดือนของรายงานล่าสุด ไม่ขึ้นกับช่วงที่เลือกดู
+  const monthGoal = useMemo(() => {
+    if (!reports.length) return null
+    const lastDate = reports[reports.length - 1].date
+    const ym = lastDate.slice(0, 7)
+    const inMonth = reports.filter(r => r.date.startsWith(ym))
+    const p = calcProfit(inMonth, stockProducts, orders, taxRate)
+    const y = Number(ym.slice(0, 4)), m = Number(ym.slice(5, 7))
+    const lastDay = new Date(y, m, 0).getDate()
+    return {
+      earned: p?.total ?? 0,
+      monthLabel: ` ${THAI_MONTHS[m - 1]}`,
+      daysLeft: Math.max(0, lastDay - Number(lastDate.slice(8, 10))),
+    }
+  }, [reports, stockProducts, orders, taxRate])
 
   const availableDates = useMemo(() => new Set(reports.map(r => r.date)), [reports])
 
@@ -688,6 +807,19 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
             <>กำไร <b className="font-semibold text-white/90">฿{formatBaht(Math.round(profit.total))}</b> · {profit.marginPct.toFixed(1)}%</>
           )} />
         <StatCard label="จำนวนชิ้น" value={`${stats.totalVolume.toLocaleString()}`} sub={`เฉลี่ย ฿${formatBaht(stats.avgPerPiece)}/ชิ้น`} icon={<Package size={12} />} delay={50} animKey={currentIdx} />
+
+        {/* เป้ากำไรรายเดือน */}
+        {monthGoal && (
+          <div className="col-span-2">
+            <MonthlyGoalBar
+              earned={monthGoal.earned}
+              goal={monthlyProfitGoal}
+              monthLabel={monthGoal.monthLabel}
+              daysLeft={monthGoal.daysLeft}
+              onEditGoal={onSetMonthlyGoal}
+            />
+          </div>
+        )}
 
         {/* Luffy — 7-day comparison card */}
         {weekStats && (() => {
