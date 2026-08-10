@@ -3,7 +3,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Sector, ReferenceLine
 } from 'recharts'
-import { ChevronLeft, ChevronRight, TrendingUp, Package, MapPin, Search, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, TrendingUp, Package, MapPin, Search, X } from 'lucide-react'
 import type { DayReport, StockProduct } from '../types'
 import { formatThaiDate, formatThaiDateFull, formatBaht, matchesKeyword } from '../utils/parser'
 import { calcProfit } from '../lib/profit'
@@ -114,6 +114,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export default function DashboardPage({ reports: allReports, stockProducts = [], taxRate = 15, activeBranch, setActiveBranch, syncStatus, lastSynced, categoryAliases = {} }: DashboardPageProps) {
   const { orders } = useOrderStore()
+  const [profitOpen, setProfitOpen] = useState(false)
   // กรองตามสาขาที่เลือก — 'ทั้งหมด' รวมทุกสาขา (ใช้ area total), ไม่งั้นดึงเฉพาะ site ที่ตรงชื่อ
   const selectedSite = activeBranch || 'ทั้งหมด'
 
@@ -650,54 +651,75 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
         )}
       </div>
 
-      {/* ── การ์ดกำไร ─────────────── */}
+      {/* ── การ์ดกำไร — ย่อไว้ก่อน กดเพื่อดูรายละเอียด ─────────────── */}
       <div className="px-4 md:px-6 mb-5">
         {profit ? (
-          <div className="rounded-2xl overflow-hidden border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 px-4 py-3 flex flex-col gap-2"
+          <div className="rounded-2xl overflow-hidden border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50"
             style={{ animation: 'fadeUp 0.4s ease both', animationDelay: '150ms' }}>
-            <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-600">
-              💰 กำไร{rangeMode === 'day' ? 'วันนี้' : `รวม ${filteredReports.length} วัน`}
-            </p>
-            <div className="flex items-end gap-5 flex-wrap">
-              <p key={`p-${profit.total}`} className="text-[26px] font-bold leading-tight text-emerald-700 animate-pop-in">
+
+            {/* แถบย่อ — คลิกทั้งแถบเพื่อกาง */}
+            <button
+              onClick={() => setProfitOpen(o => !o)}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-emerald-100/40 transition-colors"
+              aria-expanded={profitOpen}
+            >
+              <span className="text-[11px] font-bold uppercase tracking-wide text-emerald-600 flex-shrink-0">
+                💰 กำไร{rangeMode === 'day' ? 'วันนี้' : ` ${filteredReports.length} วัน`}
+              </span>
+              <span key={`p-${profit.total}`} className="text-[20px] font-bold leading-none text-emerald-700 animate-pop-in">
                 ฿{formatBaht(Math.round(profit.total))}
-              </p>
-              <div className="flex gap-5 pb-0.5 flex-wrap">
-                {profit.packQty > 0 && (
-                  <div>
-                    <p className="text-[10px] text-brand-dark/40 mb-0.5">ซอง · {profit.packQty} ซอง</p>
-                    <p className="text-[13px] font-semibold text-brand-dark/70">
-                      ฿{formatBaht(Math.round(profit.packProfit))}
-                      <span className="text-[10px] text-brand-dark/35 font-normal"> (เฉลี่ย ฿{profit.avgPerPack.toFixed(0)}/ซอง)</span>
-                    </p>
-                  </div>
-                )}
-                {profit.boxQty > 0 && (
-                  <div>
-                    <p className="text-[10px] text-brand-dark/40 mb-0.5">กล่อง · {profit.boxQty} กล่อง</p>
-                    <p className="text-[13px] font-semibold text-brand-dark/70">
-                      ฿{formatBaht(Math.round(profit.boxProfit))}
-                      <span className="text-[10px] text-brand-dark/35 font-normal"> (เฉลี่ย ฿{profit.avgPerBox.toFixed(0)}/กล่อง)</span>
-                    </p>
-                  </div>
+              </span>
+              <span className="text-[11px] font-semibold text-emerald-600/70">
+                {profit.marginPct.toFixed(1)}%
+              </span>
+              {profit.uncosted.length > 0 && !profitOpen && (
+                <span className="text-[10px] text-amber-600/90 flex-shrink-0">⚠️ {profit.uncosted.length}</span>
+              )}
+              <ChevronDown
+                size={15}
+                className={`ml-auto flex-shrink-0 text-emerald-600/50 transition-transform duration-200 ${profitOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+
+            {/* รายละเอียด */}
+            {profitOpen && (
+              <div className="px-4 pb-3 pt-1 flex flex-col gap-2 border-t border-emerald-200/60">
+                <div className="flex gap-5 flex-wrap pt-1.5">
+                  {profit.packQty > 0 && (
+                    <div>
+                      <p className="text-[10px] text-brand-dark/40 mb-0.5">ซอง · {profit.packQty} ซอง</p>
+                      <p className="text-[13px] font-semibold text-brand-dark/70">
+                        ฿{formatBaht(Math.round(profit.packProfit))}
+                        <span className="text-[10px] text-brand-dark/35 font-normal"> (เฉลี่ย ฿{profit.avgPerPack.toFixed(0)}/ซอง)</span>
+                      </p>
+                    </div>
+                  )}
+                  {profit.boxQty > 0 && (
+                    <div>
+                      <p className="text-[10px] text-brand-dark/40 mb-0.5">กล่อง · {profit.boxQty} กล่อง</p>
+                      <p className="text-[13px] font-semibold text-brand-dark/70">
+                        ฿{formatBaht(Math.round(profit.boxProfit))}
+                        <span className="text-[10px] text-brand-dark/35 font-normal"> (เฉลี่ย ฿{profit.avgPerBox.toFixed(0)}/กล่อง)</span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-4 flex-wrap text-[10px] text-brand-dark/40">
+                  <span>ยอดขาย ฿{formatBaht(Math.round(profit.revenue))}</span>
+                  <span>ต้นทุน ฿{formatBaht(Math.round(profit.cost))}</span>
+                  <span>ภาษี {taxRate}% ฿{formatBaht(Math.round(profit.tax))}</span>
+                </div>
+                {profit.uncosted.length > 0 && (
+                  <p className="text-[10px] text-amber-600">
+                    ⚠️ ยังไม่รู้ต้นทุนสินค้า {profit.uncosted.length} รายการ — ยอดส่วนนี้ยังไม่ถูกนับ
+                    (กรอกราคาตอนสั่งสินค้า หรือใส่ราคาตั้งต้นที่หน้าสต็อก)
+                  </p>
                 )}
               </div>
-            </div>
-            <div className="flex gap-4 flex-wrap text-[10px] text-brand-dark/40 pt-0.5 border-t border-emerald-200/60">
-              <span>ยอดขาย ฿{formatBaht(Math.round(profit.revenue))}</span>
-              <span>ต้นทุน ฿{formatBaht(Math.round(profit.cost))}</span>
-              <span>ภาษี {taxRate}% ฿{formatBaht(Math.round(profit.tax))}</span>
-              <span className="font-semibold text-emerald-600">กำไร {profit.marginPct.toFixed(1)}%</span>
-            </div>
-            {profit.uncosted.length > 0 && (
-              <p className="text-[10px] text-amber-600">
-                ⚠️ ยังไม่รู้ต้นทุนสินค้า {profit.uncosted.length} รายการ — ยอดส่วนนี้ยังไม่ถูกนับ
-                (กรอกราคาตอนสั่งสินค้า หรือใส่ราคาตั้งต้นที่หน้าสต็อก)
-              </p>
             )}
           </div>
         ) : (
-          <div className="rounded-2xl border border-brand-blue/10 bg-brand-pale/30 px-4 py-3 text-center">
+          <div className="rounded-2xl border border-brand-blue/10 bg-brand-pale/30 px-4 py-2.5 text-center">
             <p className="text-[12px] text-brand-dark/30">ยังคิดกำไรไม่ได้ — ต้องรู้ต้นทุนก่อน กรอกราคาต่อกล่องตอนสั่งสินค้า</p>
           </div>
         )}
