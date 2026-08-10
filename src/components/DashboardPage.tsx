@@ -109,96 +109,88 @@ function waveBg(color: string) {
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
 }
 
-/** หลอดเป้ากำไรรายเดือน — มีลูกเล่นน้ำไหลในหลอด */
-function MonthlyGoalBar({ earned, goal, monthLabel, daysLeft, onEditGoal }: {
+/** หลอดเป้ากำไรรายเดือน — แนวตั้งเล็กๆ ในการ์ดยอดขาย กดดูรายละเอียด/แก้เป้าได้ */
+function MonthlyGoalTube({ earned, goal, monthLabel, daysLeft, onEditGoal }: {
   earned: number
   goal: number
   monthLabel: string
   daysLeft: number
   onEditGoal?: (v: number) => void
 }) {
-  const [editing, setEditing] = useState(false)
+  const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState(String(goal))
   const pct = goal > 0 ? Math.min((earned / goal) * 100, 100) : 0
   const done = earned >= goal
   const remain = Math.max(0, goal - earned)
-  const perDay = daysLeft > 0 ? remain / daysLeft : 0
 
   function save() {
     const n = Number(draft)
     if (onEditGoal && n > 0) onEditGoal(Math.round(n))
-    setEditing(false)
+    setOpen(false)
   }
 
   return (
-    <div className="bg-white border border-brand-blue/10 rounded-2xl px-4 py-3 card-hover"
-      style={{ animation: 'fadeUp 0.4s ease both', animationDelay: '120ms' }}>
-      <div className="flex items-baseline justify-between gap-2 mb-2 flex-wrap">
-        <p className="text-[12px] font-medium text-brand-dark/60">
-          เป้ากำไร{monthLabel}
-        </p>
-        <div className="flex items-baseline gap-1.5 text-[11px]">
-          <span className={`font-bold text-[14px] ${done ? 'text-emerald-600' : 'text-brand-dark'}`}>
-            ฿{formatBaht(Math.round(earned))}
-          </span>
-          <span className="text-brand-dark/30">/</span>
-          {editing ? (
-            <input
-              autoFocus type="number" inputMode="numeric"
-              className="w-20 border border-brand-blue rounded-md px-1.5 py-0.5 text-[12px] text-right outline-none"
-              value={draft}
-              onChange={e => setDraft(e.target.value)}
-              onBlur={save}
-              onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }}
-            />
-          ) : (
-            <button
-              onClick={() => { setDraft(String(goal)); setEditing(true) }}
-              className="text-brand-dark/45 hover:text-brand-blue transition-colors underline decoration-dotted underline-offset-2"
-              title="แก้เป้า"
-            >
-              ฿{formatBaht(goal)}
-            </button>
-          )}
+    <div className="relative flex flex-col items-center justify-between py-0.5">
+      <button
+        onClick={() => { setDraft(String(goal)); setOpen(o => !o) }}
+        className="flex flex-col items-center gap-1 h-full group"
+        title={`เป้ากำไร${monthLabel} ฿${formatBaht(Math.round(earned))} / ฿${formatBaht(goal)}`}
+      >
+        <span className="text-[8px] font-medium text-white/50 leading-none">เป้า</span>
+        {/* หลอดน้ำแนวตั้ง — น้ำขึ้นจากล่าง */}
+        <div className="relative w-4 flex-1 min-h-[38px] rounded-full bg-white/15 overflow-hidden group-hover:bg-white/25 transition-colors">
+          <div
+            className="absolute inset-x-0 bottom-0 overflow-hidden transition-[height] duration-1000 ease-out"
+            style={{ height: `${Math.max(pct, 6)}%` }}
+          >
+            <div className={`wave-body absolute inset-0 ${done
+              ? 'bg-gradient-to-t from-emerald-500 to-emerald-300'
+              : 'bg-gradient-to-t from-sky-500 to-sky-300'}`} />
+            <div className="wave-layer wave-a" style={{ backgroundImage: waveBg('#ffffff') }} />
+            <div className="wave-layer wave-b" style={{ backgroundImage: waveBg('#ffffff') }} />
+          </div>
         </div>
-      </div>
-
-      {/* หลอดน้ำ */}
-      <div className="relative h-8 rounded-full bg-brand-pale overflow-hidden">
-        <div
-          className="absolute inset-y-0 left-0 transition-[width] duration-1000 ease-out overflow-hidden"
-          style={{ width: `${Math.max(pct, 1.5)}%` }}
-        >
-          {/* ตัวน้ำ */}
-          <div className={`wave-body absolute inset-0 ${done
-            ? 'bg-gradient-to-r from-emerald-400 to-teal-400'
-            : 'bg-gradient-to-r from-sky-400 to-brand-blue'}`} />
-          {/* ผิวน้ำ 2 ชั้น วิ่งคนละทาง */}
-          <div className="wave-layer wave-a" style={{ backgroundImage: waveBg('#ffffff') }} />
-          <div className="wave-layer wave-b" style={{ backgroundImage: waveBg('#ffffff') }} />
-          {/* ฟองอากาศ */}
-          {pct > 12 && [18, 45, 72].map((left, i) => (
-            <span key={left}
-              className="bubble absolute bottom-1 w-1 h-1 rounded-full bg-white/70"
-              style={{ left: `${left}%`, animationDelay: `${i * 0.9}s` }} />
-          ))}
-        </div>
-
-        {/* ตัวเลข % */}
-        <span className={`absolute inset-0 flex items-center px-3 text-[11px] font-bold tabular-nums pointer-events-none ${
-          pct > 55 ? 'text-white justify-start' : 'text-brand-dark/50 justify-end'
-        }`}>
+        <span className={`text-[9px] font-bold tabular-nums leading-none ${done ? 'text-emerald-300' : 'text-white/80'}`}>
           {pct.toFixed(0)}%
         </span>
-      </div>
+      </button>
 
-      <p className="text-[10px] text-brand-dark/35 mt-1.5">
-        {done
-          ? `ถึงเป้าแล้ว เกินมา ฿${formatBaht(Math.round(earned - goal))} 🎉`
-          : daysLeft > 0
-            ? `เหลืออีก ฿${formatBaht(Math.round(remain))} · ${daysLeft} วัน · เฉลี่ยวันละ ฿${formatBaht(Math.round(perDay))}`
-            : `เหลืออีก ฿${formatBaht(Math.round(remain))}`}
-      </p>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1.5 z-30 w-56 bg-white rounded-xl shadow-xl border border-brand-blue/10 p-3"
+            onClick={e => e.stopPropagation()}>
+            <p className="text-[11px] font-semibold text-brand-dark mb-1.5">เป้ากำไร{monthLabel}</p>
+            <p className="text-[12px] text-brand-dark/60 mb-2">
+              <b className={done ? 'text-emerald-600' : 'text-brand-dark'}>฿{formatBaht(Math.round(earned))}</b>
+              {' / '}฿{formatBaht(goal)}  ({pct.toFixed(0)}%)
+            </p>
+            <p className="text-[10px] text-brand-dark/40 mb-2.5">
+              {done
+                ? `ถึงเป้าแล้ว เกินมา ฿${formatBaht(Math.round(earned - goal))} 🎉`
+                : daysLeft > 0
+                  ? `เหลืออีก ฿${formatBaht(Math.round(remain))} · ${daysLeft} วัน · เฉลี่ยวันละ ฿${formatBaht(Math.round(remain / daysLeft))}`
+                  : `เหลืออีก ฿${formatBaht(Math.round(remain))}`}
+            </p>
+            {onEditGoal && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-brand-dark/40 flex-shrink-0">ตั้งเป้า ฿</span>
+                <input
+                  type="number" inputMode="numeric"
+                  className="flex-1 min-w-0 border border-brand-blue/20 rounded-lg px-2 py-1 text-[12px] outline-none focus:border-brand-blue"
+                  value={draft}
+                  onChange={e => setDraft(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setOpen(false) }}
+                />
+                <button onClick={save}
+                  className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-brand-blue text-white flex-shrink-0">
+                  ตั้ง
+                </button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -805,21 +797,17 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
         <StatCard label="ยอดขายรวม" value={`฿${formatBaht(stats.totalAmount)}`} sub={activeBranch !== 'ทั้งหมด' ? activeBranch : `${filteredReports.length} วัน`} sub2={cumulativeTotal != null ? `สะสม ณ วันนี้ ฿${formatBaht(cumulativeTotal)}` : undefined} accent icon={<TrendingUp size={12} />} delay={0} animKey={currentIdx}
           valueSuffix={profit && (
             <>กำไร <b className="font-semibold text-white/90">฿{formatBaht(Math.round(profit.total))}</b> · {profit.marginPct.toFixed(1)}%</>
-          )} />
-        <StatCard label="จำนวนชิ้น" value={`${stats.totalVolume.toLocaleString()}`} sub={`เฉลี่ย ฿${formatBaht(stats.avgPerPiece)}/ชิ้น`} icon={<Package size={12} />} delay={50} animKey={currentIdx} />
-
-        {/* เป้ากำไรรายเดือน */}
-        {monthGoal && (
-          <div className="col-span-2">
-            <MonthlyGoalBar
+          )}
+          side={monthGoal && (
+            <MonthlyGoalTube
               earned={monthGoal.earned}
               goal={monthlyProfitGoal}
               monthLabel={monthGoal.monthLabel}
               daysLeft={monthGoal.daysLeft}
               onEditGoal={onSetMonthlyGoal}
             />
-          </div>
-        )}
+          )} />
+        <StatCard label="จำนวนชิ้น" value={`${stats.totalVolume.toLocaleString()}`} sub={`เฉลี่ย ฿${formatBaht(stats.avgPerPiece)}/ชิ้น`} icon={<Package size={12} />} delay={50} animKey={currentIdx} />
 
         {/* Luffy — 7-day comparison card */}
         {weekStats && (() => {
