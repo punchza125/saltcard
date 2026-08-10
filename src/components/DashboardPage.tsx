@@ -507,8 +507,8 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
       {/* ── Stat cards: 2 cols mobile → 4 cols desktop ─ */}
       <div className="px-4 md:px-6 grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         <StatCard label="ยอดขายรวม" value={`฿${formatBaht(stats.totalAmount)}`} sub={activeBranch !== 'ทั้งหมด' ? activeBranch : `${filteredReports.length} วัน`} sub2={cumulativeTotal != null ? `สะสม ณ วันนี้ ฿${formatBaht(cumulativeTotal)}` : undefined} accent icon={<TrendingUp size={12} />} delay={0} animKey={currentIdx}
-          footer={profit && (
-            <span>กำไร <b className="font-semibold text-white/95">฿{formatBaht(Math.round(profit.total))}</b> · {profit.marginPct.toFixed(1)}%</span>
+          valueSuffix={profit && (
+            <>กำไร <b className="font-semibold text-white/90">฿{formatBaht(Math.round(profit.total))}</b> · {profit.marginPct.toFixed(1)}%</>
           )} />
         <StatCard label="จำนวนชิ้น" value={`${stats.totalVolume.toLocaleString()}`} sub={`เฉลี่ย ฿${formatBaht(stats.avgPerPiece)}/ชิ้น`} icon={<Package size={12} />} delay={50} animKey={currentIdx} />
 
