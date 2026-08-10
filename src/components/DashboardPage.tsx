@@ -109,8 +109,11 @@ function waveBg(color: string) {
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
 }
 
-/** หลอดเป้ากำไรรายเดือน — แนวตั้งเล็กๆ ในการ์ดยอดขาย กดดูรายละเอียด/แก้เป้าได้ */
-function MonthlyGoalTube({ earned, goal, monthLabel, daysLeft, onEditGoal }: {
+/**
+ * หลอดเป้ากำไรรายเดือน — แถบน้ำบางๆ วางทับที่ขอบล่างของการ์ด
+ * absolute ทั้งหมด จึงไม่กินทั้งความกว้างและความสูง การ์ดขนาดเท่าเดิมเป๊ะ
+ */
+function MonthlyGoalBar({ earned, goal, monthLabel, daysLeft, onEditGoal }: {
   earned: number
   goal: number
   monthLabel: string
@@ -130,68 +133,92 @@ function MonthlyGoalTube({ earned, goal, monthLabel, daysLeft, onEditGoal }: {
   }
 
   return (
-    <div className="relative flex flex-col items-center justify-between py-0.5">
+    <>
+      {/* แถบกดได้ สูงจริง 28px (พื้นที่กดกว้างเต็มการ์ด) แต่เห็นเป็นหลอด 12px */}
+      {/* พื้นที่กดกว้างเต็มการ์ด สูง 32px แต่มองเห็นเป็นแถบน้ำบาง 6px ที่ขอบล่าง */}
       <button
         onClick={() => { setDraft(String(goal)); setOpen(o => !o) }}
-        className="flex flex-col items-center gap-1 h-full group"
-        title={`เป้ากำไร${monthLabel} ฿${formatBaht(Math.round(earned))} / ฿${formatBaht(goal)}`}
+        className="absolute inset-x-0 bottom-0 h-8 flex items-end px-4 pb-1.5 group"
+        title={`เป้ากำไร${monthLabel} ฿${formatBaht(Math.round(earned))} / ฿${formatBaht(goal)} (${pct.toFixed(0)}%)`}
       >
-        <span className="text-[8px] font-medium text-white/50 leading-none">เป้า</span>
-        {/* หลอดน้ำแนวตั้ง — น้ำขึ้นจากล่าง */}
-        <div className="relative w-4 flex-1 min-h-[38px] rounded-full bg-white/15 overflow-hidden group-hover:bg-white/25 transition-colors">
-          <div
-            className="absolute inset-x-0 bottom-0 overflow-hidden transition-[height] duration-1000 ease-out"
-            style={{ height: `${Math.max(pct, 6)}%` }}
+        <span className="relative flex-1 h-1.5 rounded-full bg-white/20 overflow-hidden group-hover:bg-white/30 transition-colors">
+          <span
+            className="absolute inset-y-0 left-0 block overflow-hidden transition-[width] duration-1000 ease-out"
+            style={{ width: `${Math.max(pct, 4)}%` }}
           >
-            <div className={`wave-body absolute inset-0 ${done
-              ? 'bg-gradient-to-t from-emerald-500 to-emerald-300'
-              : 'bg-gradient-to-t from-sky-500 to-sky-300'}`} />
-            <div className="wave-layer wave-a" style={{ backgroundImage: waveBg('#ffffff') }} />
-            <div className="wave-layer wave-b" style={{ backgroundImage: waveBg('#ffffff') }} />
-          </div>
-        </div>
-        <span className={`text-[9px] font-bold tabular-nums leading-none ${done ? 'text-emerald-300' : 'text-white/80'}`}>
-          {pct.toFixed(0)}%
+            <span className={`wave-body absolute inset-0 block ${done
+              ? 'bg-gradient-to-r from-emerald-400 to-emerald-300'
+              : 'bg-gradient-to-r from-sky-300 to-sky-200'}`} />
+            <span className="wave-layer wave-a block" style={{ backgroundImage: waveBg('#ffffff') }} />
+            <span className="wave-layer wave-b block" style={{ backgroundImage: waveBg('#ffffff') }} />
+          </span>
         </span>
       </button>
 
-      {open && (
-        <>
-          <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1.5 z-30 w-56 bg-white rounded-xl shadow-xl border border-brand-blue/10 p-3"
+      {open && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-black/40"
+          onClick={() => setOpen(false)}>
+          <div className="bg-white w-full md:max-w-xs rounded-t-3xl md:rounded-2xl shadow-2xl p-5 pb-7 md:pb-5"
             onClick={e => e.stopPropagation()}>
-            <p className="text-[11px] font-semibold text-brand-dark mb-1.5">เป้ากำไร{monthLabel}</p>
-            <p className="text-[12px] text-brand-dark/60 mb-2">
-              <b className={done ? 'text-emerald-600' : 'text-brand-dark'}>฿{formatBaht(Math.round(earned))}</b>
-              {' / '}฿{formatBaht(goal)}  ({pct.toFixed(0)}%)
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[13px] font-semibold text-brand-dark">เป้ากำไร{monthLabel}</p>
+              <button onClick={() => setOpen(false)}
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-brand-dark/30 hover:bg-brand-pale">
+                <X size={15} />
+              </button>
+            </div>
+
+            <p className="text-[20px] font-bold leading-tight mb-0.5">
+              <span className={done ? 'text-emerald-600' : 'text-brand-dark'}>
+                ฿{formatBaht(Math.round(earned))}
+              </span>
+              <span className="text-[13px] font-normal text-brand-dark/35"> / ฿{formatBaht(goal)}</span>
             </p>
-            <p className="text-[10px] text-brand-dark/40 mb-2.5">
+
+            {/* หลอดใหญ่ในแผ่นนี้ ดูชัดกว่าในการ์ด */}
+            <div className="relative h-6 rounded-full bg-brand-pale overflow-hidden my-2.5">
+              <div className="absolute inset-y-0 left-0 overflow-hidden transition-[width] duration-1000 ease-out"
+                style={{ width: `${Math.max(pct, 3)}%` }}>
+                <div className={`wave-body absolute inset-0 ${done
+                  ? 'bg-gradient-to-r from-emerald-400 to-teal-400'
+                  : 'bg-gradient-to-r from-sky-400 to-brand-blue'}`} />
+                <div className="wave-layer wave-a" style={{ backgroundImage: waveBg('#ffffff') }} />
+                <div className="wave-layer wave-b" style={{ backgroundImage: waveBg('#ffffff') }} />
+              </div>
+              <span className={`absolute inset-0 flex items-center px-2.5 text-[11px] font-bold tabular-nums ${
+                pct > 50 ? 'text-white justify-start' : 'text-brand-dark/50 justify-end'
+              }`}>{pct.toFixed(0)}%</span>
+            </div>
+
+            <p className="text-[11px] text-brand-dark/45 leading-relaxed mb-3">
               {done
                 ? `ถึงเป้าแล้ว เกินมา ฿${formatBaht(Math.round(earned - goal))} 🎉`
                 : daysLeft > 0
                   ? `เหลืออีก ฿${formatBaht(Math.round(remain))} · ${daysLeft} วัน · เฉลี่ยวันละ ฿${formatBaht(Math.round(remain / daysLeft))}`
                   : `เหลืออีก ฿${formatBaht(Math.round(remain))}`}
             </p>
+
             {onEditGoal && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] text-brand-dark/40 flex-shrink-0">ตั้งเป้า ฿</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-brand-dark/40 flex-shrink-0">ตั้งเป้า ฿</span>
                 <input
                   type="number" inputMode="numeric"
-                  className="flex-1 min-w-0 border border-brand-blue/20 rounded-lg px-2 py-1 text-[12px] outline-none focus:border-brand-blue"
+                  className="flex-1 min-w-0 border border-brand-blue/20 rounded-xl px-3 py-2 text-[15px] outline-none focus:border-brand-blue"
                   value={draft}
                   onChange={e => setDraft(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setOpen(false) }}
                 />
                 <button onClick={save}
-                  className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-brand-blue text-white flex-shrink-0">
+                  className="text-[13px] font-semibold px-4 py-2 rounded-xl bg-brand-blue text-white flex-shrink-0 active:scale-95 transition-transform">
                   ตั้ง
                 </button>
               </div>
             )}
           </div>
-        </>
+        </div>,
+        document.body,
       )}
-    </div>
+    </>
   )
 }
 
@@ -798,8 +825,8 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
           valueSuffix={profit && (
             <>กำไร <b className="font-semibold text-white/90">฿{formatBaht(Math.round(profit.total))}</b> · {profit.marginPct.toFixed(1)}%</>
           )}
-          side={monthGoal && (
-            <MonthlyGoalTube
+          overlay={monthGoal && (
+            <MonthlyGoalBar
               earned={monthGoal.earned}
               goal={monthlyProfitGoal}
               monthLabel={monthGoal.monthLabel}
