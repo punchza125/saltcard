@@ -1,4 +1,4 @@
-import type { DayReport, PurchaseOrder, StockProduct } from '../types'
+import type { CostRate, DayReport, PurchaseOrder, StockProduct } from '../types'
 import { matchesKeyword } from '../utils/parser'
 
 /**
@@ -18,31 +18,84 @@ export function isBoxGoods(goodsName: string): boolean {
   return lower.includes('(box)') || lower.endsWith(' box')
 }
 
+export type CostSource = 'manual' | 'order' | 'default'
+export interface CostPoint { from: string; perBox: number; source: 'manual' | 'order' }
+
+export function sortCostRates(rates: CostRate[]): CostRate[] {
+  return [...rates].sort((a, b) => a.from.localeCompare(b.from))
+}
+
+/**
+ * รวมจุดเปลี่ยนต้นทุนทั้งหมดของสินค้าหนึ่งตัว เรียงตามวันที่
+ *   - ที่กรอกเองในหน้าแก้ไขสินค้า (costRates)
+ *   - ราคาจากออร์เดอร์ที่กดรับของแล้ว (นับตั้งแต่วันที่รับ)
+ * ถ้าวันเดียวกัน ค่าที่กรอกเองชนะ เพราะถือว่าตั้งใจแก้ทีหลัง
+ */
+export function costTimeline(product: StockProduct, orders: PurchaseOrder[]): CostPoint[] {
+  const points: CostPoint[] = []
+  for (const o of orders) {
+    if (o.status !== 'received' || !o.receivedAt) continue
+    for (const it of o.items) {
+      if (it.productId !== product.id || it.pricePerBox == null || it.pricePerBox <= 0) continue
+      points.push({ from: o.receivedAt, perBox: it.pricePerBox, source: 'order' })
+    }
+  }
+  for (const r of product.costRates ?? []) {
+    if (r.perBox > 0) points.push({ from: r.from, perBox: r.perBox, source: 'manual' })
+  }
+  return points.sort((a, b) =>
+    a.from === b.from
+      ? (a.source === 'manual' ? 1 : -1)   // วันเดียวกัน: manual อยู่ท้าย = ชนะ
+      : a.from.localeCompare(b.from))
+}
+
 /**
  * ต้นทุนต่อกล่องที่มีผล ณ วันที่กำหนด
- * = ราคาของออร์เดอร์ล่าสุดที่รับของแล้ว (receivedAt ≤ date) และกรอกราคาไว้
- * ถ้ายังไม่มีออร์เดอร์ไหนกรอกราคาก่อนวันนั้น → ใช้ราคาซื้อตั้งต้นของสินค้า
+ * = จุดเปลี่ยนล่าสุดที่ยังไม่เกินวันนั้น ถ้าไม่มีเลย → ราคาซื้อตั้งต้นของสินค้า
  */
 export function costPerBoxOn(
   product: StockProduct,
   date: string,
   orders: PurchaseOrder[],
 ): number | undefined {
-  let best: { at: string; price: number } | undefined
-  for (const o of orders) {
-    if (o.status !== 'received' || !o.receivedAt || o.receivedAt > date) continue
-    for (const it of o.items) {
-      if (it.productId !== product.id || it.pricePerBox == null || it.pricePerBox <= 0) continue
-      if (!best || o.receivedAt > best.at) best = { at: o.receivedAt, price: it.pricePerBox }
-    }
+  let hit: CostPoint | undefined
+  for (const p of costTimeline(product, orders)) {
+    if (p.from <= date) hit = p
+    else break
   }
-  return best?.price ?? product.buyPricePerBox
+  return hit?.perBox ?? product.buyPricePerBox
 }
 
-/** ต้นทุนต่อกล่องที่ใช้อยู่ตอนนี้ */
-export function currentCostPerBox(product: StockProduct, orders: PurchaseOrder[]) {
-  return costPerBoxOn(product, new Date().toISOString().slice(0, 10), orders)
+/** ต้นทุนที่มีผล ณ วันนั้น พร้อมบอกว่ามาจากไหน */
+export function costDetailOn(product: StockProduct, date: string, orders: PurchaseOrder[]):
+  { perBox?: number; source: CostSource } {
+  let hit: CostPoint | undefined
+  for (const p of costTimeline(product, orders)) {
+    if (p.from <= date) hit = p
+    else break
+  }
+  if (hit) return { perBox: hit.perBox, source: hit.source }
+  return { perBox: product.buyPricePerBox, source: 'default' }
 }
+
+/** เพิ่ม/แทนที่ต้นทุนที่กรอกเองของวันนั้น — ถ้าไม่ต่างจากที่มีผลอยู่แล้ว จะไม่เพิ่มซ้ำ */
+export function upsertCostRate(
+  product: StockProduct,
+  orders: PurchaseOrder[],
+  from: string,
+  perBox?: number,
+): CostRate[] {
+  const rest = sortCostRates((product.costRates ?? []).filter(r => r.from !== from))
+  if (perBox == null || perBox <= 0) return rest        // ล้างค่า = ลบจุดนั้นทิ้ง
+  const effective = costPerBoxOn({ ...product, costRates: rest }, from, orders)
+  if (effective === perBox) return rest                  // ไม่เปลี่ยน
+  return sortCostRates([...rest, { from, perBox }])
+}
+
+export function removeCostRate(product: StockProduct, from: string): CostRate[] {
+  return sortCostRates((product.costRates ?? []).filter(r => r.from !== from))
+}
+
 
 export interface ProfitBreakdown {
   total: number         // กำไรสุทธิรวม (฿)

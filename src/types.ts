@@ -43,6 +43,12 @@ export interface DashboardStore {
   reports: DayReport[]
 }
 
+/** ต้นทุนต่อกล่องที่กรอกเอง มีผลตั้งแต่วันที่ `from` เป็นต้นไป */
+export interface CostRate {
+  from: string    // YYYY-MM-DD
+  perBox: number  // ราคาซื้อต่อกล่อง (฿)
+}
+
 export type StockUnit = 'Box' | 'Pack' | 'Carton' | 'ชิ้น'
 
 export interface StockProduct {
@@ -57,11 +63,12 @@ export interface StockProduct {
   goodsKeyword: string   // keyword จับคู่ชื่อใน Goods Aspect เช่น "PRB-02"
   category: string       // หมวดหมู่ เช่น "One Piece"
   /**
-   * ราคาซื้อต่อกล่อง (฿) — ต้นทุนตั้งต้น
-   * ใช้กับวันที่เก่ากว่าออร์เดอร์แรกที่กรอกราคาไว้
-   * ออร์เดอร์ที่รับของแล้วและมีราคา จะเข้ามาแทนตั้งแต่วันที่รับเป็นต้นไป
+   * ราคาซื้อต่อกล่อง (฿) — ต้นทุนตั้งต้น ใช้กับวันที่เก่ากว่าทุกอย่าง
+   * ถูกแทนที่ด้วย costRates และราคาจากออร์เดอร์ที่รับแล้ว ตามวันที่มีผล
    */
   buyPricePerBox?: number
+  /** ประวัติต้นทุนที่กรอกเอง — เรียงตาม from จากเก่าไปใหม่ */
+  costRates?: CostRate[]
 }
 
 export type EntryKind = 'in' | 'received' | 'incoming' | 'out' | 'auto' | 'adjust'

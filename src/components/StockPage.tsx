@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import type {
   StockProduct,
+  CostRate,
   StockUnit,
   DayReport,
   PurchaseOrder,
@@ -39,7 +40,13 @@ import {
 import OrdersTab from "./OrdersTab";
 import { useOrderStore } from "../hooks/useOrderStore";
 import { categoryLogo } from "../lib/categoryLogos";
-import { currentCostPerBox } from "../lib/profit";
+import {
+  costDetailOn,
+  costTimeline,
+  upsertCostRate,
+  removeCostRate,
+  sortCostRates,
+} from "../lib/profit";
 
 const CATEGORIES = [
   "One Piece",
@@ -463,6 +470,7 @@ function ProductModal({
     goodsKeyword: string,
     category: string,
     buyPricePerBox?: number,
+    costRates?: CostRate[],
   ) => void;
   onClose: () => void;
   hiddenCategories?: string[];
@@ -489,10 +497,37 @@ function ProductModal({
   const [yellowAt, setYellowAt] = useState(String(initial?.yellowAt ?? 120));
   const [redAt, setRedAt] = useState(String(initial?.redAt ?? 48));
   const [keyword, setKeyword] = useState(initial?.goodsKeyword ?? "");
-  // ราคาซื้อต่อกล่องตั้งต้น — ใช้กับวันก่อนมีออร์เดอร์ที่กรอกราคา
+  // ── ต้นทุนต่อกล่องแบบมีวันที่มีผล ────────────────────────────────────────
+  const TODAY = new Date().toISOString().slice(0, 10);
+  const { orders } = useOrderStore();
+  const [costRates, setCostRates] = useState<CostRate[]>(initial?.costRates ?? []);
+  const [costFrom, setCostFrom] = useState(TODAY);
+  const base = initial ?? ({ id: "", costRates: [] } as unknown as StockProduct);
+  const costAt = (date: string, rs: CostRate[]) =>
+    costDetailOn({ ...base, costRates: rs }, date, orders);
+  const initCost = costAt(TODAY, initial?.costRates ?? []);
   const [buyPrice, setBuyPrice] = useState(
+    initCost.perBox != null ? String(initCost.perBox) : "",
+  );
+  // ราคาตั้งต้น (ก่อนทุกช่วง) — แก้ได้เมื่อยังไม่มีประวัติ
+  const [defaultPrice, setDefaultPrice] = useState(
     initial?.buyPricePerBox != null ? String(initial.buyPricePerBox) : "",
   );
+
+  /** เปลี่ยนวันที่มีผล → ดึงต้นทุนที่ใช้อยู่ ณ วันนั้นมาโชว์ */
+  function changeCostFrom(date: string) {
+    setCostFrom(date);
+    if (!date) return;
+    const c = costAt(date, costRates);
+    setBuyPrice(c.perBox != null ? String(c.perBox) : "");
+  }
+
+  function deleteCostRate(from: string) {
+    const next = removeCostRate({ ...base, costRates }, from);
+    setCostRates(next);
+    const c = costAt(costFrom || TODAY, next);
+    setBuyPrice(c.perBox != null ? String(c.perBox) : "");
+  }
   const [category, setCategory] = useState(initial?.category ?? "");
   const [error, setError] = useState("");
   const [showNewCat, setShowNewCat] = useState(false);
@@ -628,7 +663,28 @@ function ProductModal({
         r,
         keyword.trim(),
         category || "อื่นๆ",
-        buyPrice.trim() === "" ? undefined : Number(buyPrice),
+        ...(() => {
+          const entered =
+            buyPrice.trim() === "" ? undefined : Number(buyPrice);
+          const fallback =
+            defaultPrice.trim() === "" ? undefined : Number(defaultPrice);
+          // ค่าแรกสุดของสินค้า = ราคาตั้งต้น ครอบทุกวันย้อนหลัง
+          // (ไม่งั้นยอดขายก่อนวันที่กรอกจะกลายเป็น "ไม่รู้ต้นทุน")
+          const hasAnyCost =
+            costRates.length > 0 ||
+            fallback != null ||
+            costTimeline(base, orders).some((p) => p.source === "order");
+          if (!hasAnyCost) return [entered, [] as CostRate[]] as const;
+          return [
+            fallback,
+            upsertCostRate(
+              { ...base, costRates },
+              orders,
+              costFrom || TODAY,
+              entered,
+            ),
+          ] as const;
+        })(),
       );
     } catch (e) {
       return setError(
@@ -880,13 +936,11 @@ function ProductModal({
             )}
           </div>
 
-          {/* ราคาซื้อตั้งต้น — ปกติไม่ต้องกรอก เพราะดึงจากออร์เดอร์ให้เอง */}
+          {/* ต้นทุนต่อกล่อง — ตั้งค่าล่วงหน้าได้ แล้วเปลี่ยนทีหลังพร้อมระบุวันที่ */}
           <div>
             <label className="text-[11px] font-semibold text-brand-dark/40 uppercase tracking-wider">
-              ราคาซื้อต่อกล่อง{" "}
-              <span className="font-normal normal-case text-brand-dark/30">
-                (฿ — ตั้งต้น)
-              </span>
+              ต้นทุนต่อกล่อง{" "}
+              <span className="font-normal normal-case text-brand-dark/30">(฿)</span>
             </label>
             <div className="mt-1.5 rounded-xl border border-emerald-200 bg-emerald-50/50 px-3 py-2.5 flex items-center gap-1.5">
               <span className="text-[14px] text-brand-dark/40">฿</span>
@@ -899,11 +953,81 @@ function ProductModal({
                 onChange={(e) => setBuyPrice(e.target.value)}
                 onFocus={(e) => e.target.select()}
               />
+              {ppb > 0 && buyPrice.trim() !== "" && (
+                <span className="text-[11px] text-brand-dark/35 flex-shrink-0 whitespace-nowrap">
+                  ≈ ฿{(Number(buyPrice) / ppb).toFixed(2)}/ซอง
+                </span>
+              )}
+            </div>
+
+            <div className="mt-2 flex items-center gap-2 rounded-xl bg-brand-dark/[0.03] px-3 py-2">
+              <span className="text-[11px] font-medium text-brand-dark/50 shrink-0">
+                มีผลตั้งแต่
+              </span>
+              <input
+                type="date"
+                className="flex-1 bg-transparent text-[13px] font-semibold text-brand-dark outline-none"
+                value={costFrom}
+                onChange={(e) => changeCostFrom(e.target.value)}
+              />
             </div>
             <p className="text-[10px] text-brand-dark/30 mt-1 leading-relaxed">
-              ปกติไม่ต้องกรอก — ระบบใช้ราคาของกล่องล่าสุดที่กดรับของแล้วเป็นต้นทุน
-              ช่องนี้ใช้กับยอดขายของวันที่เก่ากว่าออร์เดอร์แรกที่กรอกราคาไว้เท่านั้น
+              {costRates.length === 0 && defaultPrice.trim() === "" ? (
+                <>ราคาแรกที่กรอกจะใช้เป็น <b>ค่าตั้งต้น</b> ครอบทุกวันย้อนหลัง
+                {" "}พอเปลี่ยนราคาครั้งถัดไปค่อยระบุวันที่มีผล</>
+              ) : (
+                <>กำไรของแต่ละวันใช้ต้นทุนที่มีผล ณ วันนั้น — เปลี่ยนราคาวันนี้{" "}
+                <b>ไม่กระทบ</b> กำไรของวันก่อนหน้า</>
+              )}
+              {" "}ถ้ารับกล่องใหม่แล้วกรอกราคาไว้ในออร์เดอร์ ระบบจะเปลี่ยนต้นทุนให้เองตั้งแต่วันที่รับ
             </p>
+
+            {(costRates.length > 0 || defaultPrice.trim() !== "") && (
+              <div className="mt-2.5 space-y-1">
+                <p className="text-[10px] font-semibold text-brand-dark/35 uppercase tracking-wider">
+                  ประวัติต้นทุนที่กรอกเอง
+                </p>
+                {[...sortCostRates(costRates)].reverse().map((r) => (
+                  <div
+                    key={r.from}
+                    className="flex items-center gap-2 rounded-lg bg-white border border-brand-dark/8 px-2.5 py-1.5"
+                  >
+                    <span className="text-[11px] font-semibold text-brand-dark/60 tabular-nums shrink-0">
+                      {formatThaiDate(r.from)}
+                    </span>
+                    <span className="text-[11px] text-brand-dark/45 flex-1 truncate">
+                      ฿{r.perBox.toLocaleString()}/กล่อง
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => deleteCostRate(r.from)}
+                      className="text-brand-dark/25 hover:text-red-500 transition-colors shrink-0 w-5 h-5 flex items-center justify-center"
+                      aria-label={`ลบต้นทุนของ ${r.from}`}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                <div className="flex items-center gap-2 rounded-lg bg-brand-pale/30 px-2.5 py-1.5">
+                  <span className="text-[10px] text-brand-dark/40 shrink-0">
+                    ก่อนหน้านั้น
+                  </span>
+                  <span className="text-[12px] text-brand-dark/40">฿</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    placeholder="—"
+                    className="flex-1 bg-transparent text-[12px] font-semibold text-brand-dark/60 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    value={defaultPrice}
+                    onChange={(e) => setDefaultPrice(e.target.value)}
+                    onFocus={(e) => e.target.select()}
+                  />
+                  <span className="text-[10px] text-brand-dark/25 shrink-0">
+                    / กล่อง
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* thresholds */}
@@ -1203,10 +1327,18 @@ function ProductRow({
 
           {/* ต้นทุนที่ใช้คิดกำไร — มาจากกล่องล่าสุดที่กดรับของแล้ว */}
           {(() => {
-            const perBox = currentCostPerBox(product, orders);
+            const detail = costDetailOn(
+              product,
+              new Date().toISOString().slice(0, 10),
+              orders,
+            );
+            const perBox = detail.perBox;
             const perPack = perBox != null && ppb > 0 ? perBox / ppb : undefined;
-            const fromOrder =
-              perBox != null && perBox !== product.buyPricePerBox;
+            const SOURCE_LABEL = {
+              order: "จากราคากล่องล่าสุดที่กดรับของแล้ว",
+              manual: "จากต้นทุนที่กรอกไว้เอง",
+              default: "จากราคาตั้งต้น — ยังไม่มีการเปลี่ยนต้นทุน",
+            } as const;
             return (
               <div className="bg-emerald-50 rounded-xl p-2.5 mb-2 border border-emerald-100">
                 <div className="flex items-center justify-between mb-1.5">
@@ -1240,15 +1372,13 @@ function ProductRow({
                       </div>
                     </div>
                     <p className="text-[9px] text-brand-dark/35 mt-1.5">
-                      {fromOrder
-                        ? "จากราคากล่องล่าสุดที่กดรับของแล้ว"
-                        : "จากราคาตั้งต้นที่กรอกไว้ — ยังไม่มีออร์เดอร์ที่กรอกราคา"}
+                      {SOURCE_LABEL[detail.source]}
                     </p>
                   </>
                 ) : (
                   <p className="text-[11px] text-brand-dark/35">
-                    ยังไม่รู้ต้นทุน — กรอกราคาตอนสั่งสินค้า
-                    หรือกด <b>แก้</b> เพื่อใส่ราคาตั้งต้น
+                    ยังไม่รู้ต้นทุน — กด <b>แก้</b> เพื่อใส่ต้นทุนต่อกล่อง
+                    หรือกรอกราคาตอนสั่งสินค้า
                   </p>
                 )}
               </div>
@@ -1988,6 +2118,7 @@ export default function StockPage({
               kw,
               cat,
               buyPricePerBox,
+              costRates,
             ) => {
               const id = addProduct(
                 name,
@@ -2001,6 +2132,7 @@ export default function StockPage({
               );
               updateProduct(id, {
                 buyPricePerBox,
+                costRates,
               });
               schedulePushStock();
             }}
@@ -2027,6 +2159,7 @@ export default function StockPage({
               kw,
               cat,
               buyPricePerBox,
+              costRates,
             ) => {
               updateProduct(editTarget.id, {
                 name,
@@ -2039,6 +2172,7 @@ export default function StockPage({
                 goodsKeyword: kw,
                 category: cat,
                 buyPricePerBox,
+                costRates,
               });
               schedulePushStock();
             }}
