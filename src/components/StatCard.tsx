@@ -9,9 +9,11 @@ interface StatCardProps {
   icon?: React.ReactNode
   delay?: number
   animKey?: string | number
+  /** บรรทัดเล็กท้ายการ์ด คั่นด้วยเส้นบาง — เช่น กำไรของช่วงนั้น */
+  footer?: React.ReactNode
 }
 
-export default function StatCard({ label, value, sub, sub2, accent, icon, delay = 0, animKey }: StatCardProps) {
+export default function StatCard({ label, value, sub, sub2, accent, icon, delay = 0, animKey, footer }: StatCardProps) {
   return (
     <div
       className={`rounded-2xl p-4 animate-pop-in card-hover ${
@@ -41,6 +43,11 @@ export default function StatCard({ label, value, sub, sub2, accent, icon, delay 
       {sub2 && (
         <div key={`sub2-${animKey}`} className={`text-[10px] mt-1 animate-pop-in ${accent ? 'text-white/50' : 'text-brand-dark/30'}`} style={{ animationDelay: '50ms' }}>
           {sub2}
+        </div>
+      )}
+      {footer && (
+        <div className={`mt-2.5 pt-2 border-t text-[11px] ${accent ? 'border-white/15 text-white/75' : 'border-brand-blue/10 text-brand-dark/45'}`}>
+          {footer}
         </div>
       )}
     </div>
