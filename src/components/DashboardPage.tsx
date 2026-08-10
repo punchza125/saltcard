@@ -128,7 +128,6 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
 
   const [rangeMode, setRangeMode] = useState<RangeMode>('day')
   const [selectedDateIdx, setSelectedDateIdx] = useState<number>(reports.length - 1)
-  const [activeGoodsTab, setActiveGoodsTab] = useState<'amount' | 'volume'>('amount')
   const [goodsSearch, setGoodsSearch] = useState('')
   const [goodsCat,    setGoodsCat]    = useState('ทั้งหมด')
   const [showCalendar, setShowCalendar] = useState(false)
@@ -310,8 +309,8 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
         else map.set(g.goodsName, { name: g.goodsName, type: resolveType(g.goodsType), volume: g.salesVolume, amount: g.salesAmount })
       })
     })
-    return Array.from(map.values()).sort((a, b) => activeGoodsTab === 'amount' ? b.amount - a.amount : b.volume - a.volume)
-  }, [filteredReports, activeGoodsTab, categoryAliases])
+    return Array.from(map.values()).sort((a, b) => b.amount - a.amount)
+  }, [filteredReports, categoryAliases])
 
   // ค้นหา + กรองหมวด สำหรับรายการสินค้าขายดี (สินค้าเยอะแล้วเลื่อนหายาก)
   const goodsTypes = useMemo(() => {
@@ -813,14 +812,6 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
                       <span className="ml-1.5 text-[11px] text-brand-dark/35">{visibleGoods.length}/{goodsData.length}</span>
                     )}
                   </p>
-                  <div className="flex bg-brand-pale rounded-lg p-0.5 gap-0.5">
-                    {([['amount','ยอด'],['volume','ชิ้น']] as ['amount'|'volume',string][]).map(([k, label]) => (
-                      <button key={k} onClick={() => setActiveGoodsTab(k)}
-                        className={`text-[11px] px-3 py-1 rounded-md transition-all ${activeGoodsTab === k ? 'bg-brand-blue text-white' : 'text-brand-dark/50'}`}>
-                        {label}
-                      </button>
-                    ))}
-                  </div>
                 </div>
 
                 {/* ค้นหา + กรองหมวด — สินค้าเยอะแล้วเลื่อนหายาก */}
@@ -869,7 +860,7 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
                 <div className="space-y-0.5 md:max-h-[26rem] md:overflow-y-auto md:pr-1">
                   {visibleGoods.map((g, i) => {
                     const top = visibleGoods[0]
-                    const pct = top ? (activeGoodsTab === 'amount' ? g.amount / top.amount : g.volume / top.volume) * 100 : 0
+                    const pct = top ? (g.amount / top.amount) * 100 : 0
                     return (
                       <div key={g.name} className="flex items-center gap-2 rounded-xl px-2 py-1.5 -mx-2 hover:bg-brand-pale/50 transition-colors">
                         {RANK_STYLES[i] ? (
@@ -887,12 +878,21 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
                           <div className="flex items-baseline justify-between gap-2 mb-1.5">
                             <p className="text-brand-dark text-[12px] font-medium truncate leading-snug">{g.name}</p>
                             <p className="text-brand-dark text-[12px] font-semibold tabular-nums flex-shrink-0">
-                              {activeGoodsTab === 'amount' ? `฿${formatBaht(g.amount)}` : `${g.volume} ชิ้น`}
+                              ฿{formatBaht(g.amount)}
                             </p>
                           </div>
-                          <div className="h-1 bg-brand-pale rounded-full overflow-hidden">
+                          <div className="relative h-4 bg-brand-pale rounded-full overflow-hidden">
                             <div className="h-full rounded-full transition-all duration-500"
                               style={{ width: `${pct}%`, backgroundColor: RANK_STYLES[i]?.bg ?? '#1a52b3', opacity: i >= 3 ? 0.45 : 1 }} />
+                            {/* จำนวนชิ้น — วางในหลอดถ้ายาวพอ ไม่งั้นวางนอกหลอด */}
+                            <span
+                              className={`absolute inset-y-0 flex items-center text-[10px] font-semibold tabular-nums leading-none ${
+                                pct >= 22 ? 'text-white/95 justify-end pr-1.5' : 'text-brand-dark/45 pl-1.5'
+                              }`}
+                              style={pct >= 22 ? { left: 0, width: `${pct}%` } : { left: `${pct}%` }}
+                            >
+                              {g.volume} ชิ้น
+                            </span>
                           </div>
                         </div>
                       </div>
