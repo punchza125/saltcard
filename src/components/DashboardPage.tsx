@@ -109,11 +109,8 @@ function waveBg(color: string) {
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
 }
 
-/**
- * หลอดเป้ากำไรรายเดือน — แถบน้ำบางๆ วางทับที่ขอบล่างของการ์ด
- * absolute ทั้งหมด จึงไม่กินทั้งความกว้างและความสูง การ์ดขนาดเท่าเดิมเป๊ะ
- */
-function MonthlyGoalBar({ earned, goal, monthLabel, daysLeft, onEditGoal }: {
+/** หลอดเป้ากำไรรายเดือน — แนวตั้งเล็กๆ ในการ์ดยอดขาย กดดูรายละเอียด/แก้เป้าได้ */
+function MonthlyGoalTube({ earned, goal, monthLabel, daysLeft, onEditGoal }: {
   earned: number
   goal: number
   monthLabel: string
@@ -133,26 +130,28 @@ function MonthlyGoalBar({ earned, goal, monthLabel, daysLeft, onEditGoal }: {
   }
 
   return (
-    <>
-      {/* แถบกดได้ สูงจริง 28px (พื้นที่กดกว้างเต็มการ์ด) แต่เห็นเป็นหลอด 12px */}
-      {/* หลอดแนวตั้งที่ขอบขวา — absolute ทั้งหมด ไม่กินความกว้าง/ความสูงของการ์ด
-          พื้นที่กดกว้าง 36px สูงเต็มการ์ด แต่มองเห็นเป็นหลอดบาง 6px */}
+    <div className="relative flex flex-col items-center justify-between py-0.5">
       <button
         onClick={() => { setDraft(String(goal)); setOpen(o => !o) }}
-        className="absolute inset-y-0 right-0 w-9 flex items-center justify-center group"
-        title={`เป้ากำไร${monthLabel} ฿${formatBaht(Math.round(earned))} / ฿${formatBaht(goal)} (${pct.toFixed(0)}%)`}
+        className="flex flex-col items-center gap-1 h-full group"
+        title={`เป้ากำไร${monthLabel} ฿${formatBaht(Math.round(earned))} / ฿${formatBaht(goal)}`}
       >
-        <span className="relative w-1.5 h-[calc(100%-1.75rem)] rounded-full bg-white/20 overflow-hidden group-hover:bg-white/35 transition-colors">
-          <span
-            className="absolute inset-x-0 bottom-0 block overflow-hidden transition-[height] duration-1000 ease-out"
-            style={{ height: `${Math.max(pct, 4)}%` }}
+        <span className="text-[8px] font-medium text-white/50 leading-none">เป้า</span>
+        {/* หลอดน้ำแนวตั้ง — น้ำขึ้นจากล่าง */}
+        <div className="relative w-4 flex-1 min-h-[38px] rounded-full bg-white/15 overflow-hidden group-hover:bg-white/25 transition-colors">
+          <div
+            className="absolute inset-x-0 bottom-0 overflow-hidden transition-[height] duration-1000 ease-out"
+            style={{ height: `${Math.max(pct, 6)}%` }}
           >
-            <span className={`wave-body absolute inset-0 block ${done
-              ? 'bg-gradient-to-t from-emerald-400 to-emerald-200'
-              : 'bg-gradient-to-t from-sky-400 to-sky-200'}`} />
-            <span className="wave-layer wave-a block" style={{ backgroundImage: waveBg('#ffffff') }} />
-            <span className="wave-layer wave-b block" style={{ backgroundImage: waveBg('#ffffff') }} />
-          </span>
+            <div className={`wave-body absolute inset-0 ${done
+              ? 'bg-gradient-to-t from-emerald-500 to-emerald-300'
+              : 'bg-gradient-to-t from-sky-500 to-sky-300'}`} />
+            <div className="wave-layer wave-a" style={{ backgroundImage: waveBg('#ffffff') }} />
+            <div className="wave-layer wave-b" style={{ backgroundImage: waveBg('#ffffff') }} />
+          </div>
+        </div>
+        <span className={`text-[9px] font-bold tabular-nums leading-none ${done ? 'text-emerald-300' : 'text-white/80'}`}>
+          {pct.toFixed(0)}%
         </span>
       </button>
 
@@ -176,7 +175,6 @@ function MonthlyGoalBar({ earned, goal, monthLabel, daysLeft, onEditGoal }: {
               <span className="text-[13px] font-normal text-brand-dark/35"> / ฿{formatBaht(goal)}</span>
             </p>
 
-            {/* หลอดใหญ่ในแผ่นนี้ ดูชัดกว่าในการ์ด */}
             <div className="relative h-6 rounded-full bg-brand-pale overflow-hidden my-2.5">
               <div className="absolute inset-y-0 left-0 overflow-hidden transition-[width] duration-1000 ease-out"
                 style={{ width: `${Math.max(pct, 3)}%` }}>
@@ -219,7 +217,7 @@ function MonthlyGoalBar({ earned, goal, monthLabel, daysLeft, onEditGoal }: {
         </div>,
         document.body,
       )}
-    </>
+    </div>
   )
 }
 
@@ -826,8 +824,8 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
           valueSuffix={profit && (
             <>กำไร <b className="font-semibold text-white/90">฿{formatBaht(Math.round(profit.total))}</b> · {profit.marginPct.toFixed(1)}%</>
           )}
-          overlay={monthGoal && (
-            <MonthlyGoalBar
+          side={monthGoal && (
+            <MonthlyGoalTube
               earned={monthGoal.earned}
               goal={monthlyProfitGoal}
               monthLabel={monthGoal.monthLabel}
