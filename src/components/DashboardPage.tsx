@@ -115,6 +115,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export default function DashboardPage({ reports: allReports, stockProducts = [], taxRate = 15, activeBranch, setActiveBranch, syncStatus, lastSynced, categoryAliases = {} }: DashboardPageProps) {
   const { orders } = useOrderStore()
   const [profitOpen, setProfitOpen] = useState(false)
+  const [goodsMetric, setGoodsMetric] = useState<'amount' | 'profit'>('amount')
   // กรองตามสาขาที่เลือก — 'ทั้งหมด' รวมทุกสาขา (ใช้ area total), ไม่งั้นดึงเฉพาะ site ที่ตรงชื่อ
   const selectedSite = activeBranch || 'ทั้งหมด'
 
@@ -312,6 +313,12 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
     return Array.from(map.values()).sort((a, b) => b.amount - a.amount)
   }, [filteredReports, categoryAliases])
 
+  // กำไรรายสินค้า → ใช้ในโหมด "กำไร" ของรายการสินค้าขายดี
+  const profitByGoods = useMemo(
+    () => new Map((profit?.items ?? []).map(it => [it.name, it])),
+    [profit],
+  )
+
   // ค้นหา + กรองหมวด สำหรับรายการสินค้าขายดี (สินค้าเยอะแล้วเลื่อนหายาก)
   const goodsTypes = useMemo(() => {
     // หมวดหลักขึ้นก่อนตามลำดับนี้ ที่เหลือเรียง ก-ฮ/A-Z ต่อท้าย
@@ -325,13 +332,23 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
   }, [goodsData])
   const visibleGoods = useMemo(() => {
     const q = goodsSearch.trim().toLowerCase()
-    return goodsData.filter(g => {
+    const list = goodsData.filter(g => {
       if (goodsCat !== 'ทั้งหมด' && g.type !== goodsCat) return false
       if (!q) return true
       // ค้นแบบแยกคำ — พิมพ์ "op 15" เจอ "One Piece OP-15" ได้
       return q.split(/\s+/).every(w => g.name.toLowerCase().includes(w))
     })
-  }, [goodsData, goodsSearch, goodsCat])
+    if (goodsMetric === 'amount') return list
+    // โหมดกำไร — ตัวที่ยังไม่รู้ต้นทุนไปอยู่ท้ายสุด
+    return [...list].sort((a, b) => {
+      const pa = profitByGoods.get(a.name)?.profit
+      const pb = profitByGoods.get(b.name)?.profit
+      if (pa == null && pb == null) return b.amount - a.amount
+      if (pa == null) return 1
+      if (pb == null) return -1
+      return pb - pa
+    })
+  }, [goodsData, goodsSearch, goodsCat, goodsMetric, profitByGoods])
 
   const goodsTypeData = useMemo(() => {
     const map = new Map<string, { name: string; value: number }>()
@@ -709,32 +726,6 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
                   <span>ภาษี {taxRate}% ฿{formatBaht(Math.round(profit.tax))}</span>
                 </div>
 
-                {/* กำไรรายสินค้า */}
-                <div className="rounded-xl bg-white/60 border border-emerald-200/70 overflow-hidden">
-                  <div className="flex items-center gap-2 px-2.5 py-1.5 text-[9px] font-semibold text-brand-dark/35 uppercase tracking-wider border-b border-emerald-200/50">
-                    <span className="flex-1">สินค้า</span>
-                    <span className="w-14 text-right">จำนวน</span>
-                    <span className="w-16 text-right">ยอดขาย</span>
-                    <span className="w-16 text-right">กำไร</span>
-                  </div>
-                  <div className="max-h-52 overflow-y-auto">
-                    {profit.items.map(it => (
-                      <div key={it.name}
-                        className="flex items-center gap-2 px-2.5 py-1.5 text-[11px] border-b border-emerald-100/50 last:border-0">
-                        <span className="flex-1 truncate text-brand-dark/70" title={it.name}>{it.name}</span>
-                        <span className="w-14 text-right text-brand-dark/45 tabular-nums whitespace-nowrap">
-                          {it.qty} {it.isBox ? 'กล่อง' : 'ชิ้น'}
-                        </span>
-                        <span className="w-16 text-right text-brand-dark/45 tabular-nums">
-                          ฿{formatBaht(Math.round(it.revenue))}
-                        </span>
-                        <span className={`w-16 text-right font-semibold tabular-nums ${it.profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                          ฿{formatBaht(Math.round(it.profit))}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
                 {profit.uncosted.length > 0 && (
                   <div className="text-[10px] text-amber-600">
                     <p>
@@ -812,6 +803,18 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
                       <span className="ml-1.5 text-[11px] text-brand-dark/35">{visibleGoods.length}/{goodsData.length}</span>
                     )}
                   </p>
+                  {profit && (
+                    <div className="flex bg-brand-pale rounded-lg p-0.5 gap-0.5">
+                      {([['amount', 'ยอดขาย'], ['profit', 'กำไร']] as ['amount' | 'profit', string][]).map(([k, label]) => (
+                        <button key={k} onClick={() => setGoodsMetric(k)}
+                          className={`text-[11px] px-3 py-1 rounded-md transition-all ${
+                            goodsMetric === k ? 'bg-brand-blue text-white' : 'text-brand-dark/50'
+                          }`}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* ค้นหา + กรองหมวด — สินค้าเยอะแล้วเลื่อนหายาก */}
@@ -859,8 +862,12 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
 
                 <div className="space-y-0.5 md:max-h-[26rem] md:overflow-y-auto md:pr-1">
                   {visibleGoods.map((g, i) => {
-                    const top = visibleGoods[0]
-                    const pct = top ? (g.amount / top.amount) * 100 : 0
+                    const gp = profitByGoods.get(g.name)
+                    const val = goodsMetric === 'amount' ? g.amount : gp?.profit
+                    const topVal = goodsMetric === 'amount'
+                      ? visibleGoods[0]?.amount
+                      : profitByGoods.get(visibleGoods[0]?.name ?? '')?.profit
+                    const pct = topVal && val != null && val > 0 ? (val / topVal) * 100 : 0
                     return (
                       <div key={g.name} className="flex items-center gap-2 rounded-xl px-2 py-1.5 -mx-2 hover:bg-brand-pale/50 transition-colors">
                         {RANK_STYLES[i] ? (
@@ -877,8 +884,12 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
                         <div className="flex-1 min-w-0">
                           <div className="flex items-baseline justify-between gap-2 mb-1.5">
                             <p className="text-brand-dark text-[12px] font-medium truncate leading-snug">{g.name}</p>
-                            <p className="text-brand-dark text-[12px] font-semibold tabular-nums flex-shrink-0">
-                              ฿{formatBaht(g.amount)}
+                            <p className={`text-[12px] font-semibold tabular-nums flex-shrink-0 ${
+                              goodsMetric === 'profit'
+                                ? val == null ? 'text-brand-dark/25' : val >= 0 ? 'text-emerald-600' : 'text-red-500'
+                                : 'text-brand-dark'
+                            }`}>
+                              {val == null ? 'ยังไม่รู้ต้นทุน' : `฿${formatBaht(Math.round(val))}`}
                             </p>
                           </div>
                           <div className="relative h-4 bg-brand-pale rounded-full overflow-hidden">
@@ -892,6 +903,7 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
                               style={pct >= 22 ? { left: 0, width: `${pct}%` } : { left: `${pct}%` }}
                             >
                               {g.volume} ชิ้น
+                              {goodsMetric === 'profit' && ` · ฿${formatBaht(g.amount)}`}
                             </span>
                           </div>
                         </div>
