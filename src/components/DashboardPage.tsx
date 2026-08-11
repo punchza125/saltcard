@@ -260,11 +260,17 @@ function GoodsDetailModal({ name, reports, onClose }: {
     const best = rows.reduce((a, b) => (b.amount > a.amount ? b : a))
     const first = all[0].date
 
-    // ขายดีวันไหนของสัปดาห์ — เฉลี่ยต่อวันที่มีข้อมูลจริง
+    // ทุกวันในช่วงที่เลือก รวมวันที่ขายไม่ได้ด้วย — ใช้เป็นตัวหารของค่าเฉลี่ยต่อวัน
+    // ช่วง "ทั้งหมด" เริ่มนับจากวันที่ขายได้ครั้งแรก ไม่งั้นวันก่อนวางขายจะมาถ่วงค่าเฉลี่ย
+    const startAt = range === 'all' ? first : (cutoff > first ? cutoff : first)
+    const volByDate = new Map(rows.map(d => [d.date, d.volume]))
+    const daysInRange = reports.filter(r => r.date >= startAt).map(r => r.date)
+
+    // ขายดีวันไหนของสัปดาห์ — เฉลี่ยจากทุกวันในช่วง วันที่ขายไม่ได้นับเป็น 0
     const dow = Array.from({ length: 7 }, () => ({ vol: 0, days: 0 }))
-    rows.forEach(d => {
-      const i = new Date(d.date).getDay()
-      dow[i].vol += d.volume
+    daysInRange.forEach(date => {
+      const i = new Date(date).getDay()
+      dow[i].vol += volByDate.get(date) ?? 0
       dow[i].days++
     })
     const dowAvg = dow.map((x, i) => ({
@@ -277,7 +283,8 @@ function GoodsDetailModal({ name, reports, onClose }: {
     return {
       rows: rows.map(d => ({ ...d, label: formatThaiDate(d.date) })),
       totalVol, totalAmt, best, first,
-      avgPerDay: totalVol / rows.length,
+      avgPerDay: daysInRange.length ? totalVol / daysInRange.length : 0,
+      rangeDays: daysInRange.length,
       dowAvg, dowMax,
       activeDays: rows.length,
     }
@@ -328,7 +335,7 @@ function GoodsDetailModal({ name, reports, onClose }: {
                 {[
                   { l: 'ขายได้', v: `${data.totalVol} ชิ้น` },
                   { l: 'ยอดขาย', v: `฿${formatBaht(data.totalAmt)}` },
-                  { l: 'เฉลี่ยวันที่ขายได้', v: `${data.avgPerDay.toFixed(1)} ชิ้น` },
+                  { l: 'เฉลี่ยต่อวัน', v: `${data.avgPerDay.toFixed(1)} ชิ้น`, sub: `จาก ${data.rangeDays} วัน` },
                   { l: 'วันที่ดีที่สุด', v: `฿${formatBaht(data.best.amount)}`, sub: formatThaiDate(data.best.date) },
                 ].map(x => (
                   <div key={x.l} className="rounded-xl bg-brand-pale/50 px-3 py-2">
@@ -381,7 +388,7 @@ function GoodsDetailModal({ name, reports, onClose }: {
                   ))}
                 </div>
                 <p className="text-[9px] text-brand-dark/30 mt-1.5">
-                  นับเฉพาะวันที่สินค้านี้ขายได้ — วันที่ไม่มียอดไม่ถูกนำมาเฉลี่ย
+                  เฉลี่ยจากทุกวันในช่วง วันที่ขายไม่ได้นับเป็น 0 — ช่วง "ทั้งหมด" เริ่มนับจากวันที่ขายได้ครั้งแรก
                 </p>
               </div>
             </>
