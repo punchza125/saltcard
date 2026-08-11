@@ -335,7 +335,7 @@ function GoodsDetailModal({ name, reports, onClose }: {
                 {[
                   { l: 'ขายได้', v: `${data.totalVol} ชิ้น` },
                   { l: 'ยอดขาย', v: `฿${formatBaht(data.totalAmt)}` },
-                  { l: 'เฉลี่ยต่อวัน', v: `${data.avgPerDay.toFixed(1)} ชิ้น`, sub: `จาก ${data.rangeDays} วัน` },
+                  { l: 'เฉลี่ยต่อวัน', v: `${data.avgPerDay.toFixed(1)} ชิ้น/วัน`, sub: `เฉลี่ยจากช่วง ${data.rangeDays} วัน` },
                   { l: 'วันที่ดีที่สุด', v: `฿${formatBaht(data.best.amount)}`, sub: formatThaiDate(data.best.date) },
                 ].map(x => (
                   <div key={x.l} className="rounded-xl bg-brand-pale/50 px-3 py-2">
