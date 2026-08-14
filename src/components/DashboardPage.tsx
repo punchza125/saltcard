@@ -1349,6 +1349,28 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
         </div>
       </div>
 
+      {/* ป้ายลอยบอกว่ากำลังดูสาขาไหน — กันเผลอกดเลือกสาขาแล้วลืม */}
+      {selectedSite !== 'ทั้งหมด' && createPortal(
+        <div className="fixed left-1/2 -translate-x-1/2 bottom-[76px] md:bottom-6 z-[90] pointer-events-none">
+          <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-brand-blue text-white
+            shadow-lg shadow-brand-blue/30 pl-3 pr-1.5 py-1.5 animate-pop-in">
+            <MapPin size={13} className="flex-shrink-0 text-white/80" />
+            <span className="text-[12px] font-semibold whitespace-nowrap">
+              <span className="font-normal text-white/70">กำลังดู </span>{selectedSite}
+            </span>
+            <button
+              onClick={() => setActiveBranch('ทั้งหมด')}
+              className="w-6 h-6 rounded-full flex items-center justify-center bg-white/15 hover:bg-white/30 transition-colors flex-shrink-0"
+              aria-label="ดูทุกสาขา"
+              title="กลับไปดูทุกสาขา"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        </div>,
+        document.body,
+      )}
+
       {goodsDetail && (
         <GoodsDetailModal
           name={goodsDetail}
