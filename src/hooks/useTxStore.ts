@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { collection, doc, getDocs, setDoc } from 'firebase/firestore'
+import { collection, doc, getDocs, setDoc, deleteDoc } from 'firebase/firestore'
 import type { TxDay } from '../types'
 import { getDb, ensureAuth, COL } from '../lib/firebase'
 
@@ -59,10 +59,26 @@ export async function saveTxDay(day: TxDay): Promise<void> {
   notify()
 }
 
+export async function removeTxDay(date: string): Promise<void> {
+  await ensureAuth()
+  await deleteDoc(doc(db(), COL.txDaily, date))
+  const next = { ..._days }
+  delete next[date]
+  _days = next
+  notify()
+}
+
+export async function clearTxDays(): Promise<void> {
+  await ensureAuth()
+  await Promise.all(Object.keys(_days).map(d => deleteDoc(doc(db(), COL.txDaily, d))))
+  _days = {}
+  notify()
+}
+
 export function useTxStore() {
   const snap = useSyncExternalStore(
     cb => { _listeners.add(cb); return () => _listeners.delete(cb) },
     () => _snapshot,
   )
-  return { ...snap, load: loadTxDays, save: saveTxDay }
+  return { ...snap, load: loadTxDays, save: saveTxDay, remove: removeTxDay, clear: clearTxDays }
 }

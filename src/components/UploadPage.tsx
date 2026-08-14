@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react'
+import React, { useRef, useState, useCallback, useEffect } from 'react'
 import {
   Upload, FileSpreadsheet, X,
   CheckCircle, AlertCircle, Loader2,
@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import type { DayReport } from '../types'
 import { parseMultiReport, parseTransactionDetails, formatThaiDate } from '../utils/parser'
-import { saveTxDay } from '../hooks/useTxStore'
+import { useTxStore } from '../hooks/useTxStore'
 import MigratePanel from './MigratePanel'
 
 interface UploadPageProps {
@@ -33,15 +33,19 @@ interface FileStatus {
   message?: string
 }
 
-// Each vending machine branch definition
-const BRANCHES = [
-  { id: 'central',  label: 'เซนทรัล ระยอง',  color: '#1a52b3', emoji: '🏪', active: true  },
-  { id: 'passion',  label: 'พาชชั่น ระยอง',   color: '#10b981', emoji: '🏬', active: false },
-]
+/**
+ * ช่องอัปโหลด 2 ช่อง
+ *   sales = Multi-Report (ไฟล์สรุปยอด มีทุกสาขาในไฟล์เดียว)
+ *   tx    = Transaction Details (ยอดรายรายการ ใช้แยกสินค้าตามสาขา)
+ * ระบบดูจากชื่อไฟล์อยู่แล้ว วางผิดช่องก็ยังเข้าถูกที่
+ */
+const ZONES = [
+  { id: 'sales', label: 'ไฟล์สรุปยอด',        color: '#1a52b3', emoji: '📊',
+    hint: 'Multi-Report — รวมทุกสาขาในไฟล์เดียว' },
+  { id: 'tx',    label: 'ไฟล์รายการขาย',      color: '#10b981', emoji: '🧾',
+    hint: 'Transaction Details — แยกสินค้าตามสาขา' },
+] as const
 
-function getReportBranch(r: DayReport): string {
-  return r.sites[0]?.name ?? r.areas[0]?.name ?? 'ไม่ระบุ'
-}
 
 function StatusIcon({ status }: { status: FileStatus['status'] }) {
   if (status === 'parsing' || status === 'syncing')
@@ -67,6 +71,9 @@ export default function UploadPage({
   sheetsUrl, lastSynced,
   onPushReport, onFetchAll, onFetchMachine, onOpenSheetsConfig,
 }: UploadPageProps) {
+  const { days: txDays, load: loadTx, save: saveTx, remove: removeTx, clear: clearTx } = useTxStore()
+  useEffect(() => { loadTx() }, [loadTx])
+
   const [fileStatuses, setFileStatuses] = useState<FileStatus[]>([])
   const [fetching,    setFetching]    = useState(false)
   const [pushingAll,  setPushingAll]  = useState(false)
@@ -105,7 +112,7 @@ export default function UploadPage({
         // ไฟล์ Transaction Details (ยอดรายรายการ แยกสาขาได้) — คนละชนิดกับไฟล์สรุปยอด
         if (/transaction\s*details/i.test(arr[i].name)) {
           const day = await parseTransactionDetails(arr[i])
-          await saveTxDay(day)
+          await saveTx(day)
           const sites = Object.keys(day.sites).length
           const pieces = Object.values(day.sites).reduce((n, x) => n + x.v, 0)
           setFileStatuses(prev => prev.map((s, idx) =>
@@ -136,7 +143,7 @@ export default function UploadPage({
         ))
       }
     }
-  }, [onAddCentral, onAddPassion, onPushReport, sheetsUrl])
+  }, [onAddCentral, onAddPassion, onPushReport, sheetsUrl, saveTx])
 
   const handleFetchAll = async () => {
     setFetching(true)
@@ -145,13 +152,14 @@ export default function UploadPage({
     setFetching(false)
   }
 
-  const reportsByBranch: Record<string, DayReport[]> = {
-    'เซนทรัล ระยอง': [...centralReports].sort((a,b) => b.date.localeCompare(a.date)),
-    'พาชชั่น ระยอง':  [...passionReports].sort((a,b) => b.date.localeCompare(a.date)),
-  }
+  // ไฟล์สรุปยอดมีทุกสาขาในไฟล์เดียวอยู่แล้ว จึงรวมเป็นรายการเดียว ไม่แยกกล่องตามสาขา
+  const allReports = [...centralReports, ...passionReports].sort((a, b) => b.date.localeCompare(a.date))
 
-  const onRemoveByBranch = { 'เซนทรัล ระยอง': onRemoveCentral, 'พาชชั่น ระยอง': onRemovePassion }
-  const onClearByBranch  = { 'เซนทรัล ระยอง': onClearCentral,  'พาชชั่น ระยอง': onClearPassion  }
+  /** ลบรายงานของวันนั้น — เผื่อข้อมูลเก่ายังกระจายอยู่สอง store */
+  function removeReport(date: string) {
+    if (centralReports.some(r => r.date === date)) onRemoveCentral(date)
+    if (passionReports.some(r => r.date === date)) onRemovePassion(date)
+  }
 
   return (
     <div className="px-4 md:px-6 py-5 md:py-8 md:max-w-4xl md:mx-auto">
@@ -217,8 +225,8 @@ export default function UploadPage({
                   </p>
                 </div>
                 <span className="text-[10px] font-medium px-2 py-0.5 rounded-full"
-                  style={{ background: `${BRANCHES.find(b=>b.label===fs.branch)?.color ?? '#888'}18`,
-                           color:      BRANCHES.find(b=>b.label===fs.branch)?.color ?? '#888' }}>
+                  style={{ background: `${ZONES.find(z => z.label === fs.branch)?.color ?? '#888'}18`,
+                           color:      ZONES.find(z => z.label === fs.branch)?.color ?? '#888' }}>
                   {fs.branch}
                 </span>
               </div>
@@ -226,137 +234,133 @@ export default function UploadPage({
           </div>
         )}
 
-        {/* ── Branch sections ── */}
+        {/* ── ช่องอัปโหลด 2 ช่อง ── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {BRANCHES.map(branch => {
-            const branchReports = (reportsByBranch[branch.label] ?? []).sort((a,b) => b.date.localeCompare(a.date))
-            const isDragging = draggingId === branch.id
+          {ZONES.map(zone => {
+            const isTx = zone.id === 'tx'
+            const isDragging = draggingId === zone.id
+
+            // แถวรายการที่จะโชว์ใต้ช่อง — คนละแหล่งกันแต่หน้าตาเดียวกัน
+            const items = isTx
+              ? Object.values(txDays)
+                  .sort((a, b) => b.date.localeCompare(a.date))
+                  .map(d => {
+                    const sites = Object.entries(d.sites)
+                    return {
+                      date: d.date,
+                      vol: sites.reduce((n, [, x]) => n + x.v, 0),
+                      amt: sites.reduce((n, [, x]) => n + x.a, 0),
+                      note: sites.map(([n, x]) => `${n} ${x.v}`).join(' · '),
+                      onRemove: () => removeTx(d.date),
+                      report: undefined as DayReport | undefined,
+                    }
+                  })
+              : allReports.map(r => ({
+                  date: r.date,
+                  vol: r.areas.reduce((n, a) => n + a.salesVolume, 0),
+                  amt: r.areas.reduce((n, a) => n + a.salesAmount, 0),
+                  note: r.sites.map(x => x.name).join(' · '),
+                  onRemove: () => removeReport(r.date),
+                  report: r,
+                }))
+
+            const totalAmt = items.reduce((n, x) => n + x.amt, 0)
 
             return (
-              <div key={branch.id}
-                className={`rounded-2xl border overflow-hidden transition-all ${
-                  branch.active
-                    ? 'border-brand-blue/15 bg-white'
-                    : 'border-dashed border-brand-blue/15 bg-brand-pale/30'
-                }`}
-              >
-                {/* Branch header */}
+              <div key={zone.id} className="rounded-2xl border border-brand-blue/15 bg-white overflow-hidden transition-all">
+                {/* หัวช่อง */}
                 <div className="flex items-center justify-between px-4 py-3 border-b border-brand-blue/8"
-                  style={{ background: `${branch.color}08` }}>
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-[18px]">{branch.emoji}</span>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-[13px] font-bold text-brand-dark">{branch.label}</p>
-                        {!branch.active && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-brand-dark/10 text-brand-dark/40 uppercase tracking-wide">
-                            เร็วๆ นี้
-                          </span>
-                        )}
-                      </div>
+                  style={{ background: `${zone.color}08` }}>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-[18px] flex-shrink-0">{zone.emoji}</span>
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-bold text-brand-dark">{zone.label}</p>
                       <div className="flex items-center gap-1 mt-0.5">
-                        <MapPin size={9} style={{ color: branch.color }} />
-                        <p className="text-[10px] font-medium" style={{ color: branch.color }}>
-                          {branchReports.length} วัน · {branchReports.reduce((s,r) => s + r.areas.reduce((a,x) => a + x.salesAmount,0),0).toLocaleString('th-TH')} บาท
+                        <MapPin size={9} style={{ color: zone.color }} className="flex-shrink-0" />
+                        <p className="text-[10px] font-medium truncate" style={{ color: zone.color }}>
+                          {items.length} วัน · {Math.round(totalAmt).toLocaleString('th-TH')} บาท
                         </p>
                       </div>
                     </div>
                   </div>
-                  {branchReports.length > 0 && (
+                  {items.length > 0 && (
                     <button onClick={() => {
-                      if (!confirm(`ลบข้อมูล ${branch.label} ทั้งหมด ${branchReports.length} วัน?`)) return
-                      onClearByBranch[branch.label]?.()
-                    }} className="text-[11px] text-red-400 hover:text-red-600 transition-colors">
+                      if (!confirm(`ลบ${zone.label}ทั้งหมด ${items.length} วัน?`)) return
+                      if (isTx) clearTx()
+                      else { onClearCentral(); onClearPassion() }
+                    }} className="text-[11px] text-red-400 hover:text-red-600 transition-colors flex-shrink-0">
                       ล้าง
                     </button>
                   )}
                 </div>
 
-                {/* Upload zone */}
+                {/* โซนวางไฟล์ */}
                 <div
-                  className={`
-                    relative border-2 border-dashed m-3 rounded-xl cursor-pointer
+                  className={`relative border-2 border-dashed m-3 rounded-xl cursor-pointer
                     flex flex-col items-center justify-center py-6 gap-2 transition-all
-                    ${isDragging
-                      ? 'scale-[1.02]'
-                      : branch.active
-                        ? 'hover:opacity-80'
-                        : 'opacity-50 pointer-events-none'
-                    }
-                  `}
+                    ${isDragging ? 'scale-[1.02]' : 'hover:opacity-80'}`}
                   style={{
-                    borderColor: isDragging ? branch.color : `${branch.color}40`,
-                    background:  isDragging ? `${branch.color}10` : `${branch.color}05`,
+                    borderColor: isDragging ? zone.color : `${zone.color}40`,
+                    background:  isDragging ? `${zone.color}10` : `${zone.color}05`,
                   }}
-                  onDragOver={e => { e.preventDefault(); setDraggingId(branch.id) }}
+                  onDragOver={e => { e.preventDefault(); setDraggingId(zone.id) }}
                   onDragLeave={() => setDraggingId(null)}
                   onDrop={e => {
                     e.preventDefault(); setDraggingId(null)
-                    processFiles(e.dataTransfer.files, branch.label)
+                    processFiles(e.dataTransfer.files, zone.label)
                   }}
-                  onClick={() => branch.active && inputRefs.current[branch.id]?.click()}
+                  onClick={() => inputRefs.current[zone.id]?.click()}
                 >
                   <input
-                    ref={el => { inputRefs.current[branch.id] = el }}
+                    ref={el => { inputRefs.current[zone.id] = el }}
                     type="file" multiple accept=".xlsx,.xls" className="hidden"
-                    onChange={e => e.target.files && processFiles(e.target.files, branch.label)}
+                    onChange={e => e.target.files && processFiles(e.target.files, zone.label)}
                   />
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center transition-all"
-                    style={{ background: isDragging ? branch.color : `${branch.color}15` }}>
-                    <Upload size={18} style={{ color: isDragging ? 'white' : branch.color }} />
+                    style={{ background: isDragging ? zone.color : `${zone.color}15` }}>
+                    <Upload size={18} style={{ color: isDragging ? 'white' : zone.color }} />
                   </div>
-                  <div className="text-center">
-                    <p className="text-[12px] font-semibold text-brand-dark">
-                      {branch.active ? 'วางไฟล์ที่นี่' : 'ยังไม่พร้อมใช้งาน'}
-                    </p>
-                    {branch.active && (
-                      <p className="text-[10px] text-brand-dark/40 mt-0.5">
-                        {sheetsUrl ? 'ส่ง Google Sheets อัตโนมัติ' : '.xlsx / .xls'}
-                      </p>
-                    )}
+                  <div className="text-center px-3">
+                    <p className="text-[12px] font-semibold text-brand-dark">วางไฟล์ที่นี่</p>
+                    <p className="text-[10px] text-brand-dark/40 mt-0.5">{zone.hint}</p>
                   </div>
                 </div>
 
-                {/* Report list */}
-                {branchReports.length > 0 ? (
+                {/* รายการที่นำเข้าแล้ว */}
+                {items.length > 0 ? (
                   <div className="mx-3 mb-3 rounded-xl overflow-hidden border border-brand-blue/8">
                     <div className="max-h-[260px] overflow-y-auto divide-y divide-brand-blue/5">
-                      {branchReports.map(r => {
-                        const total = r.areas.reduce((s,a) => s + a.salesAmount, 0)
-                        const vol   = r.areas.reduce((s,a) => s + a.salesVolume, 0)
-                        return (
-                          <div key={r.date} className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-brand-pale/40 transition-colors">
-                            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                              style={{ background: `${branch.color}12` }}>
-                              <FileSpreadsheet size={13} style={{ color: branch.color }} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-brand-dark font-medium text-[12px]">{formatThaiDate(r.date)}</p>
-                              <p className="text-brand-dark/40 text-[10px]">{vol.toLocaleString()} ชิ้น · ฿{total.toLocaleString('th-TH')}</p>
-                            </div>
-                            {sheetsUrl && (
-                              <button onClick={() => onPushReport(r)} title="ส่งไป Sheets"
-                                className="w-7 h-7 rounded-full bg-brand-pale flex items-center justify-center hover:bg-brand-blue/20 transition-colors group">
-                                <CloudUpload size={12} className="text-brand-blue/40 group-hover:text-brand-blue transition-colors" />
-                              </button>
-                            )}
-                            <button onClick={() => onRemoveByBranch[branch.label]?.(r.date)} aria-label="ลบ"
-                              className="w-7 h-7 rounded-full bg-red-50 flex items-center justify-center hover:bg-red-100 transition-colors group">
-                              <X size={12} className="text-red-300 group-hover:text-red-500 transition-colors" />
-                            </button>
+                      {items.map(it => (
+                        <div key={it.date} className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-brand-pale/40 transition-colors">
+                          <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                            style={{ background: `${zone.color}12` }}>
+                            <FileSpreadsheet size={13} style={{ color: zone.color }} />
                           </div>
-                        )
-                      })}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-brand-dark font-medium text-[12px]">{formatThaiDate(it.date)}</p>
+                            <p className="text-brand-dark/40 text-[10px] truncate">
+                              {it.vol.toLocaleString()} ชิ้น · ฿{Math.round(it.amt).toLocaleString('th-TH')}
+                              {it.note && <span className="text-brand-dark/25"> · {it.note}</span>}
+                            </p>
+                          </div>
+                          {sheetsUrl && it.report && (
+                            <button onClick={() => onPushReport(it.report!)} title="ส่งไป Sheets"
+                              className="w-7 h-7 rounded-full bg-brand-pale flex items-center justify-center hover:bg-brand-blue/20 transition-colors group flex-shrink-0">
+                              <CloudUpload size={12} className="text-brand-blue/40 group-hover:text-brand-blue transition-colors" />
+                            </button>
+                          )}
+                          <button onClick={it.onRemove} aria-label="ลบ"
+                            className="w-7 h-7 rounded-full bg-red-50 flex items-center justify-center hover:bg-red-100 transition-colors group flex-shrink-0">
+                            <X size={12} className="text-red-300 group-hover:text-red-500 transition-colors" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                ) : branch.active ? (
-                  <div className="mx-3 mb-3 py-5 rounded-xl border border-dashed border-brand-blue/10 flex flex-col items-center gap-1">
-                    <FileSpreadsheet size={20} className="text-brand-dark/15" />
-                    <p className="text-[11px] text-brand-dark/30">ยังไม่มีข้อมูล</p>
                   </div>
                 ) : (
                   <div className="mx-3 mb-3 py-5 rounded-xl border border-dashed border-brand-blue/10 flex flex-col items-center gap-1">
-                    <p className="text-[11px] text-brand-dark/20">รอเปิดสาขา</p>
+                    <FileSpreadsheet size={20} className="text-brand-dark/15" />
+                    <p className="text-[11px] text-brand-dark/30">ยังไม่มีข้อมูล</p>
                   </div>
                 )}
               </div>
