@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { branchBadge } from '../lib/branchLogos'
 import { Upload, ChevronDown, MapPin, Check, Layers } from 'lucide-react'
 
 interface HeaderProps {
@@ -128,12 +129,19 @@ export default function Header({ reportCount, onUploadClick, activeTab, setActiv
                           `}
                           style={{ animationDelay: `${i * 30}ms` }}
                         >
-                          <span className={`
-                            flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-[15px]
-                            ${active ? 'bg-brand-blue/10' : 'bg-brand-pale/60'}
-                          `}>
-                            {isAll ? '🏪' : '📍'}
-                          </span>
+                          {(() => {
+                            const badge = branchBadge(site)
+                            return (
+                              <span className={`
+                                flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-[15px] overflow-hidden
+                                ${badge?.needsDarkBg ? 'bg-brand-dark' : active ? 'bg-brand-blue/10' : 'bg-brand-pale/60'}
+                              `}>
+                                {badge
+                                  ? <img src={badge.src} alt={site} className="w-full h-full object-contain p-1" />
+                                  : isAll ? '🏪' : '📍'}
+                              </span>
+                            )
+                          })()}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
                               <p className={`font-semibold leading-none truncate ${active ? 'text-brand-blue' : ''}`}>

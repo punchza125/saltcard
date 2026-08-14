@@ -4,7 +4,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Sector, ReferenceLine
 } from 'recharts'
-import { ChevronLeft, ChevronRight, TrendingUp, Package, MapPin, Search, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Check, TrendingUp, Package, MapPin, Search, X } from 'lucide-react'
 import type { DayReport, StockProduct } from '../types'
 import { formatThaiDate, formatThaiDateFull, formatBaht, matchesKeyword, baseGoodsName } from '../utils/parser'
 import { calcProfit } from '../lib/profit'
@@ -13,6 +13,7 @@ import { useTxStore } from '../hooks/useTxStore'
 import StatCard from './StatCard'
 import { IMG_FILES } from '../generated/imgManifest'
 import { categoryLogo } from '../lib/categoryLogos'
+import { branchBadge } from '../lib/branchLogos'
 
 interface DashboardPageProps {
   reports: DayReport[]
@@ -218,6 +219,86 @@ function MonthlyGoalTube({ earned, goal, monthLabel, daysLeft, onEditGoal }: {
         </div>,
         document.body,
       )}
+    </div>
+  )
+}
+
+/** กรอบโลโก้สาขา — โลโก้สีอ่อนต้องวางบนพื้นเข้มไม่งั้นมองไม่เห็น */
+function BranchIcon({ site, size = 28 }: { site: string; size?: number }) {
+  const badge = branchBadge(site)
+  return (
+    <span
+      className={`rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden border ${
+        badge?.needsDarkBg
+          ? 'bg-brand-dark border-brand-dark'
+          : 'bg-white border-brand-blue/10'
+      }`}
+      style={{ width: size, height: size }}
+    >
+      {badge
+        ? <img src={badge.src} alt={site} className="w-full h-full object-contain p-[3px]" />
+        : <span style={{ fontSize: size * 0.5 }}>🏪</span>}
+    </span>
+  )
+}
+
+/** ป้ายลอยบอกสาขาที่ดูอยู่ — กดแล้วสลับสาขาได้ทันที */
+function BranchSwitcherPill({ selected, options, onSelect }: {
+  selected: string
+  options: string[]
+  onSelect: (s: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="fixed left-1/2 -translate-x-1/2 bottom-[76px] md:bottom-6 z-[90]">
+      {open && (
+        <>
+          <div className="fixed inset-0" onClick={() => setOpen(false)} />
+          {/* ตัวนอกจัดตำแหน่ง ตัวในทำอนิเมชัน — ไม่งั้น transform ของ animate-pop-in
+              จะไปทับ -translate-x-1/2 ทำให้เมนูเลื่อนหลุดขอบจอ */}
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 max-w-[calc(100vw-2rem)]">
+            <div className="bg-white rounded-2xl shadow-xl shadow-brand-blue/15 border border-brand-blue/10
+              overflow-hidden animate-pop-in">
+              <p className="px-3 pt-2.5 pb-1.5 text-[9px] font-bold text-brand-dark/30 uppercase tracking-widest">
+                เลือกสาขา
+              </p>
+              {['ทั้งหมด', ...options].map(site => {
+                const active = site === selected
+                return (
+                  <button
+                    key={site}
+                    onClick={() => { onSelect(site); setOpen(false) }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors
+                      ${active ? 'bg-brand-blue/5' : 'hover:bg-brand-pale/60'}`}
+                  >
+                    <BranchIcon site={site} />
+                    <span className={`text-[12px] font-semibold flex-1 truncate ${active ? 'text-brand-blue' : 'text-brand-dark/70'}`}>
+                      {site === 'ทั้งหมด' ? 'ทุกสาขา' : site}
+                    </span>
+                    {active && (
+                      <span className="w-4 h-4 rounded-full bg-brand-blue flex items-center justify-center flex-shrink-0">
+                        <Check size={9} strokeWidth={3} className="text-white" />
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </>
+      )}
+
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="relative flex items-center gap-2 rounded-full bg-brand-blue text-white
+          shadow-lg shadow-brand-blue/30 pl-1.5 pr-3 py-1.5 animate-pop-in active:scale-95 transition-transform"
+        title="กดเพื่อเปลี่ยนสาขา"
+      >
+        <BranchIcon site={selected} />
+        <span className="text-[12px] font-semibold whitespace-nowrap">{selected}</span>
+        <ChevronDown size={13} className={`text-white/70 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
     </div>
   )
 }
@@ -605,6 +686,12 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
       daysLeft: Math.max(0, lastDay - Number(lastDate.slice(8, 10))),
     }
   }, [reports, stockProducts, orders, taxRate])
+
+  // สาขาทั้งหมดที่เคยมีข้อมูล — ใช้ในป้ายลอยสำหรับสลับสาขา
+  const branchOptions = useMemo(
+    () => Array.from(new Set(allReports.flatMap(r => r.sites.map(s => s.name)))).sort(),
+    [allReports],
+  )
 
   const availableDates = useMemo(() => new Set(reports.map(r => r.date)), [reports])
 
@@ -1349,25 +1436,13 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
         </div>
       </div>
 
-      {/* ป้ายลอยบอกว่ากำลังดูสาขาไหน — กันเผลอกดเลือกสาขาแล้วลืม */}
+      {/* ป้ายลอยบอกว่ากำลังดูสาขาไหน + กดสลับสาขาได้เลย */}
       {selectedSite !== 'ทั้งหมด' && createPortal(
-        <div className="fixed left-1/2 -translate-x-1/2 bottom-[76px] md:bottom-6 z-[90] pointer-events-none">
-          <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-brand-blue text-white
-            shadow-lg shadow-brand-blue/30 pl-3 pr-1.5 py-1.5 animate-pop-in">
-            <MapPin size={13} className="flex-shrink-0 text-white/80" />
-            <span className="text-[12px] font-semibold whitespace-nowrap">
-              <span className="font-normal text-white/70">กำลังดู </span>{selectedSite}
-            </span>
-            <button
-              onClick={() => setActiveBranch('ทั้งหมด')}
-              className="w-6 h-6 rounded-full flex items-center justify-center bg-white/15 hover:bg-white/30 transition-colors flex-shrink-0"
-              aria-label="ดูทุกสาขา"
-              title="กลับไปดูทุกสาขา"
-            >
-              <X size={12} />
-            </button>
-          </div>
-        </div>,
+        <BranchSwitcherPill
+          selected={selectedSite}
+          options={branchOptions}
+          onSelect={setActiveBranch}
+        />,
         document.body,
       )}
 
