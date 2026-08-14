@@ -245,7 +245,7 @@ function BranchIcon({ site, size = 28 }: { site: string; size?: number }) {
 /**
  * ป้ายลอยบอกสาขาที่ดูอยู่ — กดทีเดียวสลับไปสาขาถัดไป วนเป็นวง ทุกสาขา → สาขาที่ 1 → สาขาที่ 2 → ทุกสาขา
  * โชว์ตลอดเพื่อให้รู้เสมอว่ากำลังดูอะไรอยู่ ตอนดูทุกสาขาใช้สีจางลงไม่ให้เด่นเกิน
- * วางชิดขวาล่าง — เดิมอยู่กลางจอแล้วไปคร่อมกราฟจนอ่านแกนไม่ออก
+ * วางกลางล่างจอ เหนือเมนูล่างบนมือถือ
  */
 function BranchSwitcherPill({ selected, options, onSelect }: {
   selected: string
@@ -259,9 +259,9 @@ function BranchSwitcherPill({ selected, options, onSelect }: {
   const label = (s: string) => (s === 'ทั้งหมด' ? 'ทุกสาขา' : s)
 
   return (
-    // ชิดขวาล่าง ไม่ไปคร่อมกลางกราฟเหมือนตอนอยู่กลางจอ
-    // มือถือเผื่อความสูงเมนูล่าง + safe area ของ iPhone ส่วนบนคอมไม่มีเมนูล่างจึงชิดขอบได้
-    <div className="fixed right-3 md:right-6 bottom-[calc(env(safe-area-inset-bottom,0px)+72px)] md:bottom-6 z-[90]">
+    // กลางล่างจอ — มือถือเผื่อความสูงเมนูล่าง + safe area ของ iPhone
+    // ส่วนบนคอมไม่มีเมนูล่างจึงชิดขอบได้
+    <div className="fixed left-1/2 -translate-x-1/2 bottom-[calc(env(safe-area-inset-bottom,0px)+72px)] md:bottom-6 z-[90]">
       <button
         onClick={() => onSelect(next)}
         title={`กดเพื่อดู ${label(next)}`}
