@@ -242,48 +242,6 @@ function BranchIcon({ site, size = 28 }: { site: string; size?: number }) {
   )
 }
 
-/**
- * ป้ายลอยบอกสาขาที่ดูอยู่ — กดทีเดียวสลับไปสาขาถัดไป
- * วนเป็นวง ทุกสาขา → สาขาที่ 1 → สาขาที่ 2 → ทุกสาขา
- * โชว์ตลอดเพื่อให้รู้เสมอว่ากำลังดูอะไรอยู่ ตอนดูทุกสาขาใช้สีจางลงไม่ให้เด่นเกิน
- */
-function BranchSwitcherPill({ selected, options, onSelect }: {
-  selected: string
-  options: string[]
-  onSelect: (s: string) => void
-}) {
-  const cycle = ['ทั้งหมด', ...options]
-  const i = cycle.indexOf(selected)
-  const next = cycle[(i + 1) % cycle.length] ?? 'ทั้งหมด'
-  const isAll = selected === 'ทั้งหมด'
-  const label = (s: string) => (s === 'ทั้งหมด' ? 'ทุกสาขา' : s)
-
-  return (
-    <div className="fixed left-1/2 -translate-x-1/2 bottom-[76px] md:bottom-6 z-[90]">
-      <button
-        onClick={() => onSelect(next)}
-        title={`กดเพื่อดู ${label(next)}`}
-        className={`flex items-center gap-2 rounded-full pl-1.5 pr-2.5 py-1.5
-          shadow-lg active:scale-95 transition-all animate-pop-in ${
-            isAll
-              ? 'bg-white text-brand-dark/70 border border-brand-blue/15 shadow-brand-blue/10'
-              : 'bg-brand-blue text-white shadow-brand-blue/30'
-          }`}
-      >
-        <BranchIcon site={selected} />
-        <span key={selected} className="text-[12px] font-semibold whitespace-nowrap animate-pop-in">
-          {label(selected)}
-        </span>
-        <span className={`flex items-center gap-0.5 text-[10px] pl-1.5 ml-0.5 border-l ${
-          isAll ? 'border-brand-blue/15 text-brand-dark/35' : 'border-white/25 text-white/65'
-        }`}>
-          <RefreshCw size={11} />
-        </span>
-      </button>
-    </div>
-  )
-}
-
 const THAI_DAY_FULL = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัส', 'ศุกร์', 'เสาร์']
 
 /** ประวัติการขายของสินค้าตัวเดียว — กดจากรายการสินค้าขายดี */
@@ -1416,16 +1374,6 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
           )}
         </div>
       </div>
-
-      {/* ป้ายลอยบอกว่ากำลังดูสาขาไหน — กดสลับไปสาขาถัดไปทีละอัน */}
-      {branchOptions.length > 0 && createPortal(
-        <BranchSwitcherPill
-          selected={selectedSite}
-          options={branchOptions}
-          onSelect={setActiveBranch}
-        />,
-        document.body,
-      )}
 
       {goodsDetail && (
         <GoodsDetailModal
