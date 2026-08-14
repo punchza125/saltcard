@@ -5,7 +5,8 @@ import {
   Link, RefreshCw, CloudUpload, MapPin,
 } from 'lucide-react'
 import type { DayReport } from '../types'
-import { parseMultiReport, formatThaiDate } from '../utils/parser'
+import { parseMultiReport, parseTransactionDetails, formatThaiDate } from '../utils/parser'
+import { saveTxDay } from '../hooks/useTxStore'
 import MigratePanel from './MigratePanel'
 
 interface UploadPageProps {
@@ -101,6 +102,19 @@ export default function UploadPage({
 
     for (let i = 0; i < arr.length; i++) {
       try {
+        // ไฟล์ Transaction Details (ยอดรายรายการ แยกสาขาได้) — คนละชนิดกับไฟล์สรุปยอด
+        if (/transaction\s*details/i.test(arr[i].name)) {
+          const day = await parseTransactionDetails(arr[i])
+          await saveTxDay(day)
+          const sites = Object.keys(day.sites).length
+          const pieces = Object.values(day.sites).reduce((n, x) => n + x.v, 0)
+          setFileStatuses(prev => prev.map((s, idx) =>
+            idx === i ? { ...s, status: 'done',
+              message: `${formatThaiDate(day.date)} · ${sites} สาขา · ${pieces} ชิ้น` } : s
+          ))
+          continue
+        }
+
         const report = await parseMultiReport(arr[i])
         const target = detectBranch(report, branchLabel)
         if (target === 'passion') onAddPassion(report)
@@ -115,9 +129,10 @@ export default function UploadPage({
             idx === i ? { ...s, status: ok ? 'synced' : 'done', message: formatThaiDate(report.date) } : s
           ))
         }
-      } catch {
+      } catch (e) {
         setFileStatuses(prev => prev.map((s, idx) =>
-          idx === i ? { ...s, status: 'error', message: 'อ่านไฟล์ไม่ได้' } : s
+          idx === i ? { ...s, status: 'error',
+            message: e instanceof Error ? e.message : 'อ่านไฟล์ไม่ได้' } : s
         ))
       }
     }

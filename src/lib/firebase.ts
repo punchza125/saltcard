@@ -65,6 +65,7 @@ export const COL = {
   orders:   'orders',     // ออเดอร์ 1 รายการ = 1 document
   entries:  'entries',    // log การเคลื่อนไหวสต็อก (audit trail)
   reports:  'reports',    // รายงานยอดขาย 1 วัน = 1 document (id = วันที่ YYYY-MM-DD)
+  txDaily:  'txDaily',    // สรุปยอดแยกสาขา 1 วัน = 1 document (จากไฟล์ Transaction Details)
   meta:     'meta',       // meta/stock = taxRate ฯลฯ, meta/machine = รายงานหน้าตู้
 } as const
 

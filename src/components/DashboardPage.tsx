@@ -9,6 +9,7 @@ import type { DayReport, StockProduct } from '../types'
 import { formatThaiDate, formatThaiDateFull, formatBaht, matchesKeyword, baseGoodsName } from '../utils/parser'
 import { calcProfit } from '../lib/profit'
 import { useOrderStore } from '../hooks/useOrderStore'
+import { useTxStore } from '../hooks/useTxStore'
 import StatCard from './StatCard'
 import { IMG_FILES } from '../generated/imgManifest'
 import { categoryLogo } from '../lib/categoryLogos'
@@ -416,6 +417,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export default function DashboardPage({ reports: allReports, stockProducts = [], taxRate = 15, monthlyProfitGoal = 40000, onSetMonthlyGoal, activeBranch, setActiveBranch, syncStatus, lastSynced, categoryAliases = {} }: DashboardPageProps) {
   const { orders } = useOrderStore()
+  const { days: txDays, load: loadTx } = useTxStore()
   const [goodsMetric, setGoodsMetric] = useState<'amount' | 'profit'>('amount')
   const [goodsDetail, setGoodsDetail] = useState<string | null>(null)
   // กรองตามสาขาที่เลือก — 'ทั้งหมด' รวมทุกสาขา (ใช้ area total), ไม่งั้นดึงเฉพาะ site ที่ตรงชื่อ
@@ -428,6 +430,9 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
     if (selectedSite === 'ทั้งหมด') return allReports
     return allReports.filter(r => r.sites.some(s => s.name === selectedSite))
   }, [allReports, selectedSite])
+
+  // ข้อมูลแยกสาขาโหลดเฉพาะตอนที่เลือกสาขาจริงๆ — ดู "ทุกสาขา" ไม่ต้องโหลด
+  useEffect(() => { if (selectedSite !== 'ทั้งหมด') loadTx() }, [selectedSite, loadTx])
 
   const [rangeMode, setRangeMode] = useState<RangeMode>('day')
   const [selectedDateIdx, setSelectedDateIdx] = useState<number>(reports.length - 1)
@@ -619,7 +624,38 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
     return cur
   }
 
+  /**
+   * สินค้าขายดี
+   * เลือกสาขา + มีไฟล์ Transaction Details ของวันนั้น → ใช้ยอดจริงของสาขานั้น
+   * ไม่งั้นใช้ยอดรวมทุกสาขาจากไฟล์สรุปเหมือนเดิม (ไฟล์นั้นไม่ได้แยกสาขาให้)
+   */
+  const goodsFromTx = useMemo(() => {
+    if (selectedSite === 'ทั้งหมด') return null
+    const usable = filteredReports.filter(r => txDays[r.date]?.sites[selectedSite])
+    if (!usable.length) return null
+    const map = new Map<string, { name: string; type: string; volume: number; amount: number }>()
+    usable.forEach(r => {
+      txDays[r.date].sites[selectedSite].g.forEach(g => {
+        const key = baseGoodsName(g.n)
+        const ex = map.get(key)
+        if (ex) { ex.volume += g.v; ex.amount += g.a }
+        else map.set(key, { name: key, type: '', volume: g.v, amount: g.a })
+      })
+    })
+    // ประเภทสินค้าเอาจากไฟล์สรุป (Transaction Details ไม่มีคอลัมน์ประเภท)
+    const typeByName = new Map<string, string>()
+    filteredReports.forEach(r => r.goods.forEach(g =>
+      typeByName.set(baseGoodsName(g.goodsName), resolveType(g.goodsType))))
+    const list = [...map.values()].map(x => ({ ...x, type: typeByName.get(x.name) ?? '' }))
+    return {
+      list: list.sort((a, b) => b.amount - a.amount),
+      coveredDays: usable.length,
+      totalDays: filteredReports.length,
+    }
+  }, [selectedSite, filteredReports, txDays, categoryAliases])
+
   const goodsData = useMemo(() => {
+    if (goodsFromTx) return goodsFromTx.list
     const map = new Map<string, { name: string; type: string; volume: number; amount: number }>()
     filteredReports.forEach(r => {
       r.goods.forEach(g => {
@@ -631,7 +667,7 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
       })
     })
     return Array.from(map.values()).sort((a, b) => b.amount - a.amount)
-  }, [filteredReports, categoryAliases])
+  }, [goodsFromTx, filteredReports, categoryAliases])
 
   // กำไรรายสินค้า → ใช้ในโหมด "กำไร" ของรายการสินค้าขายดี
   const profitByGoods = useMemo(
@@ -1043,10 +1079,22 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
             <div className="px-4 md:px-0">
               <div className="bg-white border border-brand-blue/10 rounded-2xl p-4 card-hover">
                 {selectedSite !== 'ทั้งหมด' && (
-                  <div className="flex items-start gap-1.5 text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 mb-3">
-                    <span className="flex-shrink-0">⚠️</span>
-                    <span>นับเฉพาะวันที่สาขานี้มีข้อมูล แต่ยอดสินค้าในแต่ละวันเป็น<strong>ยอดรวมทุกสาขา</strong> — ตู้ไม่ได้แยกยอดสินค้าตามสาขาในไฟล์</span>
-                  </div>
+                  goodsFromTx ? (
+                    <div className="flex items-start gap-1.5 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5 mb-3">
+                      <span className="flex-shrink-0">✅</span>
+                      <span>
+                        ยอดสินค้าของ<strong>สาขานี้จริงๆ</strong> จากไฟล์ Transaction Details
+                        {goodsFromTx.coveredDays < goodsFromTx.totalDays && (
+                          <> — มีข้อมูลแยกสาขา {goodsFromTx.coveredDays} จาก {goodsFromTx.totalDays} วันในช่วงนี้</>
+                        )}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-1.5 text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 mb-3">
+                      <span className="flex-shrink-0">⚠️</span>
+                      <span>นับเฉพาะวันที่สาขานี้มีข้อมูล แต่ยอดสินค้าในแต่ละวันเป็น<strong>ยอดรวมทุกสาขา</strong> — อัปโหลดไฟล์ <strong>Transaction Details</strong> ของวันนั้นเพื่อแยกตามสาขา</span>
+                    </div>
+                  )
                 )}
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-brand-dark/60 text-[12px] font-medium">
@@ -1181,7 +1229,11 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
                   <p className="text-brand-dark/60 text-[12px] font-medium mb-2">
                     สินค้าตามประเภท
                     {selectedSite !== 'ทั้งหมด' && (
-                      <span className="ml-1.5 text-[10px] font-normal text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">รวมทุกสาขา</span>
+                      <span className={`ml-1.5 text-[10px] font-normal px-1.5 py-0.5 rounded-full border ${
+                        goodsFromTx
+                          ? 'text-emerald-600 bg-emerald-50 border-emerald-200'
+                          : 'text-amber-600 bg-amber-50 border-amber-200'
+                      }`}>{goodsFromTx ? 'เฉพาะสาขานี้' : 'รวมทุกสาขา'}</span>
                     )}
                   </p>
                   <ResponsiveContainer width="100%" height={200}>

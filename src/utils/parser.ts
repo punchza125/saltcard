@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx'
-import type { DayReport, AreaRow, GoodsRow, MachineSlot, MachineReport } from './types'
+import type { DayReport, AreaRow, GoodsRow, MachineSlot, MachineReport, TxDay, TxSite, TxGoods } from '../types'
 
 export interface InventoryRow {
   goodsNumber: string
@@ -197,4 +197,69 @@ export async function parseMachineInventory(file: File): Promise<MachineReport> 
   }
 
   return { date, fileName: file.name, slots }
+}
+
+/**
+ * ไฟล์ Transaction Details — ยอดขายรายรายการ (มี Site Name + เวลา)
+ * แปลงเป็น "สรุปรายวันแยกสาขา" ทันทีตอนอ่าน ไม่เก็บ transaction ดิบ
+ * เพราะดิบ ~75KB/วัน แต่สรุปแล้วเหลือ ~4KB/วัน (เล็กลง 94%)
+ */
+export async function parseTransactionDetails(file: File): Promise<TxDay> {
+  const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' })
+  const ws = wb.Sheets[wb.SheetNames[0]]
+  const raw: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as string[][]
+
+  // แถวหัวตารางอาจไม่ได้อยู่บรรทัดแรก (บรรทัดแรกเป็นชื่อรายงาน)
+  const headIdx = raw.findIndex(r => r.some(c => String(c).trim() === 'Site Name'))
+  if (headIdx < 0) throw new Error('ไม่ใช่ไฟล์ Transaction Details — ไม่พบคอลัมน์ Site Name')
+  const head = raw[headIdx].map(c => String(c).trim())
+  const col = (name: string) => head.indexOf(name)
+  const iSite = col('Site Name'), iGoods = col('Goods Name')
+  const iPrice = col('Final Price'), iTime = col('Create Time')
+  const iPay = col('Payment Type'), iRefund = col('Refund Status')
+  if ([iSite, iGoods, iPrice, iTime].some(i => i < 0))
+    throw new Error('ไฟล์ Transaction Details ขาดคอลัมน์ที่ต้องใช้')
+
+  const sites: Record<string, TxSite> = {}
+  const goodsMap = new Map<string, Map<string, TxGoods>>()
+  const dates = new Set<string>()
+
+  for (let i = headIdx + 1; i < raw.length; i++) {
+    const r = raw[i]
+    const site = String(r[iSite] ?? '').trim()
+    const name = String(r[iGoods] ?? '').trim()
+    const time = String(r[iTime] ?? '').trim()
+    if (!site || !name || !time) continue
+    // รายการที่คืนเงินแล้วไม่นับเป็นยอดขาย
+    if (iRefund >= 0 && /^refunded$/i.test(String(r[iRefund] ?? '').trim())) continue
+
+    const amount = Number(r[iPrice]) || 0
+    dates.add(time.slice(0, 10))
+    const hour = Number(time.slice(11, 13))
+
+    const s = sites[site] ?? (sites[site] = { v: 0, a: 0, h: Array(24).fill(0), g: [], p: {} })
+    s.v += 1
+    s.a += amount
+    if (hour >= 0 && hour < 24) s.h[hour] += 1
+
+    const gm = goodsMap.get(site) ?? (goodsMap.set(site, new Map()), goodsMap.get(site)!)
+    const g = gm.get(name) ?? { n: name, v: 0, a: 0 }
+    g.v += 1; g.a += amount
+    gm.set(name, g)
+
+    if (iPay >= 0) {
+      const pay = String(r[iPay] ?? '').trim() || 'อื่นๆ'
+      const p = s.p[pay] ?? (s.p[pay] = { v: 0, a: 0 })
+      p.v += 1; p.a += amount
+    }
+  }
+
+  if (!Object.keys(sites).length) throw new Error('ไม่พบรายการขายในไฟล์')
+  for (const [site, gm] of goodsMap) {
+    sites[site].g = [...gm.values()].sort((a, b) => b.a - a.a)
+  }
+
+  // ไฟล์ควรเป็นของวันเดียว — ถ้ามีหลายวันให้ใช้วันแรกและเตือนไว้ที่ชื่อไฟล์
+  const date = [...dates].sort()[0]
+  return { date, fileName: file.name, importedAt: new Date().toISOString(), sites }
 }

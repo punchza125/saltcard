@@ -99,6 +99,32 @@ export interface MachineReport {
   slots: MachineSlot[]
 }
 
+/**
+ * สรุปยอดขายรายวันแยกตามสาขา — มาจากไฟล์ Transaction Details
+ * เก็บเป็น "สรุป" ไม่ใช่ transaction ดิบ (เล็กกว่า 94%: 4KB เทียบกับ 75KB ต่อวัน)
+ * ชื่อ field สั้นเพื่อประหยัดขนาดเอกสาร
+ */
+export interface TxGoods {
+  n: string   // ชื่อสินค้า
+  v: number   // จำนวนชิ้น
+  a: number   // ยอดเงิน (฿)
+}
+
+export interface TxSite {
+  v: number                                   // ชิ้นรวมของสาขานี้
+  a: number                                   // ยอดเงินรวม
+  h: number[]                                 // จำนวนชิ้นรายชั่วโมง 24 ช่อง (0–23)
+  g: TxGoods[]                                // แยกรายสินค้า
+  p: Record<string, { v: number; a: number }>  // แยกช่องทางจ่ายเงิน
+}
+
+export interface TxDay {
+  date: string       // YYYY-MM-DD
+  fileName: string
+  importedAt: string
+  sites: Record<string, TxSite>
+}
+
 export interface StockStore {
   products: StockProduct[]
   entries: StockEntry[]
