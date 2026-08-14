@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { branchBadge } from '../lib/branchLogos'
-import { Upload, Layers, RefreshCw } from 'lucide-react'
+import { Upload, ChevronDown, MapPin, Check, Layers } from 'lucide-react'
 
 interface HeaderProps {
   reportCount: number
@@ -31,10 +31,6 @@ export default function Header({ reportCount, onUploadClick, activeTab, setActiv
   }, [])
 
   const siteOptions = ['ทั้งหมด', ...availableSites]
-  // วนสลับสาขาทีละอัน: ทุกสาขา → สาขาที่ 1 → สาขาที่ 2 → ทุกสาขา
-  const cycle = ['ทั้งหมด', ...siteOptions.filter(s => s !== 'ทั้งหมด')]
-  const nextSite = cycle[(cycle.indexOf(selectedSite) + 1) % cycle.length] ?? 'ทั้งหมด'
-
   const isFiltered = selectedSite !== 'ทั้งหมด'
 
   // Only show selector when there are sites
@@ -71,10 +67,9 @@ export default function Header({ reportCount, onUploadClick, activeTab, setActiv
           {showSelector && (
             <div ref={ref} className="relative flex-shrink-0">
               <button
-                onClick={() => setSelectedSite(nextSite)}
-                title={`กดเพื่อดู ${nextSite === 'ทั้งหมด' ? 'ทุกสาขา' : nextSite}`}
+                onClick={() => open ? closeDropdown() : setOpen(true)}
                 className={`
-                  flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 rounded-xl text-[12px] font-semibold
+                  flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] font-semibold
                   border transition-all duration-200 active:scale-95
                   ${isFiltered
                     ? 'bg-brand-blue text-white border-brand-blue shadow-md shadow-brand-blue/30'
@@ -82,24 +77,97 @@ export default function Header({ reportCount, onUploadClick, activeTab, setActiv
                   }
                 `}
               >
-                {(() => {
-                  const badge = branchBadge(selectedSite)
-                  return (
-                    <span className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden border ${
-                      badge?.needsDarkBg ? 'bg-brand-dark border-brand-dark' : 'bg-white border-black/5'
-                    }`}>
-                      {badge
-                        ? <img src={badge.src} alt={selectedSite} className="w-full h-full object-contain p-[2px]" />
-                        : <Layers size={12} className="text-brand-dark/50" />}
-                    </span>
-                  )
-                })()}
-                <span key={selectedSite} className="max-w-[130px] truncate animate-pop-in">
+                {isFiltered
+                  ? <MapPin size={13} className="flex-shrink-0" />
+                  : <Layers size={13} className="flex-shrink-0" />
+                }
+                <span className="max-w-[120px] truncate">
                   {isFiltered ? selectedSite : 'ทุกสาขา'}
                 </span>
-                <RefreshCw size={11} className={`flex-shrink-0 ${isFiltered ? 'text-white/60' : 'text-brand-dark/30'}`} />
+                <ChevronDown
+                  size={13}
+                  className={`flex-shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+                />
               </button>
 
+              {open && (
+                <>
+                  {/* backdrop */}
+                  <div className="fixed inset-0 z-40" onClick={closeDropdown} />
+
+                  {/* dropdown panel */}
+                  <div className={`
+                    absolute z-50 top-[calc(100%+8px)] left-0
+                    bg-white rounded-2xl shadow-xl shadow-brand-blue/12
+                    border border-brand-blue/10 overflow-hidden
+                    min-w-[210px]
+                    ${closing ? 'branch-dropdown-exit' : 'branch-dropdown-enter'}
+                  `}>
+                    {/* header label */}
+                    <div className="px-4 py-2.5 border-b border-brand-blue/8">
+                      <p className="text-[10px] font-bold text-brand-dark/30 uppercase tracking-widest">เลือกสาขา</p>
+                    </div>
+
+                    {siteOptions.map((site, i) => {
+                      const isAll     = site === 'ทั้งหมด'
+                      const isPassion = site === 'พาชชั่น ระยอง'
+                      // Passion shows as coming-soon only when it has no real data yet
+                      // (it appears in availableSites as placeholder when passion store is empty)
+                      const comingSoon = isPassion && !availableSites.filter(s => s !== 'พาชชั่น ระยอง').some(s => s.includes('พาชชั่น'))
+                      const active    = selectedSite === site
+                      return (
+                        <button
+                          key={site}
+                          onClick={() => { if (!comingSoon) { setSelectedSite(site); closeDropdown() } }}
+                          disabled={comingSoon}
+                          className={`
+                            w-full flex items-center gap-3 px-4 py-3
+                            text-[13px] text-left transition-all duration-150
+                            ${active ? 'bg-brand-blue/5 text-brand-blue' : ''}
+                            ${comingSoon ? 'opacity-50 cursor-default' : 'hover:bg-brand-pale/50 text-brand-dark/70'}
+                            ${i < siteOptions.length - 1 ? 'border-b border-brand-blue/5' : ''}
+                          `}
+                          style={{ animationDelay: `${i * 30}ms` }}
+                        >
+                          {(() => {
+                            const badge = branchBadge(site)
+                            return (
+                              <span className={`
+                                flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-[15px] overflow-hidden
+                                ${badge?.needsDarkBg ? 'bg-brand-dark' : active ? 'bg-brand-blue/10' : 'bg-brand-pale/60'}
+                              `}>
+                                {badge
+                                  ? <img src={badge.src} alt={site} className="w-full h-full object-contain p-1" />
+                                  : isAll ? '🏪' : '📍'}
+                              </span>
+                            )
+                          })()}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <p className={`font-semibold leading-none truncate ${active ? 'text-brand-blue' : ''}`}>
+                                {isAll ? 'ทุกสาขา' : site}
+                              </p>
+                              {comingSoon && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-brand-dark/10 text-brand-dark/40 uppercase tracking-wide flex-shrink-0">
+                                  เร็วๆ นี้
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-brand-dark/30 mt-0.5 font-normal">
+                              {isAll ? 'แสดงข้อมูลทั้งหมด' : comingSoon ? 'ยังไม่มีข้อมูล' : 'เฉพาะสาขานี้'}
+                            </p>
+                          </div>
+                          {active && (
+                            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-brand-blue flex items-center justify-center">
+                              <Check size={11} strokeWidth={3} className="text-white" />
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           )}
 
