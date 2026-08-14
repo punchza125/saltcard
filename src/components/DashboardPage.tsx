@@ -569,11 +569,26 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
     return { best, streak, winsTotal, total: dailyAmts.length - 1 }
   }, [reports, rangeMode])
 
-  // กำไรของช่วงที่เลือก — ต้นทุนอ้างอิงราคากล่องล่าสุดที่รับของแล้ว ณ วันนั้น
+  /**
+   * กำไรของช่วงที่เลือก — ต้นทุนอ้างอิงราคากล่องล่าสุดที่รับของแล้ว ณ วันนั้น
+   * เลือกสาขา + มีไฟล์ Transaction Details ของวันนั้น → คิดจากยอดสินค้าของสาขานั้น
+   * ไม่งั้นกำไรจะเป็นของทั้งวันทุกสาขา ทั้งที่ยอดขายด้านบนแสดงแค่สาขาเดียว
+   */
   const profit = useMemo(() => {
     if (!filteredReports.length || stockProducts.length === 0) return null
-    return calcProfit(filteredReports, stockProducts, orders, taxRate)
-  }, [filteredReports, stockProducts, orders, taxRate])
+    const src = selectedSite === 'ทั้งหมด' ? filteredReports : filteredReports.map(r => {
+      const site = txDays[r.date]?.sites[selectedSite]
+      if (!site) return r
+      return {
+        ...r,
+        goods: site.g.map(g => ({
+          goodsNumber: '', goodsName: g.n, goodsType: '',
+          salesVolume: g.v, salesAmount: g.a,
+        })),
+      }
+    })
+    return calcProfit(src, stockProducts, orders, taxRate)
+  }, [filteredReports, stockProducts, orders, taxRate, selectedSite, txDays])
 
   // เป้ากำไรรายเดือน — นับทั้งเดือนของรายงานล่าสุด ไม่ขึ้นกับช่วงที่เลือกดู
   const monthGoal = useMemo(() => {

@@ -202,7 +202,11 @@ export async function parseMachineInventory(file: File): Promise<MachineReport> 
 /**
  * ไฟล์ Transaction Details — ยอดขายรายรายการ (มี Site Name + เวลา)
  * แปลงเป็น "สรุปรายวันแยกสาขา" ทันทีตอนอ่าน ไม่เก็บ transaction ดิบ
- * เพราะดิบ ~75KB/วัน แต่สรุปแล้วเหลือ ~4KB/วัน (เล็กลง 94%)
+ * เพราะดิบ ~75KB/วัน แต่สรุปแล้วเหลือ ~2KB/วัน
+ *
+ * นับเฉพาะแถวที่ Ship Status = "Ship Success" — คือตู้จ่ายของออกไปจริง
+ * แถว "Ignore" ไม่ใช่ยอดขาย ไฟล์สรุป Multi-Report ก็ไม่นับเช่นกัน
+ * (ตรวจกับ 12 ส.ค. 2569 แล้ว: กรองแล้วได้ 35 ชิ้น ฿5,110 ตรงกับไฟล์สรุปทั้งสองสาขา)
  */
 export async function parseTransactionDetails(file: File): Promise<TxDay> {
   const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' })
@@ -216,8 +220,8 @@ export async function parseTransactionDetails(file: File): Promise<TxDay> {
   const col = (name: string) => head.indexOf(name)
   const iSite = col('Site Name'), iGoods = col('Goods Name')
   const iPrice = col('Final Price'), iTime = col('Create Time')
-  const iPay = col('Payment Type'), iRefund = col('Refund Status')
-  if ([iSite, iGoods, iPrice, iTime].some(i => i < 0))
+  const iPay = col('Payment Type'), iShip = col('Ship Status')
+  if ([iSite, iGoods, iPrice, iTime, iShip].some(i => i < 0))
     throw new Error('ไฟล์ Transaction Details ขาดคอลัมน์ที่ต้องใช้')
 
   const sites: Record<string, TxSite> = {}
@@ -230,8 +234,9 @@ export async function parseTransactionDetails(file: File): Promise<TxDay> {
     const name = String(r[iGoods] ?? '').trim()
     const time = String(r[iTime] ?? '').trim()
     if (!site || !name || !time) continue
-    // รายการที่คืนเงินแล้วไม่นับเป็นยอดขาย
-    if (iRefund >= 0 && /^refunded$/i.test(String(r[iRefund] ?? '').trim())) continue
+    // นับเฉพาะรายการที่ตู้จ่ายของออกไปจริง (Ship Success)
+    // แถวที่เป็น Ignore คือรายการที่ไม่ได้จ่ายของ ไฟล์สรุปยอดก็ไม่นับเหมือนกัน
+    if (String(r[iShip] ?? '').trim().toLowerCase() !== 'ship success') continue
 
     const amount = Number(r[iPrice]) || 0
     dates.add(time.slice(0, 10))
