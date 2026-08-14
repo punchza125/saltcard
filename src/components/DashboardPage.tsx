@@ -4,7 +4,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Sector, ReferenceLine
 } from 'recharts'
-import { ChevronLeft, ChevronRight, ChevronDown, Check, TrendingUp, Package, MapPin, Search, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, RefreshCw, TrendingUp, Package, MapPin, Search, X } from 'lucide-react'
 import type { DayReport, StockProduct } from '../types'
 import { formatThaiDate, formatThaiDateFull, formatBaht, matchesKeyword, baseGoodsName } from '../utils/parser'
 import { calcProfit } from '../lib/profit'
@@ -242,62 +242,43 @@ function BranchIcon({ site, size = 28 }: { site: string; size?: number }) {
   )
 }
 
-/** ป้ายลอยบอกสาขาที่ดูอยู่ — กดแล้วสลับสาขาได้ทันที */
+/**
+ * ป้ายลอยบอกสาขาที่ดูอยู่ — กดทีเดียวสลับไปสาขาถัดไป
+ * วนเป็นวง ทุกสาขา → สาขาที่ 1 → สาขาที่ 2 → ทุกสาขา
+ * โชว์ตลอดเพื่อให้รู้เสมอว่ากำลังดูอะไรอยู่ ตอนดูทุกสาขาใช้สีจางลงไม่ให้เด่นเกิน
+ */
 function BranchSwitcherPill({ selected, options, onSelect }: {
   selected: string
   options: string[]
   onSelect: (s: string) => void
 }) {
-  const [open, setOpen] = useState(false)
+  const cycle = ['ทั้งหมด', ...options]
+  const i = cycle.indexOf(selected)
+  const next = cycle[(i + 1) % cycle.length] ?? 'ทั้งหมด'
+  const isAll = selected === 'ทั้งหมด'
+  const label = (s: string) => (s === 'ทั้งหมด' ? 'ทุกสาขา' : s)
 
   return (
     <div className="fixed left-1/2 -translate-x-1/2 bottom-[76px] md:bottom-6 z-[90]">
-      {open && (
-        <>
-          <div className="fixed inset-0" onClick={() => setOpen(false)} />
-          {/* ตัวนอกจัดตำแหน่ง ตัวในทำอนิเมชัน — ไม่งั้น transform ของ animate-pop-in
-              จะไปทับ -translate-x-1/2 ทำให้เมนูเลื่อนหลุดขอบจอ */}
-          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 max-w-[calc(100vw-2rem)]">
-            <div className="bg-white rounded-2xl shadow-xl shadow-brand-blue/15 border border-brand-blue/10
-              overflow-hidden animate-pop-in">
-              <p className="px-3 pt-2.5 pb-1.5 text-[9px] font-bold text-brand-dark/30 uppercase tracking-widest">
-                เลือกสาขา
-              </p>
-              {['ทั้งหมด', ...options].map(site => {
-                const active = site === selected
-                return (
-                  <button
-                    key={site}
-                    onClick={() => { onSelect(site); setOpen(false) }}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors
-                      ${active ? 'bg-brand-blue/5' : 'hover:bg-brand-pale/60'}`}
-                  >
-                    <BranchIcon site={site} />
-                    <span className={`text-[12px] font-semibold flex-1 truncate ${active ? 'text-brand-blue' : 'text-brand-dark/70'}`}>
-                      {site === 'ทั้งหมด' ? 'ทุกสาขา' : site}
-                    </span>
-                    {active && (
-                      <span className="w-4 h-4 rounded-full bg-brand-blue flex items-center justify-center flex-shrink-0">
-                        <Check size={9} strokeWidth={3} className="text-white" />
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        </>
-      )}
-
       <button
-        onClick={() => setOpen(o => !o)}
-        className="relative flex items-center gap-2 rounded-full bg-brand-blue text-white
-          shadow-lg shadow-brand-blue/30 pl-1.5 pr-3 py-1.5 animate-pop-in active:scale-95 transition-transform"
-        title="กดเพื่อเปลี่ยนสาขา"
+        onClick={() => onSelect(next)}
+        title={`กดเพื่อดู ${label(next)}`}
+        className={`flex items-center gap-2 rounded-full pl-1.5 pr-2.5 py-1.5
+          shadow-lg active:scale-95 transition-all animate-pop-in ${
+            isAll
+              ? 'bg-white text-brand-dark/70 border border-brand-blue/15 shadow-brand-blue/10'
+              : 'bg-brand-blue text-white shadow-brand-blue/30'
+          }`}
       >
         <BranchIcon site={selected} />
-        <span className="text-[12px] font-semibold whitespace-nowrap">{selected}</span>
-        <ChevronDown size={13} className={`text-white/70 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <span key={selected} className="text-[12px] font-semibold whitespace-nowrap animate-pop-in">
+          {label(selected)}
+        </span>
+        <span className={`flex items-center gap-0.5 text-[10px] pl-1.5 ml-0.5 border-l ${
+          isAll ? 'border-brand-blue/15 text-brand-dark/35' : 'border-white/25 text-white/65'
+        }`}>
+          <RefreshCw size={11} />
+        </span>
       </button>
     </div>
   )
@@ -1436,8 +1417,8 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
         </div>
       </div>
 
-      {/* ป้ายลอยบอกว่ากำลังดูสาขาไหน + กดสลับสาขาได้เลย */}
-      {selectedSite !== 'ทั้งหมด' && createPortal(
+      {/* ป้ายลอยบอกว่ากำลังดูสาขาไหน — กดสลับไปสาขาถัดไปทีละอัน */}
+      {branchOptions.length > 0 && createPortal(
         <BranchSwitcherPill
           selected={selectedSite}
           options={branchOptions}
