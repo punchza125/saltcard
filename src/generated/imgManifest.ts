@@ -1,6 +1,9 @@
 // ไฟล์นี้ถูกสร้างอัตโนมัติโดย scripts/gen-img-manifest.mjs — อย่าแก้ด้วยมือ
 export const IMG_FILES: string[] = [
   "2025 Argentina national soccer team HALO series (1 Pack).jpg",
+  "Conan - CT-P10 (1 Pack).jpg",
+  "Demon Slayer - Breathing Pack Vol. 1 (1 Pack).jpg",
+  "Demon Slayer - Infinity Castle Arc (1 Pack).jpg",
   "Doraemon Nobita's Painting Adventure (1 Pack).jpg",
   "Doraemon Nobita's Painting Adventure (Box).jpg",
   "Dragon Ball FB02 (1 Pack).jpg",
@@ -28,6 +31,8 @@ export const IMG_FILES: string[] = [
   "One Piece OP-15 (Box).jpg",
   "One Piece OP-16 (1 Pack).jpg",
   "One Piece OP-16 (Box).jpg",
+  "One Piece OP-17 (1 Pack).jpg",
+  "One Piece OP-17 (Box).jpg",
   "One Piece PRB-02 (1 Pack).jpg",
   "One Piece PRB-02 (Box).jpg",
   "PANINI - FIFA World Cup 2026 - Black (1 Pack).jpg",
