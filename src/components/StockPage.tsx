@@ -1136,39 +1136,14 @@ const STATUS_BAR = {
 };
 
 /**
- * รหัสชุดของสินค้า One Piece เช่น "One Piece OP-13 (Box)" → { prefix: 'OP', num: 13 }
- * ใช้เรียงลำดับให้ OP-08 มาก่อน OP-13 ก่อน OP-16 แทนที่จะเรียงแบบตัวอักษร
- * (เรียงตัวอักษรจะได้ OP-10 มาก่อน OP-8 ซึ่งไม่ใช่ที่ต้องการ)
+ * เรียงชื่อสินค้าแบบเข้าใจตัวเลข — "OP-08" มาก่อน "OP-10"
+ * ถ้าเทียบตัวอักษรตรงๆ จะได้ OP-10 ก่อน OP-08 เพราะดูทีละตัวอักษร
+ * numeric: true บอกให้เทียบกลุ่มตัวเลขเป็นจำนวนจริง ใช้ได้กับทุกหมวด
  */
-function opSetCode(name: string): { prefix: string; num: number } | null {
-  const m = name.match(/\b([A-Z]{2,4})[-\s]?(\d{1,3})\b/i)
-  return m ? { prefix: m[1].toUpperCase(), num: Number(m[2]) } : null
-}
-
-/**
- * เรียงเฉพาะสินค้า One Piece ตามรหัสชุด โดยไม่ขยับตำแหน่งสินค้าหมวดอื่น
- * (สลับเฉพาะตัวที่อยู่ในตำแหน่งของ One Piece เดิม)
- */
-function sortOnePieceInPlace(list: StockProduct[]): StockProduct[] {
-  const slots: number[] = []
-  const items: StockProduct[] = []
-  list.forEach((p, i) => {
-    if ((p.category || "").toLowerCase().replace(/\s+/g, "") === "onepiece") {
-      slots.push(i)
-      items.push(p)
-    }
-  })
-  if (items.length < 2) return list
-  items.sort((a, b) => {
-    const ca = opSetCode(a.name), cb = opSetCode(b.name)
-    if (!ca && !cb) return a.name.localeCompare(b.name)
-    if (!ca) return 1          // ไม่มีรหัสชุด ไปอยู่ท้าย
-    if (!cb) return -1
-    return ca.prefix.localeCompare(cb.prefix) || ca.num - cb.num
-  })
-  const out = [...list]
-  slots.forEach((slot, i) => { out[slot] = items[i] })
-  return out
+function compareProductName(a: string, b: string): number {
+  // ใช้ locale en เพื่อให้ชื่อภาษาอังกฤษเรียงก่อนชื่อไทยในกลุ่มเดียวกัน
+  // (locale th จะดันชื่อไทยขึ้นหน้า เช่น "Pokemon เงามืดคุกคาม" มาก่อน "Pokemon Abyss Eye")
+  return a.localeCompare(b, "en", { numeric: true, sensitivity: "base" })
 }
 
 function ProductRow({
@@ -1794,8 +1769,8 @@ export default function StockPage({
     return statusOk && catOk;
   });
 
-  // One Piece เรียงตามรหัสชุด (OP-08 → OP-13 → OP-16) หมวดอื่นคงลำดับเดิม
-  const sorted = sortOnePieceInPlace(filtered);
+  // เรียงตามชื่อทุกหมวด และเข้าใจตัวเลขในรหัสชุด (OP-08 → OP-13 → OP-16)
+  const sorted = [...filtered].sort((a, b) => compareProductName(a.name, b.name));
 
   function handleConfirmSync() {
     withSaving(() => applySync(syncPreview, Array.from(selectedSyncDates)));
