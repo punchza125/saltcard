@@ -29,7 +29,7 @@ export interface InventorySnapshotItem {
 // ── Shared store: ประกอบจาก Firestore listener (ทุก component เห็นค่าเดียวกัน) ──
 // Firestore มี local cache + offline queue ในตัว → เขียนแล้วเห็นผลทันที (optimistic)
 // และถ้าเน็ตหลุดจะ queue ไว้ส่งเองเมื่อกลับมา
-const EMPTY: StockStore = { products: [], entries: [], syncedDates: [], taxRate: 15, monthlyProfitGoal: 40000 }
+const EMPTY: StockStore = { products: [], entries: [], syncedDates: [], taxRate: 15, monthlyProfitGoal: 40000, yearlyProfitGoals: {} }
 let _stock: StockStore = EMPTY
 const _listeners = new Set<() => void>()
 function notify() { _listeners.forEach(fn => fn()) }
@@ -53,6 +53,7 @@ function startListeners() {
       patch({
         taxRate:          m.taxRate ?? 15,
         monthlyProfitGoal: m.monthlyProfitGoal ?? 40000,
+        yearlyProfitGoals: m.yearlyProfitGoals ?? {},
         syncedDates:      m.syncedDates ?? [],
         hiddenCategories: m.hiddenCategories ?? [],
         categoryAliases:  m.categoryAliases ?? {},
@@ -138,6 +139,13 @@ export function useStockStore() {
   /** เป้ากำไรต่อเดือน (฿) */
   function setMonthlyProfitGoal(goal: number) {
     setDoc(metaRef(), { monthlyProfitGoal: goal }, { merge: true })
+  }
+
+  /** เป้ากำไรของปีใดปีหนึ่ง (฿) — ไม่ตั้ง = คิดจากเป้าเดือน × จำนวนเดือนในปีนั้น */
+  function setYearlyProfitGoal(year: string, goal: number) {
+    setDoc(metaRef(), {
+      yearlyProfitGoals: { ...(_stock.yearlyProfitGoals ?? {}), [year]: goal },
+    }, { merge: true })
   }
 
   function unhideCategory(name: string) {
@@ -371,6 +379,6 @@ export function useStockStore() {
     getPendingDates, resetSyncedDates,
     previewInventorySnapshot, applyInventorySnapshot,
     getStatus, getEntries,
-    replaceAll, setTaxRate, setMonthlyProfitGoal,
+    replaceAll, setTaxRate, setMonthlyProfitGoal, setYearlyProfitGoal,
   }
 }

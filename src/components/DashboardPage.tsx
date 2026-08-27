@@ -21,6 +21,8 @@ interface DashboardPageProps {
   taxRate?: number
   monthlyProfitGoal?: number
   onSetMonthlyGoal?: (v: number) => void
+  yearlyProfitGoals?: Record<string, number>
+  onSetYearlyGoal?: (year: string, v: number) => void
   activeBranch: string       // which branch is selected (for display only — reports are pre-filtered)
   setActiveBranch: (s: string) => void
   syncStatus?: 'idle' | 'syncing' | 'success' | 'error'
@@ -33,6 +35,36 @@ type RangeMode = 'day' | 'week' | 'month' | 'all'
 
 const TYPE_COLORS = ['#4f3dc8', '#1a52b3', '#e94560', '#f59e0b', '#10b981', '#8b5cf6', '#0ea5e9', '#14b8a6']
 const THAI_MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม']
+const THAI_MONTHS_SHORT = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']
+
+/**
+ * ปีของเป้ากำไร
+ *   ปีแรก (2569) นับ ส.ค. – ธ.ค. เพราะก่อนสิงหาคมยังไม่ได้เก็บข้อมูลกำไร
+ *   ปีถัดไปนับเป็นปีปฏิทินเต็ม ม.ค. – ธ.ค. แล้ววนใหม่ทุกวันที่ 1 ม.ค.
+ */
+const YEAR_ONE = 2026
+const YEAR_ONE_START_MONTH = 8
+
+function goalYear(date: string) {
+  const y = Number(date.slice(0, 4))
+  const m = Number(date.slice(5, 7))
+  const startMonth = y === YEAR_ONE ? YEAR_ONE_START_MONTH : 1
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const totalMonths = 12 - startMonth + 1
+  // เดือนที่เดินมาแล้วรวมเดือนปัจจุบัน เช่น อยู่ ส.ค. ของปีแรก = 1
+  const monthsElapsed = Math.min(totalMonths, Math.max(0, m - startMonth + 1))
+  const be = (y + 543) % 100
+  return {
+    key: String(y),
+    start: `${y}-${pad(startMonth)}-01`,
+    end: `${y}-12-31`,
+    totalMonths,
+    monthsElapsed,
+    monthsLeft: totalMonths - monthsElapsed,
+    label: `${THAI_MONTHS_SHORT[startMonth - 1]} – ธ.ค. ${be}`,
+  }
+}
+
 const THAI_DAYS = ['อา','จ','อ','พ','พฤ','ศ','ส']
 
 const RANK_STYLES = [
@@ -111,32 +143,110 @@ function waveBg(color: string) {
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
 }
 
-/** หลอดเป้ากำไรรายเดือน — แนวตั้งเล็กๆ ในการ์ดยอดขาย กดดูรายละเอียด/แก้เป้าได้ */
-function MonthlyGoalTube({ earned, goal, monthLabel, daysLeft, onEditGoal }: {
+/** แถบคลื่นแนวนอนในป๊อปอัปเป้า */
+function WaveBar({ pct, done }: { pct: number; done: boolean }) {
+  return (
+    <div className="relative h-6 rounded-full bg-brand-pale overflow-hidden my-2.5">
+      <div className="absolute inset-y-0 left-0 overflow-hidden transition-[width] duration-1000 ease-out"
+        style={{ width: `${Math.max(pct, 3)}%` }}>
+        <div className={`wave-body absolute inset-0 ${done
+          ? 'bg-gradient-to-r from-emerald-400 to-teal-400'
+          : 'bg-gradient-to-r from-sky-400 to-brand-blue'}`} />
+        <div className="wave-layer wave-a" style={{ backgroundImage: waveBg('#ffffff') }} />
+        <div className="wave-layer wave-b" style={{ backgroundImage: waveBg('#ffffff') }} />
+      </div>
+      <span className={`absolute inset-0 flex items-center px-2.5 text-[11px] font-bold tabular-nums ${
+        pct > 50 ? 'text-white justify-start' : 'text-brand-dark/50 justify-end'
+      }`}>{pct.toFixed(0)}%</span>
+    </div>
+  )
+}
+
+/** เป้าหนึ่งอัน (เดือน หรือ ปี) ในป๊อปอัป — ตัวเลข + หลอด + ช่องแก้เป้า */
+function GoalRow({ title, sub, earned, goal, hint, onSave }: {
+  title: string
+  sub?: string
+  earned: number
+  goal: number
+  hint: string
+  onSave?: (v: number) => void
+}) {
+  const [draft, setDraft] = useState(String(goal))
+  useEffect(() => { setDraft(String(goal)) }, [goal])
+  const pct = goal > 0 ? Math.min((earned / goal) * 100, 100) : 0
+  const done = earned >= goal
+
+  function save() {
+    const n = Number(draft)
+    if (onSave && n > 0) onSave(Math.round(n))
+  }
+
+  return (
+    <div>
+      <div className="flex items-baseline justify-between">
+        <p className="text-[13px] font-semibold text-brand-dark">{title}</p>
+        {sub && <span className="text-[10px] text-brand-dark/35">{sub}</span>}
+      </div>
+
+      <p className="text-[20px] font-bold leading-tight mt-1 mb-0.5">
+        <span className={done ? 'text-emerald-600' : 'text-brand-dark'}>
+          ฿{formatBaht(Math.round(earned))}
+        </span>
+        <span className="text-[13px] font-normal text-brand-dark/35"> / ฿{formatBaht(goal)}</span>
+      </p>
+
+      <WaveBar pct={pct} done={done} />
+
+      <p className="text-[11px] text-brand-dark/45 leading-relaxed mb-3">{hint}</p>
+
+      {onSave && (
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-brand-dark/40 flex-shrink-0">ตั้งเป้า ฿</span>
+          <input
+            type="number" inputMode="numeric"
+            className="flex-1 min-w-0 border border-brand-blue/20 rounded-xl px-3 py-2 text-[15px] outline-none focus:border-brand-blue"
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') save() }}
+          />
+          <button onClick={save}
+            className="text-[13px] font-semibold px-4 py-2 rounded-xl bg-brand-blue text-white flex-shrink-0 active:scale-95 transition-transform">
+            ตั้ง
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** หลอดเป้ากำไร — แนวตั้งเล็กๆ ในการ์ดยอดขาย กดดูรายละเอียด/แก้เป้าทั้งเดือนและปีได้ */
+function MonthlyGoalTube({ earned, goal, monthLabel, daysLeft, onEditGoal, year, yearGoal, yearGoalAuto, onEditYearGoal }: {
   earned: number
   goal: number
   monthLabel: string
   daysLeft: number
   onEditGoal?: (v: number) => void
+  year: { earned: number; label: string; monthsElapsed: number; monthsLeft: number; totalMonths: number; key: string }
+  yearGoal: number
+  /** true = ยังไม่ได้ตั้งเอง กำลังคิดจากเป้าเดือน × จำนวนเดือน */
+  yearGoalAuto: boolean
+  onEditYearGoal?: (year: string, v: number) => void
 }) {
   const [open, setOpen] = useState(false)
-  const [draft, setDraft] = useState(String(goal))
   const pct = goal > 0 ? Math.min((earned / goal) * 100, 100) : 0
   const done = earned >= goal
   const remain = Math.max(0, goal - earned)
 
-  function save() {
-    const n = Number(draft)
-    if (onEditGoal && n > 0) onEditGoal(Math.round(n))
-    setOpen(false)
-  }
+  const yearPct = yearGoal > 0 ? Math.min((year.earned / yearGoal) * 100, 100) : 0
+  const yearDone = year.earned >= yearGoal
+  const yearRemain = Math.max(0, yearGoal - year.earned)
 
   return (
     <div className="relative flex flex-col items-center justify-between py-0.5">
       <button
-        onClick={() => { setDraft(String(goal)); setOpen(o => !o) }}
+        onClick={() => setOpen(o => !o)}
         className="flex flex-col items-center gap-1 h-full group"
-        title={`เป้ากำไร${monthLabel} ฿${formatBaht(Math.round(earned))} / ฿${formatBaht(goal)}`}
+        title={`เป้ากำไร${monthLabel} ฿${formatBaht(Math.round(earned))} / ฿${formatBaht(goal)}\nเป้าปี ${year.label} ฿${formatBaht(Math.round(year.earned))} / ฿${formatBaht(yearGoal)}`}
       >
         <span className="text-[8px] font-medium text-white/50 leading-none">เป้า</span>
         {/* หลอดน้ำแนวตั้ง — น้ำขึ้นจากล่าง */}
@@ -151,70 +261,62 @@ function MonthlyGoalTube({ earned, goal, monthLabel, daysLeft, onEditGoal }: {
             <div className="wave-layer wave-a" style={{ backgroundImage: waveBg('#ffffff') }} />
             <div className="wave-layer wave-b" style={{ backgroundImage: waveBg('#ffffff') }} />
           </div>
+          {/* ขีดบอกความคืบหน้าของเป้าปี ซ้อนบนหลอดเดียวกัน */}
+          <div className="absolute inset-x-0 h-[2px] bg-white/80 shadow-[0_0_3px_rgba(0,0,0,0.4)] transition-[bottom] duration-1000 ease-out"
+            style={{ bottom: `${yearPct}%` }} />
         </div>
         <span className={`text-[9px] font-bold tabular-nums leading-none ${done ? 'text-emerald-300' : 'text-white/80'}`}>
           {pct.toFixed(0)}%
+        </span>
+        <span className={`text-[8px] font-medium tabular-nums leading-none ${yearDone ? 'text-emerald-300' : 'text-white/45'}`}>
+          ปี {yearPct.toFixed(0)}%
         </span>
       </button>
 
       {open && createPortal(
         <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-black/40"
           onClick={() => setOpen(false)}>
-          <div className="bg-white w-full md:max-w-xs rounded-t-3xl md:rounded-2xl shadow-2xl p-5 pb-7 md:pb-5"
+          <div className="bg-white w-full md:max-w-xs rounded-t-3xl md:rounded-2xl shadow-2xl p-5 pb-7 md:pb-5 max-h-[85vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[13px] font-semibold text-brand-dark">เป้ากำไร{monthLabel}</p>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[13px] font-bold text-brand-dark">เป้ากำไร</p>
               <button onClick={() => setOpen(false)}
                 className="w-7 h-7 rounded-lg flex items-center justify-center text-brand-dark/30 hover:bg-brand-pale">
                 <X size={15} />
               </button>
             </div>
 
-            <p className="text-[20px] font-bold leading-tight mb-0.5">
-              <span className={done ? 'text-emerald-600' : 'text-brand-dark'}>
-                ฿{formatBaht(Math.round(earned))}
-              </span>
-              <span className="text-[13px] font-normal text-brand-dark/35"> / ฿{formatBaht(goal)}</span>
-            </p>
-
-            <div className="relative h-6 rounded-full bg-brand-pale overflow-hidden my-2.5">
-              <div className="absolute inset-y-0 left-0 overflow-hidden transition-[width] duration-1000 ease-out"
-                style={{ width: `${Math.max(pct, 3)}%` }}>
-                <div className={`wave-body absolute inset-0 ${done
-                  ? 'bg-gradient-to-r from-emerald-400 to-teal-400'
-                  : 'bg-gradient-to-r from-sky-400 to-brand-blue'}`} />
-                <div className="wave-layer wave-a" style={{ backgroundImage: waveBg('#ffffff') }} />
-                <div className="wave-layer wave-b" style={{ backgroundImage: waveBg('#ffffff') }} />
-              </div>
-              <span className={`absolute inset-0 flex items-center px-2.5 text-[11px] font-bold tabular-nums ${
-                pct > 50 ? 'text-white justify-start' : 'text-brand-dark/50 justify-end'
-              }`}>{pct.toFixed(0)}%</span>
-            </div>
-
-            <p className="text-[11px] text-brand-dark/45 leading-relaxed mb-3">
-              {done
+            <GoalRow
+              title={`เดือน${monthLabel.trim()}`}
+              earned={earned}
+              goal={goal}
+              hint={done
                 ? `ถึงเป้าแล้ว เกินมา ฿${formatBaht(Math.round(earned - goal))} 🎉`
                 : daysLeft > 0
                   ? `เหลืออีก ฿${formatBaht(Math.round(remain))} · ${daysLeft} วัน · เฉลี่ยวันละ ฿${formatBaht(Math.round(remain / daysLeft))}`
                   : `เหลืออีก ฿${formatBaht(Math.round(remain))}`}
-            </p>
+              onSave={onEditGoal}
+            />
 
-            {onEditGoal && (
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-brand-dark/40 flex-shrink-0">ตั้งเป้า ฿</span>
-                <input
-                  type="number" inputMode="numeric"
-                  className="flex-1 min-w-0 border border-brand-blue/20 rounded-xl px-3 py-2 text-[15px] outline-none focus:border-brand-blue"
-                  value={draft}
-                  onChange={e => setDraft(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setOpen(false) }}
-                />
-                <button onClick={save}
-                  className="text-[13px] font-semibold px-4 py-2 rounded-xl bg-brand-blue text-white flex-shrink-0 active:scale-95 transition-transform">
-                  ตั้ง
-                </button>
-              </div>
-            )}
+            <div className="h-px bg-brand-pale my-4" />
+
+            <GoalRow
+              title="เป้าปีนี้"
+              sub={`${year.label} · เดือนที่ ${year.monthsElapsed}/${year.totalMonths}`}
+              earned={year.earned}
+              goal={yearGoal}
+              hint={yearDone
+                ? `ถึงเป้าปีแล้ว เกินมา ฿${formatBaht(Math.round(year.earned - yearGoal))} 🎉`
+                : year.monthsLeft > 0
+                  ? `เหลืออีก ฿${formatBaht(Math.round(yearRemain))} · ${year.monthsLeft} เดือน · เฉลี่ยเดือนละ ฿${formatBaht(Math.round(yearRemain / year.monthsLeft))}`
+                  : `เหลืออีก ฿${formatBaht(Math.round(yearRemain))} · เดือนสุดท้ายของปีแล้ว`}
+              onSave={onEditYearGoal && (v => onEditYearGoal(year.key, v))}
+            />
+
+            <p className="text-[10px] text-brand-dark/35 leading-relaxed mt-3">
+              {yearGoalAuto && <>เป้าปีคิดจากเป้าเดือน ฿{formatBaht(goal)} × {year.totalMonths} เดือน — ตั้งเองทับได้<br /></>}
+              ปีนี้นับ ส.ค. – ธ.ค. 69 เพราะก่อนสิงหาคมยังไม่มีข้อมูลกำไร · ปีถัดไปนับ ม.ค. – ธ.ค. ตามปฏิทิน แล้วเริ่มใหม่ทุก 1 ม.ค. · ตัวเลขเป็นกำไรรวมทุกสาขา ไม่ขึ้นกับสาขาที่เลือกดู
+            </p>
           </div>
         </div>,
         document.body,
@@ -479,9 +581,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   )
 }
 
-export default function DashboardPage({ reports: allReports, stockProducts = [], taxRate = 15, monthlyProfitGoal = 40000, onSetMonthlyGoal, activeBranch, setActiveBranch, syncStatus, lastSynced, categoryAliases = {} }: DashboardPageProps) {
+export default function DashboardPage({ reports: allReports, stockProducts = [], taxRate = 15, monthlyProfitGoal = 40000, onSetMonthlyGoal, yearlyProfitGoals = {}, onSetYearlyGoal, activeBranch, setActiveBranch, syncStatus, lastSynced, categoryAliases = {} }: DashboardPageProps) {
   const { orders } = useOrderStore()
-  const { days: txDays, load: loadTx } = useTxStore()
+  const { days: txDays, loaded: txLoaded, load: loadTx } = useTxStore()
   const [goodsMetric, setGoodsMetric] = useState<'amount' | 'profit'>('amount')
   const [goodsDetail, setGoodsDetail] = useState<string | null>(null)
   // กรองตามสาขาที่เลือก — 'ทั้งหมด' รวมทุกสาขา (ใช้ area total), ไม่งั้นดึงเฉพาะ site ที่ตรงชื่อ
@@ -640,35 +742,69 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
    */
   const profit = useMemo(() => {
     if (!filteredReports.length || stockProducts.length === 0) return null
-    const src = selectedSite === 'ทั้งหมด' ? filteredReports : filteredReports.map(r => {
+
+    if (selectedSite === 'ทั้งหมด') {
+      const p = calcProfit(filteredReports, stockProducts, orders, taxRate)
+      return p && { ...p, days: filteredReports.length, totalDays: filteredReports.length }
+    }
+
+    // รายสาขาต้องใช้ยอดจากไฟล์ Transaction Details เท่านั้น
+    // วันไหนไม่มีไฟล์ก็ข้ามไป — ห้ามเอายอดรวมทุกสาขามาคิดแทน ไม่งั้นกำไรจะบวมเป็นของสาขาอื่นด้วย
+    if (!txLoaded) return null
+    const src: DayReport[] = []
+    let missing = 0
+    for (const r of filteredReports) {
       const site = txDays[r.date]?.sites[selectedSite]
-      if (!site) return r
-      return {
+      if (!site) {
+        // วันที่สาขาขายได้จริงแต่ไม่มีไฟล์ = ข้อมูลหาย ต้องเตือน
+        // ส่วนวันที่สาขายอด 0 ข้ามเงียบ ๆ ได้ เพราะไม่มีอะไรให้นับอยู่แล้ว
+        if (siteAmt(r, selectedSite) > 0) missing++
+        continue
+      }
+      src.push({
         ...r,
         goods: site.g.map(g => ({
           goodsNumber: '', goodsName: g.n, goodsType: '',
           salesVolume: g.v, salesAmount: g.a,
         })),
-      }
-    })
-    return calcProfit(src, stockProducts, orders, taxRate)
-  }, [filteredReports, stockProducts, orders, taxRate, selectedSite, txDays])
+      })
+    }
+    const p = calcProfit(src, stockProducts, orders, taxRate)
+    return p && { ...p, days: src.length, totalDays: src.length + missing }
+  }, [filteredReports, stockProducts, orders, taxRate, selectedSite, txDays, txLoaded])
 
-  // เป้ากำไรรายเดือน — นับทั้งเดือนของรายงานล่าสุด ไม่ขึ้นกับช่วงที่เลือกดู
+  // เป้ากำไรรายเดือน + รายปีร้าน — เป็นตัวเลขของทั้งร้านเสมอ
+  // ใช้ allReports ไม่ใช่ reports เพราะเป้าเป็นของร้าน ไม่ใช่ของสาขาที่เลือกดูอยู่
   const monthGoal = useMemo(() => {
-    if (!reports.length) return null
-    const lastDate = reports[reports.length - 1].date
+    if (!allReports.length) return null
+    const sorted = [...allReports].sort((a, b) => a.date.localeCompare(b.date))
+    const lastDate = sorted[sorted.length - 1].date
     const ym = lastDate.slice(0, 7)
-    const inMonth = reports.filter(r => r.date.startsWith(ym))
+    const inMonth = sorted.filter(r => r.date.startsWith(ym))
     const p = calcProfit(inMonth, stockProducts, orders, taxRate)
     const y = Number(ym.slice(0, 4)), m = Number(ym.slice(5, 7))
     const lastDay = new Date(y, m, 0).getDate()
+
+    // ปีของเป้า — ปีแรก ส.ค.–ธ.ค. 69 หลังจากนั้นเป็นปีปฏิทิน
+    const fy = goalYear(lastDate)
+    const inYear = sorted.filter(r => r.date >= fy.start && r.date <= fy.end)
+    const py = calcProfit(inYear, stockProducts, orders, taxRate)
+
     return {
       earned: p?.total ?? 0,
       monthLabel: ` ${THAI_MONTHS[m - 1]}`,
       daysLeft: Math.max(0, lastDay - Number(lastDate.slice(8, 10))),
+      year: {
+        earned: py?.total ?? 0,
+        label: fy.label,
+        monthsElapsed: fy.monthsElapsed,
+        monthsLeft: fy.monthsLeft,
+        totalMonths: fy.totalMonths,
+        key: fy.key,
+        days: inYear.length,
+      },
     }
-  }, [reports, stockProducts, orders, taxRate])
+  }, [allReports, stockProducts, orders, taxRate])
 
   // สาขาทั้งหมดที่เคยมีข้อมูล — ใช้ในป้ายลอยสำหรับสลับสาขา
   const branchOptions = useMemo(
@@ -950,7 +1086,14 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
       <div className="px-4 md:px-6 grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         <StatCard label="ยอดขายรวม" value={`฿${formatBaht(stats.totalAmount)}`} sub={activeBranch !== 'ทั้งหมด' ? activeBranch : `${filteredReports.length} วัน`} sub2={cumulativeTotal != null ? `สะสม ณ วันนี้ ฿${formatBaht(cumulativeTotal)}` : undefined} accent icon={<TrendingUp size={12} />} delay={0} animKey={currentIdx}
           valueSuffix={profit && (
-            <>กำไร <b className="font-semibold text-white/90">฿{formatBaht(Math.round(profit.total))}</b> · {profit.marginPct.toFixed(1)}%</>
+            <>
+              กำไร <b className="font-semibold text-white/90">฿{formatBaht(Math.round(profit.total))}</b> · {profit.marginPct.toFixed(1)}%
+              {profit.days < profit.totalDays && (
+                <span className="text-amber-200" title={`ขาดไฟล์แยกสาขา ${profit.totalDays - profit.days} วัน — กำไรนับเฉพาะวันที่มีข้อมูล`}>
+                  {' '}⚠ {profit.days}/{profit.totalDays} วัน
+                </span>
+              )}
+            </>
           )}
           side={monthGoal && (
             <MonthlyGoalTube
@@ -959,6 +1102,10 @@ export default function DashboardPage({ reports: allReports, stockProducts = [],
               monthLabel={monthGoal.monthLabel}
               daysLeft={monthGoal.daysLeft}
               onEditGoal={onSetMonthlyGoal}
+              year={monthGoal.year}
+              yearGoal={yearlyProfitGoals[monthGoal.year.key] ?? monthlyProfitGoal * monthGoal.year.totalMonths}
+              yearGoalAuto={yearlyProfitGoals[monthGoal.year.key] == null}
+              onEditYearGoal={onSetYearlyGoal}
             />
           )} />
         <StatCard label="จำนวนชิ้น" value={`${stats.totalVolume.toLocaleString()}`} sub={`เฉลี่ย ฿${formatBaht(stats.avgPerPiece)}/ชิ้น`} icon={<Package size={12} />} delay={50} animKey={currentIdx} />
