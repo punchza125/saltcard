@@ -11,7 +11,7 @@ import { calcProfit } from '../lib/profit'
 import { useOrderStore } from '../hooks/useOrderStore'
 import { useTxStore } from '../hooks/useTxStore'
 import StatCard from './StatCard'
-import { IMG_FILES } from '../generated/imgManifest'
+import { productImageCandidates } from '../lib/productImages'
 import { categoryLogo } from '../lib/categoryLogos'
 import { branchBadge } from '../lib/branchLogos'
 
@@ -73,42 +73,8 @@ const RANK_STYLES = [
   { bg: '#8b5cf6', text: '#fff' },
 ]
 
-/**
- * ลำดับรูปที่จะลองโหลดสำหรับสินค้าในรายงานขาย
- * สินค้า [Promotion] ใช้รูปปกติของสินค้านั้น (ตัดคำว่า promotion ออกก่อนค้น)
- */
-// ชื่อไฟล์รูปจริง (จาก manifest) → คีย์ที่ตัดช่องว่าง/ตัวพิมพ์ออก
-// กันเคสไฟล์ตั้งชื่อไม่ตรงเป๊ะ เช่น "Attack Of The Vine - Set 13(1 Pack).jpg"
-// ขณะที่รายงานเขียนว่า "Attack of the Vine - Set 13 (1 Pack)"
-const IMG_BY_KEY: Record<string, string> = (() => {
-  const map: Record<string, string> = {}
-  for (const f of IMG_FILES) {
-    const key = f.replace(/\.(jpe?g|png|webp)$/i, '').toLowerCase().replace(/\s+/g, '')
-    if (!(key in map)) map[key] = f
-  }
-  return map
-})()
-
-function goodsImageCandidates(name: string): string[] {
-  const base = name
-    .replace(/^\[Promotion\]\s*/i, '')
-    .replace(/^Promotion\s*-\s*/i, '')
-    .replace(/\s*\(Promotion\)\s*$/i, '')
-    .trim()
-  // สินค้า promotion ใช้ "รูปปกติ" ของสินค้านั้นก่อน แล้วค่อย fallback เป็นชื่อเต็ม
-  const names: string[] = base !== name ? [base, name] : [name]
-  for (const b of [...names]) {
-    if (!/\((1 Pack|Box)\)\s*$/i.test(b)) names.push(`${b} (1 Pack)`)
-    const noBox = b.replace(/\s*\(Box\)\s*$/i, '')
-    if (noBox !== b) names.push(`${noBox} (1 Pack)`)
-  }
-  const out: string[] = []
-  for (const n of names) {
-    const hit = IMG_BY_KEY[n.toLowerCase().replace(/\s+/g, '')]
-    if (hit) out.push(`/Img/${hit}`)
-  }
-  return [...new Set(out)]
-}
+/** ลำดับรูปที่จะลองโหลดสำหรับสินค้าในรายงานขาย — ดูกติกาใน lib/productImages */
+const goodsImageCandidates = (name: string) => productImageCandidates(name)
 
 /** รูปสินค้าเล็กในรายการขายดี — ลองหลายชื่อ ถ้าไม่เจอเลยแสดงกล่องเปล่า */
 function GoodsThumb({ name, delay = 0 }: { name: string; delay?: number }) {

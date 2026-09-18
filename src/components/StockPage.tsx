@@ -40,6 +40,7 @@ import {
 import OrdersTab from "./OrdersTab";
 import { useOrderStore } from "../hooks/useOrderStore";
 import { categoryLogo } from "../lib/categoryLogos";
+import { productImageCandidates } from "../lib/productImages";
 import {
   costDetailOn,
   costTimeline,
@@ -1179,17 +1180,12 @@ function ProductRow({
   const total = product.qty + incomingPacks;
   const [open, setOpen] = useState(false);
   const [imgIdx, setImgIdx] = useState(0);
-  const imgCandidates = useMemo(() => {
-    // ถ้าชื่อสินค้ามี "(1 Pack)" หรือ "(Box)" อยู่แล้ว ใช้ชื่อตรงๆ ไม่เติมซ้ำ
-    const hasUnitSuffix = /\((1 Pack|Box)\)\s*$/i.test(product.name);
-    const list = [
-      `/Img/${product.name}.jpg`,
-      ...(hasUnitSuffix ? [] : [`/Img/${product.name} (1 Pack).jpg`]),
-      ...(resolvedGoodsName ? [`/Img/${resolvedGoodsName}.jpg`] : []),
-    ];
-    // deduplicate
-    return [...new Set(list)];
-  }, [product.name, resolvedGoodsName]);
+  // หารูปจาก manifest ของ public/Img — ไม่ต่อ path ตรงๆ เพราะชื่อที่มี /
+  // (เช่น 2026/27) หรือตัวพิมพ์ไม่ตรงจะกลายเป็น URL ที่หาไม่เจอ
+  const imgCandidates = useMemo(
+    () => productImageCandidates(product.name, resolvedGoodsName),
+    [product.name, resolvedGoodsName],
+  );
 
   const barMax = Math.max(total, product.yellowAt + (ppb > 0 ? ppb : 1));
   const qtyPct = Math.min((product.qty / barMax) * 100, 100);
