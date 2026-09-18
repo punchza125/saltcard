@@ -413,7 +413,21 @@ function GoodsDetailModal({ name, reports, onClose }: {
     }))
     const dowMax = Math.max(...dowAvg.map(x => x.avg), 0)
 
+    // ราคาขายล่าสุด — ดูจากวันล่าสุดที่ขายได้จริง ไม่ขึ้นกับช่วงที่เลือก
+    // วันนั้นอาจขายทั้งราคาปกติและ [Promotion] → ใช้ราคาปกติเป็นหลัก
+    const lastReport = [...reports].reverse().find(r =>
+      r.goods.some(x => baseGoodsName(x.goodsName) === name && x.salesVolume > 0))
+    const lastRows = lastReport?.goods.filter(x =>
+      baseGoodsName(x.goodsName) === name && x.salesVolume > 0) ?? []
+    const lastRow = lastRows.find(x => x.goodsName === name) ?? lastRows[0]
+    const latestPrice = lastRow && lastReport ? {
+      price: lastRow.salesAmount / lastRow.salesVolume,
+      date: lastReport.date,
+      promo: lastRow.goodsName !== name,
+    } : null
+
     return {
+      latestPrice,
       rows: rows.map(d => ({ ...d, label: formatThaiDate(d.date) })),
       totalVol, totalAmt, best, first,
       avgPerDay: daysInRange.length ? totalVol / daysInRange.length : 0,
@@ -464,14 +478,20 @@ function GoodsDetailModal({ name, reports, onClose }: {
           ) : (
             <>
               {/* สรุป */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                 {[
                   { l: 'ขายได้', v: `${data.totalVol} ชิ้น` },
                   { l: 'ยอดขาย', v: `฿${formatBaht(data.totalAmt)}` },
                   { l: 'เฉลี่ยต่อวัน', v: `${data.avgPerDay.toFixed(1)} ชิ้น/วัน`, sub: `เฉลี่ยจากช่วง ${data.rangeDays} วัน` },
                   { l: 'วันที่ดีที่สุด', v: `฿${formatBaht(data.best.amount)}`, sub: formatThaiDate(data.best.date) },
-                ].map(x => (
-                  <div key={x.l} className="rounded-xl bg-brand-pale/50 px-3 py-2">
+                  ...(data.latestPrice ? [{
+                    l: 'ราคาขายล่าสุด',
+                    v: `฿${formatBaht(Math.round(data.latestPrice.price))}/ชิ้น`,
+                    sub: `${formatThaiDate(data.latestPrice.date)}${data.latestPrice.promo ? ' · ราคาโปรฯ' : ''}`,
+                    wide: true,
+                  }] : []),
+                ].map((x: { l: string; v: string; sub?: string; wide?: boolean }) => (
+                  <div key={x.l} className={`rounded-xl bg-brand-pale/50 px-3 py-2 ${x.wide ? 'col-span-2 md:col-span-1' : ''}`}>
                     <p className="text-[9px] text-brand-dark/40 mb-0.5">{x.l}</p>
                     <p className="text-[14px] font-bold text-brand-dark leading-tight">{x.v}</p>
                     {x.sub && <p className="text-[9px] text-brand-dark/35 mt-0.5">{x.sub}</p>}
