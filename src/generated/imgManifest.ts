@@ -8,6 +8,8 @@ export const IMG_FILES: string[] = [
   "Doraemon Nobita's Painting Adventure (Box).jpg",
   "Dragon Ball FB02 (1 Pack).jpg",
   "Dragon Ball FB09 (1 Pack).jpg",
+  "Futera - Liverpool 1998 Fan's Selection.jpg",
+  "Futera - Manchester United 1997 Fan's Selection (1 Pack).jpg",
   "Naruto Kayou Earth scroll vol.1 (1 Pack).jpg",
   "Naruto Kayou Earth scroll vol.1 EN (Box).jpg",
   "Naruto Kayou Earth scroll vol.2 (1 Pack).jpg",
@@ -56,6 +58,7 @@ export const IMG_FILES: string[] = [
   "Promotion - One Piece OP-15 (1 Pack).jpg",
   "Toploader - Blue (30 แผ่น).jpg",
   "Toploader - White (30 แผ่น).jpg",
+  "Topps - Premier League 2026:27 (1 Pack).jpg",
   "ZBG-RAV11090046-SP.webp",
   "[EN] Lorcana Attack Of The Vine - Set 13(1 Pack).jpg",
   "[JP] Lorcana Attack of the Vine - Set 13 (1 Pack).jpg",
@@ -68,7 +71,8 @@ export const IMG_FILES: string[] = [
   "[JP] Lorcana Wilds Unknown - Set 12 (1 Pack).jpg",
   "[Promotion] One Piece OP-13 (1 Pack).jpg",
   "[Promotion] One Piece OP-16 (1 Pack).jpg",
-  "[Promotion] PANINI - FIFA World Cup 2026 - Black (1 Pack).jpg"
+  "[Promotion] PANINI - FIFA World Cup 2026 - Black (1 Pack).jpg",
+  "[TH] Pokemon 30th Anniversary Celebration.jpg"
 ]
 
 export const LOGO_FILES: string[] = [
