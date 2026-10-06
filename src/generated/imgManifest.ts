@@ -69,10 +69,13 @@ export const IMG_FILES: string[] = [
   "[JP] Lorcana The First Chapter - Set 1 (1 Pack).jpg",
   "[JP] Lorcana Ursula's Return - Set 4 (1 Pack).jpg",
   "[JP] Lorcana Wilds Unknown - Set 12 (1 Pack).jpg",
+  "[JP] Pokemon 30th Anniversary Celebration (1 Pack).jpg",
+  "[JP] Pokemon 30th Anniversary Celebration (Box).jpg",
   "[Promotion] One Piece OP-13 (1 Pack).jpg",
   "[Promotion] One Piece OP-16 (1 Pack).jpg",
   "[Promotion] PANINI - FIFA World Cup 2026 - Black (1 Pack).jpg",
-  "[TH] Pokemon 30th Anniversary Celebration.jpg"
+  "[TH] Pokemon 30th Anniversary Celebration (1 Pack).jpg",
+  "[TH] Pokemon 30th Anniversary Celebration (Box).jpg"
 ]
 
 export const LOGO_FILES: string[] = [
