@@ -69,6 +69,12 @@ export interface StockProduct {
   buyPricePerBox?: number
   /** ประวัติต้นทุนที่กรอกเอง — เรียงตาม from จากเก่าไปใหม่ */
   costRates?: CostRate[]
+  /**
+   * เก็บเข้าคลัง — ซ่อนจากรายการสต็อกปกติแต่ไม่ได้ลบ
+   * ใช้กับสินค้าที่เลิกขาย/หมดแล้ว ข้อมูลยอดขายย้อนหลังยังอยู่ครบ กลับมาเปิดใหม่ได้ตลอด
+   */
+  archived?: boolean
+  archivedAt?: string   // YYYY-MM-DD
 }
 
 export type EntryKind = 'in' | 'received' | 'incoming' | 'out' | 'auto' | 'adjust'

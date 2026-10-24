@@ -123,6 +123,14 @@ export function useStockStore() {
     if (patchData.category) unhideCategory(patchData.category)
   }
 
+  /** เก็บเข้าคลัง / เอากลับมาขาย — ไม่ได้ลบ ข้อมูลยังอยู่ครบ */
+  function setArchived(id: string, archived: boolean) {
+    updateProduct(id, {
+      archived,
+      archivedAt: archived ? new Date().toISOString().slice(0, 10) : undefined,
+    })
+  }
+
   async function removeProduct(id: string) {
     const b = writeBatch(db())
     b.delete(productRef(id))
@@ -374,7 +382,7 @@ export function useStockStore() {
 
   return {
     stock,
-    addProduct, updateProduct, removeProduct, removeCategory, mergeCategory, logEntry,
+    addProduct, updateProduct, removeProduct, setArchived, removeCategory, mergeCategory, logEntry,
     previewSync, applySync, previewSyncProduct, applySyncProduct,
     getPendingDates, resetSyncedDates,
     previewInventorySnapshot, applyInventorySnapshot,

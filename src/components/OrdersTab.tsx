@@ -1,14 +1,15 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Plus, Package, CheckCircle2, Clock, Truck,
   ChevronDown, X, Pencil, Trash2, Search,
-  Cloud, CloudOff, RefreshCw, Loader2, Copy, ExternalLink, Check, Plane,
+  Cloud, CloudOff, RefreshCw, Loader2, Copy, ExternalLink, Check, Plane, Package2,
 } from 'lucide-react'
 import type { PurchaseOrder, OrderItem, OrderStatus, StockProduct, OrderMember, CarrierId, ShipMethod } from '../types'
 import { ORDER_MEMBERS, CARRIERS } from '../types'
 import { useOrderStore } from '../hooks/useOrderStore'
 import { formatThaiDate } from '../utils/parser'
+import { productImageCandidates } from '../lib/productImages'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -462,8 +463,8 @@ function OrderCard({
         {order.items.map((item, i) => {
           const product = products.find(p => p.id === item.productId)
           return (
-            <div key={i} className="flex items-center gap-1.5 text-[11px]">
-              <span className="w-1 h-1 rounded-full bg-brand-dark/20 flex-shrink-0" />
+            <div key={i} className="flex items-center gap-2 text-[11px] py-0.5">
+              <OrderItemThumb name={item.name} productName={product?.name} />
               <span className="text-brand-dark/70 flex-1 truncate">{item.name}</span>
               <span className="font-semibold text-brand-dark flex-shrink-0">
                 {item.qty} {item.unit}
@@ -525,6 +526,29 @@ function OrderCard({
 // ── OrdersTab (main) ─────────────────────────────────────────────────────────
 
 type FilterTab = 'all' | 'pending' | 'received'
+
+/** รูปสินค้าในรายการสั่งซื้อ — ไม่มีรูปก็แสดงกล่องจางๆ แทน ไม่ให้แถวเลื่อน */
+function OrderItemThumb({ name, productName }: { name: string; productName?: string }) {
+  const srcs = useMemo(() => productImageCandidates(name, productName), [name, productName])
+  const [idx, setIdx] = useState(0)
+  if (idx >= srcs.length) {
+    return (
+      <span className="w-8 h-8 rounded-lg bg-brand-dark/[0.04] flex items-center justify-center flex-shrink-0">
+        <Package2 size={12} className="text-brand-dark/20" />
+      </span>
+    )
+  }
+  return (
+    <img
+      key={srcs[idx]}
+      src={srcs[idx]}
+      alt={name}
+      loading="lazy"
+      onError={() => setIdx(i => i + 1)}
+      className="w-8 h-8 rounded-lg object-contain bg-white ring-1 ring-brand-dark/5 flex-shrink-0"
+    />
+  )
+}
 
 export default function OrdersTab({ products }: {
   products: StockProduct[]

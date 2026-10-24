@@ -30,11 +30,13 @@ const IMG_BY_KEY: Record<string, string> = (() => {
   return map
 })()
 
+/** ตัดคำกำกับที่ไม่เกี่ยวกับตัวสินค้าออก เช่น [Promotion] หรือ (Pre) ของสินค้าพรีออเดอร์ */
 function promotionBase(name: string): string {
   return name
     .replace(/^\[Promotion\]\s*/i, '')
     .replace(/^Promotion\s*-\s*/i, '')
     .replace(/\s*\(Promotion\)\s*$/i, '')
+    .replace(/\s*\((?:pre|pre-?order|พรี(?:ออเดอร์)?)\)\s*$/i, '')
     .trim()
 }
 

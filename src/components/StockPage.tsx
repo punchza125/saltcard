@@ -19,6 +19,8 @@ import {
   Truck,
   Loader2,
   Plane,
+  Archive,
+  RotateCcw,
 } from "lucide-react";
 import type {
   StockProduct,
@@ -1152,6 +1154,7 @@ function ProductRow({
   resolvedGoodsName,
   onEdit,
   onDelete,
+  onToggleArchive,
   onSync,
   pendingSyncCount,
   readOnly,
@@ -1161,6 +1164,7 @@ function ProductRow({
   resolvedGoodsName: string | null;
   onEdit: () => void;
   onDelete: () => void;
+  onToggleArchive: () => void;
   onSync: () => void;
   pendingSyncCount: number;
   readOnly?: boolean;
@@ -1392,12 +1396,25 @@ function ProductRow({
             );
           })()}
           {!readOnly && (
-            <button
-              onClick={onDelete}
-              className="mt-1 flex items-center gap-1 text-[11px] text-red-400 hover:text-red-600"
-            >
-              <Trash2 size={11} /> ลบสินค้านี้
-            </button>
+            <div className="mt-1 flex items-center gap-3 flex-wrap">
+              {/* เก็บเข้าคลังแทนการลบ — ข้อมูลยอดขายย้อนหลังยังอยู่ครบ */}
+              <button
+                onClick={onToggleArchive}
+                className="flex items-center gap-1 text-[11px] text-brand-dark/45 hover:text-brand-blue transition-colors"
+              >
+                {product.archived ? (
+                  <><RotateCcw size={11} /> เอากลับมาขาย</>
+                ) : (
+                  <><Archive size={11} /> เก็บเข้าคลัง</>
+                )}
+              </button>
+              <button
+                onClick={onDelete}
+                className="flex items-center gap-1 text-[11px] text-red-400 hover:text-red-600"
+              >
+                <Trash2 size={11} /> ลบถาวร
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -1497,6 +1514,7 @@ export default function StockPage({
     addProduct,
     updateProduct,
     removeProduct,
+    setArchived,
     removeCategory,
     mergeCategory,
     logEntry,
@@ -1543,7 +1561,9 @@ export default function StockPage({
 
   const [showAdd, setShowAdd] = useState(false);
   const [editTarget, setEditTarget] = useState<StockProduct | null>(null);
-  const [filter, setFilter] = useState<"all" | "red" | "yellow" | "green">(
+  const [filter, setFilter] = useState<
+    "all" | "red" | "yellow" | "green" | "archived"
+  >(
     "all",
   );
   const [catFilter, setCatFilter] = useState<string>("ทั้งหมด");
@@ -1742,19 +1762,25 @@ export default function StockPage({
     [syncProduct, reports, stock],
   );
 
+  // สินค้าที่เก็บเข้าคลังไม่นับรวมในสถิติและไม่โชว์ในรายการปกติ
+  const active = stock.products.filter((p) => !p.archived);
+  const archivedList = stock.products.filter((p) => p.archived);
+
   const counts = {
-    red: stock.products.filter((p) => {
+    red: active.filter((p) => {
       const s = getStatus(p);
       return s === "red" || s === "empty";
     }).length,
-    yellow: stock.products.filter((p) => getStatus(p) === "yellow").length,
-    green: stock.products.filter((p) => getStatus(p) === "green").length,
+    yellow: active.filter((p) => getStatus(p) === "yellow").length,
+    green: active.filter((p) => getStatus(p) === "green").length,
+    archived: archivedList.length,
   };
 
-  const filtered = stock.products.filter((p) => {
+  const filtered = (filter === "archived" ? archivedList : active).filter((p) => {
     const s = getStatus(p);
     const statusOk =
       filter === "all" ||
+      filter === "archived" ||
       (filter === "red" && (s === "red" || s === "empty")) ||
       s === filter;
     const catOk =
@@ -2013,18 +2039,20 @@ export default function StockPage({
         {/* status filter + add */}
         <div className="flex gap-1.5 items-center flex-wrap">
           {/* ไม่มีปุ่ม "บันทึกสต๊อก" แล้ว — Firestore บันทึกให้อัตโนมัติทุกการแก้ไข */}
-          {(["all", "red", "yellow", "green"] as const).map((f) => {
+          {(["all", "red", "yellow", "green", "archived"] as const).map((f) => {
             const labels = {
               all: `ทั้งหมด`,
               red: `หมด/กำลังจะหมด`,
               yellow: `ใกล้หมด`,
               green: `ปกติ`,
+              archived: `เก็บไว้`,
             };
             const badges = {
               all: counts.red + counts.yellow + counts.green,
               red: counts.red,
               yellow: counts.yellow,
               green: counts.green,
+              archived: counts.archived,
             };
             const colors = {
               all:
@@ -2043,6 +2071,10 @@ export default function StockPage({
                 filter === "green"
                   ? "bg-emerald-500 text-white border-transparent"
                   : "bg-white text-emerald-600 border-emerald-200",
+              archived:
+                filter === "archived"
+                  ? "bg-brand-dark text-white border-transparent"
+                  : "bg-white text-brand-dark/50 border-brand-dark/15",
             };
             if (f !== "all" && badges[f] === 0) return null;
             return (
@@ -2052,7 +2084,7 @@ export default function StockPage({
                 className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all border ${colors[f]}`}
               >
                 {f === "all"
-                  ? `${labels[f]} ${stock.products.length}`
+                  ? `${labels[f]} ${active.length}`
                   : `${labels[f]} ${badges[f]}`}
               </button>
             );
@@ -2104,6 +2136,9 @@ export default function StockPage({
                   resolvedGoodsName={resolveGoodsName(p)}
                   onEdit={() => setEditTarget(p)}
                   onDelete={() => withSaving(() => removeProduct(p.id))}
+                  onToggleArchive={() =>
+                    withSaving(() => setArchived(p.id, !p.archived))
+                  }
                   onSync={() => setSyncProduct(p)}
                   pendingSyncCount={pendingForProduct}
                   readOnly={readOnly}
