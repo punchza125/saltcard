@@ -63,29 +63,29 @@ export function costTimeline(product: StockProduct, orders: PurchaseOrder[]): Co
 /**
  * ต้นทุนต่อกล่องที่มีผล ณ วันที่กำหนด
  * = จุดเปลี่ยนล่าสุดที่ยังไม่เกินวันนั้น ถ้าไม่มีเลย → ราคาซื้อตั้งต้นของสินค้า
+ * ถ้าไม่มีราคาตั้งต้นด้วย → ต้นทุนแรกสุดที่รู้ (เช่น ขายก่อนวันที่กด "รับของ" กล่องแรก)
+ * — หลักเดียวกับหน้าแก้ไขสินค้า: ค่าแรกสุดครอบทุกวันย้อนหลัง ไม่งั้นยอดขายก่อนหน้าจะกลายเป็น "ไม่รู้ต้นทุน"
  */
 export function costPerBoxOn(
   product: StockProduct,
   date: string,
   orders: PurchaseOrder[],
 ): number | undefined {
-  let hit: CostPoint | undefined
-  for (const p of costTimeline(product, orders)) {
-    if (p.from <= date) hit = p
-    else break
-  }
-  return hit?.perBox ?? product.buyPricePerBox
+  return costDetailOn(product, date, orders).perBox
 }
 
 /** ต้นทุนที่มีผล ณ วันนั้น พร้อมบอกว่ามาจากไหน */
 export function costDetailOn(product: StockProduct, date: string, orders: PurchaseOrder[]):
   { perBox?: number; source: CostSource } {
+  const timeline = costTimeline(product, orders)
   let hit: CostPoint | undefined
-  for (const p of costTimeline(product, orders)) {
+  for (const p of timeline) {
     if (p.from <= date) hit = p
     else break
   }
   if (hit) return { perBox: hit.perBox, source: hit.source }
+  if (product.buyPricePerBox != null && product.buyPricePerBox > 0) return { perBox: product.buyPricePerBox, source: 'default' }
+  if (timeline.length) return { perBox: timeline[0].perBox, source: timeline[0].source }   // before the first known cost: use that first cost
   return { perBox: product.buyPricePerBox, source: 'default' }
 }
 

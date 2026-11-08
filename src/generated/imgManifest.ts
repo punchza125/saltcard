@@ -60,6 +60,7 @@ export const IMG_FILES: string[] = [
   "Promotion - Dragon Ball FB09 (1 Pack).jpg",
   "Promotion - One Piece OP-13 (1 Pack).jpg",
   "Promotion - One Piece OP-15 (1 Pack).jpg",
+  "Riftbound - Radiance (1 Pack).jpg",
   "Toploader - Blue (30 แผ่น).jpg",
   "Toploader - White (30 แผ่น).jpg",
   "Topps - Match Attax 2026: 27 (1 Pack).jpg",
